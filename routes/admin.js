@@ -113,12 +113,18 @@ router.delete('/api/items/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Manual sync
+// Manual sync — always resets error state so deactivated items can retry
 router.post('/api/items/:id/sync', requireAuth, async (req, res) => {
   try {
+    await db.query(
+      `UPDATE monitored_items SET is_active = TRUE, retry_count = 0,
+       last_error = NULL, last_error_date = NULL WHERE id = $1`,
+      [req.params.id]
+    );
     const { rows } = await db.query('SELECT * FROM monitored_items WHERE id = $1', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Item not found' });
     const result = await syncItem(rows[0]);
+    if (result.error) return res.status(502).json(result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

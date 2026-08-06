@@ -22,6 +22,7 @@
     <div class="nav-inner">
       <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Item Tracker</span>
       <div class="nav-right">
+        <button id="tzToggle" class="btn btn-ghost btn-sm">TCT</button>
         <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">Auto-Refresh: Off</button>
       </div>
     </div>
@@ -32,46 +33,56 @@
     <!-- LEFT SIDEBAR: Filters -->
     <aside class="sidebar-left">
 
+      <!-- Item search: always visible -->
       <div class="glass-card sidebar-section item-search-card">
         <div class="section-title">Item</div>
         <div class="search-wrap">
           <input id="itemSearch" type="text" placeholder="Search item name…" autocomplete="off" />
           <div id="autocomplete" class="autocomplete hidden"></div>
         </div>
-        <div class="field-row">
-          <label>Item ID</label>
-          <input id="itemIdInput" type="number" placeholder="e.g. 206" />
-        </div>
+        <input id="itemIdInput" type="hidden" />
       </div>
 
-      <div class="glass-card sidebar-section">
-        <div class="section-title">Date Range</div>
-        <div class="field-row">
-          <label>From</label>
-          <input id="startDate" type="date" />
-        </div>
-        <div class="field-row">
-          <label>To</label>
-          <input id="endDate" type="date" />
-        </div>
-        <div class="day-nav">
-          <button id="prevDay" class="btn btn-ghost btn-sm">← Prev</button>
-          <button id="nextDay" class="btn btn-ghost btn-sm">Next →</button>
-        </div>
-        <div class="field-row">
-          <label>Start Time</label>
-          <input id="startTime" type="time" value="00:00" />
-        </div>
-        <div class="field-row">
-          <label>End Time</label>
-          <input id="endTime" type="time" value="23:59" />
-        </div>
-        <div class="btn-row">
-          <button id="applyFilters" class="btn btn-primary btn-sm btn-full">Apply</button>
-          <button id="resetFilters" class="btn btn-ghost btn-sm btn-full">Reset</button>
-        </div>
+      <!-- Quick nav: always visible (prev/apply/next) -->
+      <div class="filter-quick-nav">
+        <button id="prevDay" class="btn btn-ghost btn-sm">← Prev</button>
+        <button id="applyFilters" class="btn btn-primary btn-sm" style="flex:1;justify-content:center">Apply</button>
+        <button id="nextDay" class="btn btn-ghost btn-sm">Next →</button>
       </div>
 
+      <!-- Mobile-only collapse toggle -->
+      <button class="filter-toggle-row" id="filterToggle">
+        <span class="filter-toggle-label">⚙ Date / Time</span>
+        <span class="filter-toggle-icon" id="filterToggleIcon">▾</span>
+      </button>
+
+      <!-- Collapsible body: date/time details -->
+      <div class="filter-collapse-body" id="filterCollapseBody">
+
+        <div class="glass-card sidebar-section">
+          <div class="section-title">Date Range</div>
+          <div class="field-row">
+            <label>From</label>
+            <input id="startDate" type="date" />
+          </div>
+          <div class="field-row">
+            <label>To</label>
+            <input id="endDate" type="date" />
+          </div>
+          <div class="field-row">
+            <label>Start Time</label>
+            <input id="startTime" type="time" value="00:00" />
+          </div>
+          <div class="field-row">
+            <label>End Time</label>
+            <input id="endTime" type="time" value="23:59" />
+          </div>
+          <div class="btn-row">
+            <button id="resetFilters" class="btn btn-ghost btn-sm btn-full">Reset</button>
+          </div>
+        </div>
+
+      </div><!-- /filter-collapse-body -->
     </aside>
 
     <!-- MAIN: Chart -->
@@ -85,9 +96,9 @@
           </div>
           <div class="timeframe-btns">
             <button class="tf-btn" data-tf="1m">1m</button>
-            <button class="tf-btn" data-tf="5m">5m</button>
+            <button class="tf-btn active" data-tf="5m">5m</button>
             <button class="tf-btn" data-tf="15m">15m</button>
-            <button class="tf-btn active" data-tf="30m">30m</button>
+            <button class="tf-btn" data-tf="30m">30m</button>
             <button class="tf-btn" data-tf="1h">1h</button>
             <button class="tf-btn" data-tf="day">1D</button>
           </div>
@@ -122,8 +133,14 @@
 
     </main>
 
-    <!-- RIGHT SIDEBAR: Calculator + Best Items -->
-    <aside class="sidebar-right">
+    <!-- RIGHT SIDEBAR: Calculator + Best Items (desktop) / Drawer (mobile) -->
+    <aside class="sidebar-right" id="toolsDrawer">
+
+      <!-- Mobile drawer close button (hidden on desktop) -->
+      <div class="drawer-header">
+        <span class="section-title" style="margin:0">Tools</span>
+        <button class="drawer-close-btn" id="closeDrawer">✕</button>
+      </div>
 
       <div class="glass-card sidebar-section">
         <div class="section-title">Profit Calculator</div>
@@ -171,6 +188,51 @@
     </aside>
   </div>
 
+  <!-- Mobile: overlay backdrop + floating action button -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <button class="tools-fab" id="toolsFab" aria-label="Open tools">
+    <span class="fab-icon">$</span>
+  </button>
+
   <script src="app.js"></script>
+  <script>
+    (function () {
+      /* ── Filter collapse (mobile only) ── */
+      var filterToggle = document.getElementById('filterToggle');
+      var filterBody   = document.getElementById('filterCollapseBody');
+      var filterIcon   = document.getElementById('filterToggleIcon');
+
+      filterToggle.addEventListener('click', function () {
+        var open = filterBody.classList.toggle('open');
+        filterIcon.textContent = open ? '▴' : '▾';
+      });
+
+      /* ── Tools drawer (mobile only) ── */
+      var toolsFab    = document.getElementById('toolsFab');
+      var toolsDrawer = document.getElementById('toolsDrawer');
+      var overlay     = document.getElementById('drawerOverlay');
+      var closBtn     = document.getElementById('closeDrawer');
+
+      function openTools() {
+        toolsDrawer.classList.add('drawer-open');
+        overlay.classList.add('visible');
+        toolsFab.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeTools() {
+        toolsDrawer.classList.remove('drawer-open');
+        overlay.classList.remove('visible');
+        toolsFab.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      toolsFab.addEventListener('click', function () {
+        toolsDrawer.classList.contains('drawer-open') ? closeTools() : openTools();
+      });
+      overlay.addEventListener('click', closeTools);
+      closBtn.addEventListener('click', closeTools);
+    })();
+  </script>
 </body>
 </html>

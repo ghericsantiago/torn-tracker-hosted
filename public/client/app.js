@@ -6,8 +6,20 @@
   let currentData    = [];
   let activeChart    = null;
   let chartType      = 'line';
-  let timeframe      = '30m';
+  let timeframe      = '5m';
   let autoRefresh    = null;
+  let displayTZ      = 'utc'; // 'utc' = TCT, 'local' = browser
+  let awaitingSell   = false; // chart click: true = next click sets sell price
+
+  function getZone() {
+    return displayTZ === 'utc' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+
+  function formatDateTime(isoStr) {
+    const dt = luxon.DateTime.fromISO(isoStr, { zone: getZone() });
+    const label = displayTZ === 'utc' ? 'TCT' : 'Local';
+    return dt.toFormat('yyyy-MM-dd HH:mm') + ' ' + label;
+  }
 
   const tfIntervalMap = {
     '1m': '1 minute', '5m': '5 minutes', '15m': '15 minutes',
@@ -28,10 +40,40 @@
     status.classList.add('hidden');
   }
 
+  const tfBucketMs = {
+    '1m': 60000, '5m': 300000, '15m': 900000,
+    '30m': 1800000, '1h': 3600000, 'day': 86400000,
+  };
+
+  function aggregateByTimeframe(rows) {
+    const ms = tfBucketMs[timeframe] || 1800000;
+    const buckets = new Map();
+    rows.forEach(r => {
+      const t = Math.floor(new Date(r.created_at).getTime() / ms) * ms;
+      if (!buckets.has(t)) buckets.set(t, []);
+      buckets.get(t).push(r);
+    });
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([t, recs]) => {
+        const last = recs[recs.length - 1];
+        const avgP = recs.reduce((s, r) => s + Number(r.average_price), 0) / recs.length;
+        return {
+          created_at:    new Date(t).toISOString(),
+          price:         Number(last.price),
+          average_price: avgP,
+          quantity:      Number(last.quantity),
+          item_id:       last.item_id,
+          name:          last.name,
+        };
+      });
+  }
+
   function buildChartDatasets(rows) {
-    const lowestOffer = rows.map(r => ({ x: new Date(r.created_at), y: Number(r.price) }));
-    const avgPrice    = rows.map(r => ({ x: new Date(r.created_at), y: Number(r.average_price) }));
-    const quantity    = rows.map(r => ({ x: new Date(r.created_at), y: Number(r.quantity) }));
+    const agg = aggregateByTimeframe(rows);
+    const lowestOffer = agg.map(r => ({ x: new Date(r.created_at), y: r.price }));
+    const avgPrice    = agg.map(r => ({ x: new Date(r.created_at), y: r.average_price }));
+    const quantity    = agg.map(r => ({ x: new Date(r.created_at), y: r.quantity }));
     return { lowestOffer, avgPrice, quantity };
   }
 
@@ -137,6 +179,7 @@
         scales: {
           x: {
             type: 'time',
+            adapters: { date: { zone: getZone() } },
             ticks: { color: '#64748b', maxTicksLimit: 8 },
             grid:  { color: 'rgba(255,255,255,0.04)' },
           },
@@ -166,8 +209,7 @@
         onClick: (e, elements) => {
           if (!elements.length) return;
           const el = elements[0];
-          // ignore clicks on the quantity bars
-          if (el.datasetIndex === 2) return;
+          if (el.datasetIndex === 2) return; // ignore quantity line
           const clickedPrice = el.datasetIndex === 0
             ? lowestOffer[el.index]?.y
             : avgPrice[el.index]?.y;
@@ -175,22 +217,19 @@
 
           const buyEl    = document.getElementById('buyPrice');
           const targetEl = document.getElementById('targetPrice');
-          const buy    = parseFloat(buyEl.value)    || 0;
-          const target = parseFloat(targetEl.value) || 0;
 
-          if (target && buy) {
-            if (clickedPrice > target)      targetEl.value = clickedPrice;
-            else if (clickedPrice < buy)    buyEl.value    = clickedPrice;
-            else                            buyEl.value    = clickedPrice;
-          } else if (buy && !target) {
-            if (clickedPrice > buy)  targetEl.value = clickedPrice;
-            else { targetEl.value = buyEl.value; buyEl.value = clickedPrice; }
+          if (!awaitingSell) {
+            // First click: set buy price, wait for sell
+            buyEl.value    = clickedPrice;
+            targetEl.value = '';
+            autoCalc = false; // don't overwrite target with break-even
+            awaitingSell = true;
           } else {
-            buyEl.value = clickedPrice;
+            // Second click: set sell price, calculate profit
+            targetEl.value = clickedPrice;
+            autoCalc = false;
+            awaitingSell = false;
           }
-
-          autoCalc = !target;
-          updateBreakEven();
           calcProfit();
         },
       },
@@ -203,9 +242,7 @@
     div.style.display = 'block';
     if (activeChart) { activeChart.destroy(); activeChart = null; }
 
-    // Group into OHLC buckets client-side
-    const bucketMs = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, 'day': 86400000 };
-    const ms = bucketMs[timeframe] || 1800000;
+    const ms = tfBucketMs[timeframe] || 1800000;
     const buckets = {};
     rows.forEach(r => {
       const t = Math.floor(new Date(r.created_at).getTime() / ms) * ms;
@@ -220,7 +257,7 @@
       close: prices[prices.length - 1],
     }));
 
-    AmCharts.useUTC = false;
+    AmCharts.useUTC = displayTZ === 'utc';
     AmCharts.makeChart('candlestickChart', {
       type: 'serial',
       theme: 'dark',
@@ -248,7 +285,7 @@
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = rows.slice().reverse().slice(0, 200).map(r => `
       <tr>
-        <td>${new Date(r.created_at).toLocaleString()}</td>
+        <td>${formatDateTime(r.created_at)}</td>
         <td>${r.item_id}</td>
         <td>${r.name || '—'}</td>
         <td>$${Number(r.average_price).toLocaleString()}</td>
@@ -278,7 +315,7 @@
       if (rows.length) {
         const last = rows[rows.length - 1];
         document.getElementById('displayName').textContent  = last.name || `Item #${currentItemId}`;
-        document.getElementById('displayPrice').textContent = `$${Number(last.price).toLocaleString()} · ${new Date(last.created_at).toLocaleString()}`;
+        document.getElementById('displayPrice').textContent = `$${Number(last.price).toLocaleString()} · ${formatDateTime(last.created_at)}`;
       }
     } catch (e) {
       showStatus('Failed to load data');
@@ -408,12 +445,23 @@
     return d ? `${d}T${t}:00` : '';
   }
 
+  // Torn City operates on UTC — returns "YYYY-MM-DD" in UTC
+  function tornToday() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function initDates() {
+    const today = tornToday();
+    document.getElementById('startDate').value = today;
+    document.getElementById('endDate').value   = today;
+    document.getElementById('startTime').value = '00:00';
+    document.getElementById('endTime').value   = '23:59';
+  }
+
   document.getElementById('applyFilters').addEventListener('click', fetchData);
 
   document.getElementById('resetFilters').addEventListener('click', () => {
-    ['startDate','endDate','startTime','endTime'].forEach(id => {
-      document.getElementById(id).value = id === 'startTime' ? '00:00' : id === 'endTime' ? '23:59' : '';
-    });
+    initDates();
     fetchData();
   });
 
@@ -453,6 +501,21 @@
     const el = document.getElementById('dataTable');
     const hidden = el.classList.toggle('hidden');
     this.textContent = hidden ? 'Show Data Table' : 'Hide Data Table';
+  });
+
+  // ── Timezone toggle ──
+  document.getElementById('tzToggle').addEventListener('click', function () {
+    displayTZ = displayTZ === 'utc' ? 'local' : 'utc';
+    this.textContent = displayTZ === 'utc' ? 'TCT' : 'Local';
+    this.classList.toggle('btn-primary', displayTZ === 'local');
+    this.classList.toggle('btn-ghost',   displayTZ === 'utc');
+    renderChart(currentData);
+    updateTable(currentData);
+    if (currentData.length) {
+      const last = currentData[currentData.length - 1];
+      document.getElementById('displayPrice').textContent =
+        `$${Number(last.price).toLocaleString()} · ${formatDateTime(last.created_at)}`;
+    }
   });
 
   // ── Auto-refresh ──
@@ -523,7 +586,8 @@
   });
 
   document.getElementById('resetCalc').addEventListener('click', () => {
-    autoCalc = true;
+    autoCalc    = false;
+    awaitingSell = false;
     document.getElementById('buyPrice').value    = '';
     document.getElementById('targetPrice').value = '';
     document.getElementById('txFee').value       = '5';
@@ -531,6 +595,7 @@
   });
 
   // ── Init ──
+  initDates();
   loadBestItems();
   showStatus('Select an item to view market data');
 })();

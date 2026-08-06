@@ -11,12 +11,27 @@ function resolveUrl(url) {
   return url;
 }
 
+// Torn API errors that are transient and should NOT count as item failures
+const RATE_LIMIT_CODES = new Set([5, 8, 14]);
+
+class TornApiError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'TornApiError';
+    this.code = code;
+    this.isRateLimit = RATE_LIMIT_CODES.has(code);
+  }
+}
+
 async function tornFetch(url) {
   const resolved = resolveUrl(url);
   const res = await fetch(resolved, { timeout: 15000 });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  if (data.error) throw new Error(`Torn API: ${data.error.error}`);
+  if (data.error) {
+    const { code, error: msg } = data.error;
+    throw new TornApiError(code, `Torn API [${code}]: ${msg}`);
+  }
   return data;
 }
 
@@ -71,4 +86,4 @@ async function fetchAllTornItems(apiKey) {
   return list;
 }
 
-module.exports = { fetchItemMarket, fetchPointsMarket, fetchAllTornItems, POINT_MARKET_ID };
+module.exports = { fetchItemMarket, fetchPointsMarket, fetchAllTornItems, POINT_MARKET_ID, TornApiError };

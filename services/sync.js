@@ -1,7 +1,12 @@
 const db = require('../db');
-const { fetchItemMarket, fetchPointsMarket, POINT_MARKET_ID } = require('./torn');
+const { fetchItemMarket, fetchPointsMarket, POINT_MARKET_ID, TornApiError } = require('./torn');
 
 const MAX_RETRIES = 5;
+const PACE_MS     = 700; // ~85 req/min max, safely under the 100/min per-user limit
+
+let syncRunning = false; // prevent overlapping cron runs
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function syncItem(item) {
   const { id, torn_item_id, api_key } = item;
@@ -17,7 +22,9 @@ async function syncItem(item) {
     );
     if (latest.rows.length && Number(latest.rows[0].price) === Number(data.price)) {
       await db.query(
-        'UPDATE monitored_items SET last_sync = NOW() WHERE id = $1',
+        `UPDATE monitored_items
+         SET last_sync = NOW(), retry_count = 0, last_error = NULL, last_error_date = NULL
+         WHERE id = $1`,
         [id]
       );
       return { skipped: true };
@@ -29,16 +36,22 @@ async function syncItem(item) {
       [data.item_id, data.name, data.type, data.price, data.average_price, data.quantity]
     );
 
-    // Update item name + reset error state
     await db.query(
       `UPDATE monitored_items
-       SET name = $1, last_sync = NOW(), retry_count = 0, last_error = NULL, last_error_date = NULL
+       SET name = $1, last_sync = NOW(), retry_count = 0, last_error = NULL, last_error_date = NULL,
+           is_active = TRUE
        WHERE id = $2`,
       [data.name, id]
     );
 
     return { inserted: true };
   } catch (err) {
+    // Rate limit / IP block / daily cap — transient, do NOT penalise the item
+    if (err instanceof TornApiError && err.isRateLimit) {
+      console.warn(`[sync] Rate limited on item ${id} (code ${err.code}) — skipping this cycle`);
+      return { rateLimited: true };
+    }
+
     const newCount = (item.retry_count || 0) + 1;
     const deactivate = newCount > MAX_RETRIES;
     await db.query(
@@ -53,23 +66,39 @@ async function syncItem(item) {
 }
 
 async function syncAllItems() {
-  const { rows } = await db.query(
-    `SELECT * FROM monitored_items
-     WHERE is_active = TRUE AND retry_count <= $1
-     ORDER BY last_sync ASC NULLS FIRST`,
-    [MAX_RETRIES]
-  );
-
-  let inserted = 0, skipped = 0, errors = 0;
-  for (const item of rows) {
-    const result = await syncItem(item);
-    if (result.inserted) inserted++;
-    else if (result.skipped) skipped++;
-    else errors++;
+  if (syncRunning) {
+    console.warn('[sync] Previous run still in progress — skipping this tick');
+    return;
   }
+  syncRunning = true;
 
-  if (rows.length > 0) {
-    console.log(`[sync] ${new Date().toISOString()} — ${rows.length} items: +${inserted} inserted, ${skipped} skipped, ${errors} errors`);
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM monitored_items
+       WHERE is_active = TRUE
+          OR (last_error IS NOT NULL AND last_error_date < NOW() - INTERVAL '1 hour')
+       ORDER BY last_sync ASC NULLS FIRST`
+    );
+
+    let inserted = 0, skipped = 0, errors = 0, rateLimited = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const result = await syncItem(rows[i]);
+      if (result.inserted)    inserted++;
+      else if (result.skipped)     skipped++;
+      else if (result.rateLimited) rateLimited++;
+      else                         errors++;
+
+      // Pace requests — skip delay after the last item
+      if (i < rows.length - 1) await sleep(PACE_MS);
+    }
+
+    if (rows.length > 0) {
+      const parts = [`+${inserted} inserted`, `${skipped} skipped`, `${errors} errors`];
+      if (rateLimited) parts.push(`${rateLimited} rate-limited`);
+      console.log(`[sync] ${new Date().toISOString()} — ${rows.length} items: ${parts.join(', ')}`);
+    }
+  } finally {
+    syncRunning = false;
   }
 }
 
