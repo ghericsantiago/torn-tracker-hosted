@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torn Tracker — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
+      <div class="nav-right">
+        <a href="/" target="_blank" class="btn btn-ghost btn-sm">View Client</a>
+        <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Settings</button>
+        <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="dashboard">
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="glass-card stat-card">
+        <div class="stat-value" id="statActive">—</div>
+        <div class="stat-label">Active Items</div>
+      </div>
+      <div class="glass-card stat-card clickable" id="filterInactiveCard">
+        <div class="stat-value" id="statInactive">—</div>
+        <div class="stat-label">Inactive</div>
+      </div>
+      <div class="glass-card stat-card clickable" id="filterErrorCard">
+        <div class="stat-value error-color" id="statErrors">—</div>
+        <div class="stat-label">Errors</div>
+      </div>
+      <div class="glass-card stat-card">
+        <div class="stat-value" id="statRecords">—</div>
+        <div class="stat-label">Total Records</div>
+      </div>
+      <div class="glass-card stat-card">
+        <div class="stat-value mono" id="statLastSync">—</div>
+        <div class="stat-label">Last Sync</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+
+      <!-- Add item form -->
+      <div class="glass-card add-card">
+        <h2>Add Item to Monitor</h2>
+        <form id="addForm">
+          <div class="field">
+            <label>Torn API Key</label>
+            <input id="addApiKey" type="text" placeholder="Your Torn API key" required />
+          </div>
+          <div class="field">
+            <label>Item Name</label>
+            <div class="ac-wrap">
+              <input id="addItemSearch" type="text" placeholder="Search by name…" autocomplete="off" />
+              <div id="addItemAc" class="ac-dropdown hidden"></div>
+            </div>
+            <div id="selectedChips" class="selected-chips"></div>
+          </div>
+          <div id="addError" class="error-msg hidden"></div>
+          <button type="submit" class="btn btn-primary">Add Item</button>
+        </form>
+      </div>
+
+      <!-- Items table -->
+      <div class="glass-card table-card">
+        <div class="table-header">
+          <h2>Monitored Items</h2>
+          <div class="table-controls">
+            <input id="tableSearch" type="text" placeholder="Search by ID or name…" class="table-search" />
+            <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="itemsTable">
+            <thead>
+              <tr>
+                <th class="sortable" data-col="torn_item_id">Item ID <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-col="name">Name <span class="sort-icon">↕</span></th>
+                <th>Status</th>
+                <th class="sortable" data-col="latest_price">Latest Price <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-col="last_sync">Last Sync <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-col="retry_count">Retries <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-col="record_count">Records <span class="sort-icon">↕</span></th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody">
+              <tr><td colspan="8" class="loading-cell">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+    </div>
+
+    <!-- Setup modal (forced on first login) -->
+    <div id="setupModal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="glass-card modal-card setup-modal-card">
+        <div class="setup-modal-top">
+          <div class="setup-icon">🔑</div>
+          <h3>Setup Required</h3>
+          <p class="setup-desc">Enter your Torn API key to enable item search and market tracking. This key will be stored securely and used as the default for all item monitoring.</p>
+        </div>
+        <div class="field">
+          <label>Torn API Key</label>
+          <input id="setupApiKey" type="text" placeholder="Your Torn API key" autocomplete="off" />
+        </div>
+        <div id="setupError" class="error-msg hidden"></div>
+        <button id="setupSave" class="btn btn-primary btn-full">Save & Continue</button>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-overlay" id="settingsOverlay"></div>
+      <div class="glass-card modal-card settings-modal-card">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="btn-close" id="closeSettings">&times;</button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Item Database</div>
+          <div class="sync-section">
+            <div class="sync-info">
+              <span class="sync-count" id="syncCount">— items in DB</span>
+              <span class="sync-time"  id="syncTime"></span>
+            </div>
+            <button id="syncItemsBtn" class="btn btn-ghost btn-sm">Sync Items</button>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Data Retention</div>
+          <p class="settings-desc">Automatically delete market records older than the specified number of days. Set to 0 to keep all data.</p>
+          <div class="retention-row">
+            <span class="retention-hint">Keep last</span>
+            <input id="retentionDays" type="number" min="0" step="1" placeholder="∞" class="retention-input" />
+            <span class="retention-hint">days</span>
+          </div>
+          <div class="retention-actions">
+            <button id="saveRetentionBtn" class="btn btn-ghost btn-sm">Save</button>
+            <button id="runCleanupBtn"    class="btn btn-ghost btn-sm">Run Cleanup Now</button>
+          </div>
+          <span class="sync-time" id="cleanupTime"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error detail modal -->
+    <div id="errorModal" class="modal hidden">
+      <div class="modal-overlay" id="modalOverlay"></div>
+      <div class="glass-card modal-card">
+        <div class="modal-header">
+          <h3>Error Details</h3>
+          <button class="btn-close" id="closeModal">&times;</button>
+        </div>
+        <pre id="errorDetail" class="error-detail mono"></pre>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
