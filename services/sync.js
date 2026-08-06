@@ -44,9 +44,9 @@ async function syncItem(item) {
     await db.query(
       `UPDATE monitored_items
        SET retry_count = $1, last_error = $2, last_error_date = NOW(),
-           is_active = CASE WHEN $3 = 1 THEN 0 ELSE is_active END
+           is_active = CASE WHEN $3 = TRUE THEN FALSE ELSE is_active END
        WHERE id = $4`,
-      [newCount, err.message, deactivate ? 1 : 0, id]
+      [newCount, err.message, deactivate, id]
     );
     return { error: err.message, deactivated: deactivate };
   }

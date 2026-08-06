@@ -250,8 +250,8 @@ router.get('/api/stats', requireAuth, async (req, res) => {
   try {
     const [totals, records] = await Promise.all([
       db.query(`SELECT
-        SUM(CASE WHEN is_active  = 1 THEN 1 ELSE 0 END) AS active,
-        SUM(CASE WHEN is_active != 1 THEN 1 ELSE 0 END) AS inactive,
+        SUM(CASE WHEN is_active = TRUE     THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN is_active IS NOT TRUE THEN 1 ELSE 0 END) AS inactive,
         SUM(CASE WHEN last_error IS NOT NULL THEN 1 ELSE 0 END) AS errors,
         MAX(last_sync) AS last_sync
         FROM monitored_items`),
