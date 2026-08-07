@@ -20,9 +20,8 @@ app.use(session({
   cookie:            { secure: false, maxAge: 8 * 60 * 60 * 1000 }, // 8h
 }));
 
-// Static files
+// Static files — /torn/ intentionally excluded so auth middleware in routes/torn.js applies
 app.use('/admin',  express.static(path.join(__dirname, 'public/admin')));
-app.use('/torn',   express.static(path.join(__dirname, 'public/torn')));
 app.use('/',       express.static(path.join(__dirname, 'public/client')));
 
 // Routes

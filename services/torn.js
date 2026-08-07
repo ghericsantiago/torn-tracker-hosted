@@ -133,8 +133,9 @@ async function fetchUserLogPage(url, apiKey) {
   return { entries, prevUrl };
 }
 
-function buildUserLogUrl(apiKey, logTypes) {
-  return `${TORN_BASE}/v2/user/log?log=${logTypes.join(',')}&limit=100&sort=desc&key=${apiKey}`;
+// log=0 returns all log types; limit=1000 is the max per page
+function buildUserLogUrl(apiKey) {
+  return `${TORN_BASE}/v2/user/log?log=0&limit=1000&sort=desc&key=${apiKey}`;
 }
 
 module.exports = {

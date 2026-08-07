@@ -6,22 +6,7 @@ const {
   fetchUserLogPage, buildUserLogUrl,
   POINT_MARKET_ID, TornApiError,
 } = require('./torn');
-
-const BUY_TYPES  = [1103, 1112, 1220, 1225, 4201, 4200];
-const SELL_TYPES = [1104, 1113, 1221, 1226, 4210, 4220];
-const ALL_LOG_TYPES = [...BUY_TYPES, ...SELL_TYPES];
-
-const BUY_TYPE_SET  = new Set(BUY_TYPES);
-const SELL_TYPE_SET = new Set(SELL_TYPES);
-
-const SOURCE_MAP = {
-  1103: 'item_market',   1104: 'item_market',
-  1112: 'npc',           1113: 'npc',
-  1220: 'bazaar',        1221: 'bazaar',
-  1225: 'trade',         1226: 'trade',
-  4200: 'points_market', 4201: 'points_market',
-  4210: 'points_market', 4220: 'points_market',
-};
+const { processLots } = require('./lot-processor');
 
 const INVENTORY_CATEGORIES = [
   'Alcohol', 'Artifact', 'Booster', 'Candy', 'Clothing', 'Defensive',
@@ -45,13 +30,28 @@ async function setSyncState(key, value) {
   );
 }
 
+async function retryOnRateLimit(fn, label) {
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err instanceof TornApiError && err.isRateLimit) {
+        console.warn(`[portfolio] Rate limited on ${label} — waiting 60s`);
+        await sleep(60_000);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 async function syncItemCatalog(apiKey) {
   console.log('[portfolio] Updating item catalog...');
-  const items = await fetchAllTornItems(apiKey);
+  const items = await retryOnRateLimit(() => fetchAllTornItems(apiKey), 'item catalog');
 
   // Patch in live Points price
   try {
-    const pts = await fetchPointsMarket(apiKey);
+    const pts = await retryOnRateLimit(() => fetchPointsMarket(apiKey), 'points market');
     const ptsItem = items.find(i => i.id === POINT_MARKET_ID);
     if (ptsItem) ptsItem.market_price = pts.price;
   } catch (err) {
@@ -70,15 +70,26 @@ async function syncItemCatalog(apiKey) {
 }
 
 async function syncLogs(apiKey) {
-  const lastTs   = await getSyncState('last_log_ts');
-  const stopAt   = lastTs ? Number(lastTs) : 0;
+  const lastTs     = await getSyncState('last_log_ts');
+  const stopAt     = lastTs ? Number(lastTs) : 0;
   const isBackfill = !lastTs;
 
-  console.log(isBackfill
-    ? '[portfolio] First run — full backfill of buy/sell logs'
-    : `[portfolio] Incremental log sync from ${new Date(stopAt * 1000).toISOString()}`);
+  let url;
+  if (isBackfill) {
+    const savedCursor = await getSyncState('backfill_cursor');
+    if (savedCursor) {
+      url = savedCursor.includes('key=') ? savedCursor : `${savedCursor}&key=${apiKey}`;
+      console.log('[portfolio] Resuming backfill from checkpoint');
+    } else {
+      url = buildUserLogUrl(apiKey);
+      console.log('[portfolio] First run — full backfill of all logs');
+    }
+  } else {
+    url = buildUserLogUrl(apiKey);
+    console.log(`[portfolio] Incremental sync from ${new Date(stopAt * 1000).toISOString()}`);
+  }
 
-  let url      = buildUserLogUrl(apiKey, ALL_LOG_TYPES);
+  let backfillMaxTs = isBackfill ? Number(await getSyncState('backfill_max_ts') || 0) : 0;
   let inserted = 0;
   let pages    = 0;
   let newMaxTs = 0;
@@ -92,7 +103,7 @@ async function syncLogs(apiKey) {
       if (err instanceof TornApiError && err.isRateLimit) {
         console.warn(`[portfolio] Rate limited (code ${err.code}) — waiting 60s`);
         await sleep(60_000);
-        continue; // retry same url
+        continue;
       }
       throw err;
     }
@@ -102,46 +113,43 @@ async function syncLogs(apiKey) {
     for (const entry of entries) {
       const ts      = entry.timestamp;
       const logType = entry.details?.id;
-      const item    = entry.data?.items?.[0];
-
-      if (!item || !logType) continue;
-
-      // Stop paginating once we reach already-processed entries
+      if (!logType) continue;
       if (stopAt && ts <= stopAt) { done = true; break; }
 
-      const type = BUY_TYPE_SET.has(logType) ? 'buy'
-                 : SELL_TYPE_SET.has(logType) ? 'sell'
-                 : null;
-      if (!type) continue;
-
-      const qty   = item.qty;
-      const total = entry.data?.cost_total;
-      if (!qty || !total) continue;
-
-      const logId  = `${ts}_${logType}_${item.id}`;
-      const source = SOURCE_MAP[logType] ?? 'other';
-
+      const logId = entry.id ?? `${ts}_${logType}`;
       await db.query(
-        `INSERT INTO torn_transactions
-           (torn_log_id, happened_at, type, item_id, qty, unit_price, total_amount, source)
-         VALUES ($1, to_timestamp($2), $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (torn_log_id) DO NOTHING`,
-        [logId, ts, type, item.id, qty, total / qty, total, source]
+        `INSERT INTO torn_logs (id, log_type, happened_at, data)
+         VALUES ($1, $2, to_timestamp($3), $4)
+         ON CONFLICT (id) DO NOTHING`,
+        [logId, logType, ts, JSON.stringify(entry.data ?? {})]
       );
       inserted++;
       if (ts > newMaxTs) newMaxTs = ts;
+      if (isBackfill && ts > backfillMaxTs) backfillMaxTs = ts;
     }
 
     if (!done) {
       url = prevUrl
         ? (prevUrl.includes('key=') ? prevUrl : `${prevUrl}&key=${apiKey}`)
         : null;
-      if (url) await sleep(600); // ~100 req/min max
+
+      if (isBackfill) {
+        if (url) await setSyncState('backfill_cursor', url);
+        if (backfillMaxTs > 0) await setSyncState('backfill_max_ts', backfillMaxTs);
+      }
+
+      if (url) await sleep(1500);
     }
   }
 
-  if (newMaxTs > 0) await setSyncState('last_log_ts', newMaxTs);
-  console.log(`[portfolio] Logs: ${pages} pages, ${inserted} new entries`);
+  if (isBackfill) {
+    if (backfillMaxTs > 0) await setSyncState('last_log_ts', backfillMaxTs);
+    await db.query("DELETE FROM torn_sync_state WHERE key IN ('backfill_cursor', 'backfill_max_ts')");
+    console.log(`[portfolio] Backfill complete: ${pages} pages, ${inserted} entries stored`);
+  } else {
+    if (newMaxTs > 0) await setSyncState('last_log_ts', newMaxTs);
+    console.log(`[portfolio] Logs: ${pages} pages, ${inserted} new entries`);
+  }
 }
 
 async function snapshotInventory(apiKey) {
@@ -200,8 +208,26 @@ async function snapshotInventory(apiKey) {
   console.log(`[portfolio] Inventory snapshot: ${total} entries`);
 }
 
-let syncRunning = false;
+let syncRunning    = false;
+let logSyncRunning = false;
 
+// Lightweight: only fetch new logs and process lots (1-2 API calls)
+async function runLogSync() {
+  const apiKey = process.env.TORN_API_KEY;
+  if (!apiKey) return;
+  if (logSyncRunning || syncRunning) return; // full sync covers this too
+  logSyncRunning = true;
+  try {
+    await syncLogs(apiKey);
+    await processLots();
+  } catch (err) {
+    console.error('[portfolio] Log sync error:', err.message);
+  } finally {
+    logSyncRunning = false;
+  }
+}
+
+// Full sync: catalog + logs + lots + inventory snapshot
 async function runSync() {
   const apiKey = process.env.TORN_API_KEY;
   if (!apiKey) {
@@ -216,6 +242,7 @@ async function runSync() {
   try {
     await syncItemCatalog(apiKey);
     await syncLogs(apiKey);
+    await processLots();
     await snapshotInventory(apiKey);
     await setSyncState('last_sync_ts', Math.floor(Date.now() / 1000));
     console.log('[portfolio] Sync complete');
@@ -226,4 +253,4 @@ async function runSync() {
   }
 }
 
-module.exports = { runSync };
+module.exports = { runSync, runLogSync };
