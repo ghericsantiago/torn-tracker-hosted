@@ -737,7 +737,7 @@
         <td class="cell-muted">${fmt(r.break_even)}</td>
         <td>${fmt(r.market_price)}</td>
         <td class="${pnlClass(r.unrealized_pnl)}">${fmtPnl(r.unrealized_pnl)}</td>
-        <td class="${pnlClass(r.realized_pnl)}">${fmtPnl(r.realized_pnl)}</td>
+        <td class="${pnlClass(r.realized_pnl)}">${r.realized_pnl ? `<span class="qty-clickable" onclick="openPnlModal(${r.item_id},'${esc(r.name)}')">${fmtPnl(r.realized_pnl)}</span>` : '—'}</td>
         <td class="${pnlClass(r.total_pnl)}"><strong>${fmtPnl(r.total_pnl)}</strong></td>
       </tr>`;
     }).join('');
@@ -960,6 +960,81 @@
                 <td><strong>${l.qty_remaining.toLocaleString()}</strong></td>
                 <td class="cell-muted">${l.unit_cost > 0 ? fmt(l.unit_cost) : '—'}</td>
                 <td>${l.unit_cost > 0 ? fmt(l.qty_remaining * l.unit_cost) : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      document.getElementById('modal-body').innerHTML = `<div class="empty">Failed to load: ${err.message}</div>`;
+    }
+  }
+
+  async function openPnlModal(itemId, itemName) {
+    const modal = document.getElementById('lot-modal');
+    document.getElementById('modal-title').textContent = `${itemName} — Realized P&L Breakdown`;
+    document.getElementById('modal-body').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Loading…</div>';
+    modal.classList.add('open');
+
+    try {
+      const res  = await fetch(`/torn/api/sales?item_id=${itemId}&limit=500`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('modal-body').innerHTML = `<div class="empty">Error: ${data.error}</div>`;
+        return;
+      }
+
+      const sales = data.sales ?? [];
+      if (!sales.length) {
+        document.getElementById('modal-body').innerHTML = '<div class="empty">No sales recorded for this item.</div>';
+        return;
+      }
+
+      const totalQty     = sales.reduce((s, r) => s + r.qty, 0);
+      const totalRevenue = sales.reduce((s, r) => s + r.total_revenue, 0);
+      const totalPnl     = sales.reduce((s, r) => s + r.pnl, 0);
+
+      document.getElementById('modal-body').innerHTML = `
+        <div class="modal-summary">
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Sold</span>
+            <span class="modal-stat-value">${totalQty.toLocaleString()}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Revenue</span>
+            <span class="modal-stat-value">${fmt(totalRevenue)}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Realized P&amp;L</span>
+            <span class="modal-stat-value ${pnlClass(totalPnl)}">${fmtPnl(totalPnl)}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Transactions</span>
+            <span class="modal-stat-value">${sales.length}</span>
+          </div>
+        </div>
+        <table class="lot-table">
+          <thead>
+            <tr>
+              <th>Sale Date</th>
+              <th>Qty</th>
+              <th>Lot Date</th>
+              <th>Unit Cost</th>
+              <th>Unit Revenue</th>
+              <th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sales.map(s => {
+              const isPre = s.lot_source === 'pre_tracking';
+              return `<tr>
+                <td>${fmtDate(s.happened_at)}</td>
+                <td>${s.qty.toLocaleString()}</td>
+                <td>${isPre ? '<span class="cell-muted">pre-tracking</span>' : fmtDate(s.lot_acquired_at)}</td>
+                <td class="cell-muted">${s.unit_cost > 0 ? fmt(s.unit_cost) : '—'}</td>
+                <td>${fmt(s.unit_revenue)}</td>
+                <td class="${pnlClass(s.pnl)}">${fmtPnl(s.pnl)}</td>
               </tr>`;
             }).join('')}
           </tbody>

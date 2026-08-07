@@ -152,13 +152,14 @@ router.get('/api/portfolio', async (req, res) => {
   }
 });
 
-// Sales history — supports ?limit=50&offset=0&from=<ISO>&to=<ISO>
+// Sales history — supports ?limit=50&offset=0&from=<ISO>&to=<ISO>&item_id=<int>
 router.get('/api/sales', async (req, res) => {
   try {
     const limit  = Math.min(Number(req.query.limit)  || 100, 500);
     const offset = Number(req.query.offset) || 0;
     const from   = req.query.from || null;
     const to     = req.query.to   || null;
+    const itemId = req.query.item_id ? Number(req.query.item_id) : null;
 
     const { rows } = await db.query(`
       SELECT
@@ -179,9 +180,10 @@ router.get('/api/sales', async (req, res) => {
       WHERE e.reason = 'sell'
         AND ($3::timestamptz IS NULL OR e.happened_at >= $3)
         AND ($4::timestamptz IS NULL OR e.happened_at <= $4)
+        AND ($5::int IS NULL OR l.item_id = $5)
       ORDER BY e.happened_at DESC
       LIMIT $1 OFFSET $2
-    `, [limit, offset, from, to]);
+    `, [limit, offset, from, to, itemId]);
 
     const totals = await db.query(`
       SELECT
@@ -189,10 +191,12 @@ router.get('/api/sales', async (req, res) => {
         SUM(e.pnl)      AS total_pnl,
         SUM(e.qty * e.unit_revenue) AS total_revenue
       FROM torn_lot_events e
+      JOIN torn_lots l ON l.id = e.lot_id
       WHERE e.reason = 'sell'
         AND ($1::timestamptz IS NULL OR e.happened_at >= $1)
         AND ($2::timestamptz IS NULL OR e.happened_at <= $2)
-    `, [from, to]);
+        AND ($3::int IS NULL OR l.item_id = $3)
+    `, [from, to, itemId]);
 
     res.json({
       total:         Number(totals.rows[0].total_rows),
