@@ -22,11 +22,13 @@ app.use(session({
 
 // Static files
 app.use('/admin',  express.static(path.join(__dirname, 'public/admin')));
+app.use('/torn',   express.static(path.join(__dirname, 'public/torn')));
 app.use('/',       express.static(path.join(__dirname, 'public/client')));
 
 // Routes
 app.use('/admin',  require('./routes/admin'));
 app.use('/api',    require('./routes/api'));
+app.use('/torn',   require('./routes/torn'));
 
 // Start server
 app.listen(PORT, () => {

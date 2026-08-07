@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torn Portfolio Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07080f;
+      --glass:    rgba(255,255,255,0.035);
+      --border:   rgba(255,255,255,0.07);
+      --accent:   #6ee7f7;
+      --pos:      #4ade80;
+      --neg:      #f87171;
+      --warn:     #fbbf24;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --heading:  'Space Grotesk', sans-serif;
+      --mono:     'JetBrains Mono', monospace;
+      --body:     'Inter', sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .header h1 {
+      font-family: var(--heading);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+    }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sync-time {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .btn-sync {
+      background: rgba(110,231,247,0.08);
+      border: 1px solid rgba(110,231,247,0.25);
+      color: var(--accent);
+      font-family: var(--heading);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-sync:hover { background: rgba(110,231,247,0.15); border-color: rgba(110,231,247,0.4); }
+    .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Glass panel */
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    /* Summary tiles */
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .tiles { grid-template-columns: 1fr; } }
+
+    .tile {
+      padding: 18px 20px;
+    }
+    .tile-label {
+      font-family: var(--heading);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .tile-value {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1;
+    }
+    .tile-value.pos { color: var(--pos); }
+    .tile-value.neg { color: var(--neg); }
+
+    /* Table section */
+    .section-title {
+      font-family: var(--heading);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: rgba(255,255,255,0.025);
+      padding: 11px 14px;
+      text-align: right;
+      font-family: var(--heading);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+      transition: color 0.15s;
+    }
+    thead th:first-child { text-align: left; }
+    thead th:hover { color: var(--accent); }
+    thead th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+    thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    td {
+      padding: 11px 14px;
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    td:first-child { text-align: left; font-family: var(--body); }
+
+    .item-name { font-weight: 500; color: var(--text); }
+    .item-type {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+    .loc-breakdown { color: var(--muted); font-size: 11px; }
+    .cell-pos { color: var(--pos); }
+    .cell-neg { color: var(--neg); }
+    .cell-muted { color: var(--muted); }
+
+    /* Chart section */
+    .chart-section { margin-top: 24px; padding: 20px 24px; }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(30,35,55,0.95);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-family: var(--body);
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    .empty { padding: 48px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <h1>Torn Portfolio Tracker</h1>
+    </div>
+    <div class="header-meta">
+      <span class="sync-time" id="sync-time">Loading…</span>
+      <button class="btn-sync" id="btn-sync" onclick="triggerSync()">Sync Now</button>
+    </div>
+  </div>
+
+  <!-- Summary tiles -->
+  <div class="tiles">
+    <div class="tile glass">
+      <div class="tile-label">Total Value</div>
+      <div class="tile-value" id="tile-value">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Cost Basis</div>
+      <div class="tile-value" id="tile-cost">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Realized P&amp;L</div>
+      <div class="tile-value" id="tile-realized">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Unrealized P&amp;L</div>
+      <div class="tile-value" id="tile-unrealized">—</div>
+    </div>
+  </div>
+
+  <!-- Item table -->
+  <div class="section-title">Holdings</div>
+  <div class="table-wrap">
+    <table id="portfolio-table">
+      <thead>
+        <tr>
+          <th data-col="name"         data-type="str"  style="min-width:160px">Item</th>
+          <th data-col="inv_qty"      data-type="num">Inv</th>
+          <th data-col="baz_qty"      data-type="num">Baz</th>
+          <th data-col="disp_qty"     data-type="num">Disp</th>
+          <th data-col="remaining"    data-type="num">Total Held</th>
+          <th data-col="avg_cost"     data-type="num">Avg Cost</th>
+          <th data-col="break_even"   data-type="num">Break Even</th>
+          <th data-col="market_price" data-type="num">Mkt Price</th>
+          <th data-col="unrealized_pnl" data-type="num">Unrealized P&amp;L</th>
+          <th data-col="realized_pnl"   data-type="num">Realized P&amp;L</th>
+          <th data-col="total_pnl"      data-type="num">Total P&amp;L</th>
+        </tr>
+      </thead>
+      <tbody id="portfolio-body">
+        <tr><td colspan="11" class="empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- P&L over time chart -->
+  <div class="chart-section glass">
+    <div class="section-title" style="margin-bottom:16px">Portfolio Value Over Time</div>
+    <div class="chart-wrap">
+      <canvas id="history-chart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let portfolioData = [];
+  let sortCol  = 'unrealized_pnl';
+  let sortDir  = -1; // -1 = desc, 1 = asc
+  let histChart = null;
+
+  // ── Number formatting ─────────────────────────────────────────────────────
+  function fmt(n, dp = 0) {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(dp);
+  }
+
+  function fmtPnl(n) {
+    if (n == null || isNaN(n)) return '—';
+    const s = fmt(n);
+    return n >= 0 ? '+' + s : s;
+  }
+
+  function pnlClass(n) {
+    if (!n) return '';
+    return n > 0 ? 'cell-pos' : 'cell-neg';
+  }
+
+  // ── Tile updates ──────────────────────────────────────────────────────────
+  function setTile(id, val, signed = false) {
+    const el = document.getElementById(id);
+    el.textContent = signed ? fmtPnl(val) : fmt(val);
+    if (signed) el.className = 'tile-value ' + (val >= 0 ? 'pos' : 'neg');
+    else el.className = 'tile-value';
+  }
+
+  // ── Table rendering ───────────────────────────────────────────────────────
+  function renderTable() {
+    const sorted = [...portfolioData].sort((a, b) => {
+      const av = a[sortCol], bv = b[sortCol];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+      return sortDir * (av - bv);
+    });
+
+    const tbody = document.getElementById('portfolio-body');
+    if (!sorted.length) {
+      tbody.innerHTML = '<tr><td colspan="11" class="empty">No transactions synced yet. Run a sync to populate data.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = sorted.map(r => {
+      const baz = r.baz_price ? ` @${fmt(r.baz_price)}` : '';
+      return `<tr>
+        <td>
+          <span class="item-name">${esc(r.name ?? 'Unknown')}</span>
+          ${r.type ? `<span class="item-type">${esc(r.type)}</span>` : ''}
+        </td>
+        <td>${r.inv_qty  || '—'}</td>
+        <td>${r.baz_qty  ? `${r.baz_qty}${baz}` : '—'}</td>
+        <td>${r.disp_qty || '—'}</td>
+        <td>${r.remaining ?? '—'}</td>
+        <td class="cell-muted">${fmt(r.avg_cost)}</td>
+        <td class="cell-muted">${fmt(r.break_even)}</td>
+        <td>${fmt(r.market_price)}</td>
+        <td class="${pnlClass(r.unrealized_pnl)}">${fmtPnl(r.unrealized_pnl)}</td>
+        <td class="${pnlClass(r.realized_pnl)}">${fmtPnl(r.realized_pnl)}</td>
+        <td class="${pnlClass(r.total_pnl)}"><strong>${fmtPnl(r.total_pnl)}</strong></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Sort headers ──────────────────────────────────────────────────────────
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) { sortDir = -sortDir; }
+      else { sortCol = col; sortDir = th.dataset.type === 'str' ? 1 : -1; }
+      document.querySelectorAll('thead th').forEach(h => h.className = '');
+      th.className = sortDir === 1 ? 'sort-asc' : 'sort-desc';
+      renderTable();
+    });
+  });
+  // Default sort indicator
+  document.querySelector('th[data-col="unrealized_pnl"]').className = 'sort-desc';
+
+  // ── Chart ─────────────────────────────────────────────────────────────────
+  function renderChart(history) {
+    const labels = history.map(d => d.day.split('T')[0]);
+    const values = history.map(d => d.total_value);
+
+    if (histChart) histChart.destroy();
+
+    histChart = new Chart(document.getElementById('history-chart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Portfolio Value',
+          data: values,
+          borderColor: '#6ee7f7',
+          backgroundColor: 'rgba(110,231,247,0.06)',
+          borderWidth: 2,
+          pointRadius: history.length > 60 ? 0 : 3,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(7,8,15,0.9)',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#e2e8f0',
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            callbacks: {
+              label: ctx => ' ' + fmt(ctx.raw),
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 11 } },
+            grid:  { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            ticks: {
+              color: '#64748b',
+              font: { family: 'JetBrains Mono', size: 11 },
+              callback: v => fmt(v),
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+        },
+      },
+    });
+  }
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  async function loadPortfolio() {
+    const res  = await fetch('/torn/api/portfolio');
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('portfolio-body').innerHTML =
+        `<tr><td colspan="11" class="empty" style="color:var(--neg)">${esc(data.error)}</td></tr>`;
+      return;
+    }
+
+    portfolioData = data.items;
+    const t = data.totals;
+
+    setTile('tile-value',      t.total_value);
+    setTile('tile-cost',       t.cost_basis);
+    setTile('tile-realized',   t.realized_pnl,   true);
+    setTile('tile-unrealized', t.unrealized_pnl, true);
+
+    const syncEl = document.getElementById('sync-time');
+    syncEl.textContent = data.syncedAt
+      ? 'Last sync: ' + new Date(data.syncedAt).toLocaleString()
+      : 'Never synced';
+
+    renderTable();
+  }
+
+  async function loadHistory() {
+    const res  = await fetch('/torn/api/history');
+    const data = await res.json();
+    if (Array.isArray(data)) renderChart(data);
+  }
+
+  async function triggerSync() {
+    const btn = document.getElementById('btn-sync');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    try {
+      await fetch('/torn/api/sync', { method: 'POST' });
+      showToast('Sync started — may take a few minutes on first run');
+    } catch {
+      showToast('Failed to trigger sync');
+    }
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = 'Sync Now';
+    }, 3000);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadPortfolio();
+  loadHistory();
+</script>
+</body>
+</html>

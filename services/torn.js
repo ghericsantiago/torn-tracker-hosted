@@ -79,11 +79,67 @@ async function fetchAllTornItems(apiKey) {
   const url  = `${TORN_BASE}/torn/?selections=items&key=${apiKey}`;
   const data = await tornFetch(url);
   const list = Object.entries(data.items || {})
-    .map(([id, item]) => ({ id: Number(id), name: item.name, type: item.type }))
+    .map(([id, item]) => ({
+      id:           Number(id),
+      name:         item.name,
+      type:         item.type,
+      market_price: item.market_value ?? null,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  list.unshift({ id: POINT_MARKET_ID, name: 'Point Market', type: 'Special' });
+  list.unshift({ id: POINT_MARKET_ID, name: 'Point Market', type: 'Special', market_price: null });
   return list;
 }
 
-module.exports = { fetchItemMarket, fetchPointsMarket, fetchAllTornItems, POINT_MARKET_ID, TornApiError };
+async function fetchInventoryCategory(category, apiKey) {
+  const url  = `${TORN_BASE}/v2/user/inventory?cat=${encodeURIComponent(category)}&key=${apiKey}`;
+  const data = await tornFetch(url);
+  return (data.inventory?.items || []).map(item => ({
+    item_id: item.id,
+    qty:     item.amount,
+  }));
+}
+
+async function fetchBazaar(apiKey) {
+  const url  = `${TORN_BASE}/user/?selections=bazaar&key=${apiKey}`;
+  const data = await tornFetch(url);
+  const raw  = data.bazaar;
+  if (!raw) return [];
+
+  if (Array.isArray(raw)) {
+    return raw.map(i => ({ item_id: i.ID ?? i.id, qty: i.quantity, list_price: i.price }));
+  }
+  // Object keyed by item id or slot
+  return Object.values(raw).map(i => ({ item_id: i.ID ?? i.id, qty: i.quantity, list_price: i.price }));
+}
+
+async function fetchDisplay(apiKey) {
+  const url  = `${TORN_BASE}/user/?selections=display&key=${apiKey}`;
+  const data = await tornFetch(url);
+  const raw  = data.display?.items ?? data.display;
+  if (!raw) return [];
+
+  const entries = Array.isArray(raw) ? raw : Object.values(raw);
+  return entries.map(i => ({ item_id: i.ID ?? i.id, qty: i.quantity ?? 1 }));
+}
+
+// Returns { entries: [...], prevUrl: string|null } for one page of user logs.
+// Torn strips key= from pagination URLs — re-append before calling.
+async function fetchUserLogPage(url, apiKey) {
+  const fetchUrl = url.includes('key=') ? url : `${url}&key=${apiKey}`;
+  const data     = await tornFetch(fetchUrl);
+  const entries  = Array.isArray(data.log) ? data.log : [];
+  const prevUrl  = data._metadata?.links?.prev ?? null;
+  return { entries, prevUrl };
+}
+
+function buildUserLogUrl(apiKey, logTypes) {
+  return `${TORN_BASE}/v2/user/log?log=${logTypes.join(',')}&limit=100&sort=desc&key=${apiKey}`;
+}
+
+module.exports = {
+  fetchItemMarket, fetchPointsMarket, fetchAllTornItems,
+  fetchInventoryCategory, fetchBazaar, fetchDisplay,
+  fetchUserLogPage, buildUserLogUrl,
+  POINT_MARKET_ID, TornApiError,
+};
