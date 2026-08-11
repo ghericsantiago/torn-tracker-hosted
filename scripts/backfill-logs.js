@@ -43,6 +43,15 @@ async function backfill() {
   let pages         = savedPages ? Number(savedPages) : 0;
   let inserted      = 0;
 
+  // If no checkpoint, start from the oldest log we already have — don't re-fetch
+  if (!savedToTs) {
+    const { rows: oldest } = await db.query('SELECT MIN(happened_at) AS ts FROM torn_logs');
+    if (oldest[0]?.ts) {
+      toTs = Math.floor(new Date(oldest[0].ts).getTime() / 1000) - 1;
+      console.log(`[backfill] DB has logs from ${oldest[0].ts.toISOString().slice(0,10)} — starting from older`);
+    }
+  }
+
   console.log(savedToTs
     ? `[backfill] Resuming from ${new Date(toTs * 1000).toISOString()}...`
     : '[backfill] Starting full history fetch (newest → oldest)...'

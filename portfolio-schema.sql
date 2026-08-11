@@ -22,12 +22,13 @@ CREATE INDEX IF NOT EXISTS idx_torn_logs_type     ON torn_logs (log_type);
 CREATE TABLE IF NOT EXISTS torn_lots (
   id            SERIAL      PRIMARY KEY,
   item_id       INT         NOT NULL,
-  acquired_log  TEXT        UNIQUE,          -- torn_logs.id; NULL for synthetic pre-tracking lots
+  acquired_log  TEXT,                           -- torn_logs.id; NULL for synthetic pre-tracking lots
   acquired_at   TIMESTAMPTZ NOT NULL,        -- controls FIFO order
   qty_original  INT         NOT NULL,
   qty_remaining INT         NOT NULL,
   unit_cost     NUMERIC     NOT NULL DEFAULT 0, -- 0 for free items
-  source        TEXT        NOT NULL          -- 'buy' | 'received' | 'trade_in' | 'pre_tracking'
+  source        TEXT        NOT NULL,         -- 'buy' | 'received' | 'trade_in' | 'pre_tracking'
+  UNIQUE (acquired_log, item_id)              -- one lot per (log, item); NULLs are distinct per row
 );
 CREATE INDEX IF NOT EXISTS idx_torn_lots_item    ON torn_lots (item_id, acquired_at ASC);
 CREATE INDEX IF NOT EXISTS idx_torn_lots_avail   ON torn_lots (item_id) WHERE qty_remaining > 0;

@@ -26,7 +26,10 @@ app.use('/',       express.static(path.join(__dirname, 'public/client')));
 
 // Routes
 app.use('/admin',  require('./routes/admin'));
-app.use('/api',    require('./routes/api'));
+app.use('/api',             require('./routes/api'));
+app.use('/api/portfolio',   require('./routes/portfolio'));
+app.use('/admin/torn',  require('./routes/torn'));
+app.use('/torn',       require('./routes/torn'));
 
 // Start server
 app.listen(PORT, () => {

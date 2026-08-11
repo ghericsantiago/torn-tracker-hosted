@@ -9,9 +9,9 @@ const {
 const { processLots } = require('./lot-processor');
 
 const INVENTORY_CATEGORIES = [
-  'Alcohol', 'Artifact', 'Booster', 'Candy', 'Clothing', 'Defensive',
+  'Alcohol', 'Artifact', 'Booster', 'Candy', 'Car', 'Clothing', 'Defensive',
   'Drug', 'Enhancer', 'Energy Drink', 'Flower', 'Jewelry', 'Material',
-  'Medical', 'Melee', 'Other', 'Primary', 'Secondary', 'Special',
+  'Medical', 'Melee', 'Other', 'Plushie', 'Primary', 'Secondary', 'Special',
   'Supply Pack', 'Temporary', 'Tool',
 ];
 
@@ -156,54 +156,80 @@ async function snapshotInventory(apiKey) {
   console.log('[portfolio] Snapshotting inventory...');
   const now   = new Date().toISOString();
   let   total = 0;
+  const failedCategories = [];
 
   for (const cat of INVENTORY_CATEGORIES) {
+    let items;
     try {
-      const items = await fetchInventoryCategory(cat, apiKey);
-      for (const item of items) {
-        await db.query(
-          `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price)
-           VALUES ($1, $2, 'inventory', $3, NULL)`,
-          [now, item.item_id, item.qty]
-        );
-        total++;
-      }
+      items = await retryOnRateLimit(() => fetchInventoryCategory(cat, apiKey), `inventory/${cat}`);
     } catch (err) {
       console.warn(`[portfolio] Inventory ${cat} failed:`, err.message);
+      failedCategories.push(cat);
+      await sleep(500);
+      continue;
     }
-    await sleep(300);
+
+    // Batch insert for performance
+    if (items.length > 0) {
+      const vals = items.map((_, i) =>
+        `($1, $${i * 2 + 2}, 'inventory', $${i * 2 + 3}, NULL)`
+      ).join(', ');
+      const params = [now];
+      items.forEach(item => { params.push(item.item_id, item.qty); });
+      await db.query(
+        `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price) VALUES ${vals}`,
+        params
+      );
+      total += items.length;
+    }
+    await sleep(500);
   }
 
+  // Bazaar
   try {
-    const bazaar = await fetchBazaar(apiKey);
-    for (const item of bazaar) {
+    const bazaar = await retryOnRateLimit(() => fetchBazaar(apiKey), 'bazaar');
+    if (bazaar.length > 0) {
+      const vals = bazaar.map((_, i) =>
+        `($1, $${i * 3 + 2}, 'bazaar', $${i * 3 + 3}, $${i * 3 + 4})`
+      ).join(', ');
+      const params = [now];
+      bazaar.forEach(item => { params.push(item.item_id, item.qty, item.list_price); });
       await db.query(
-        `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price)
-         VALUES ($1, $2, 'bazaar', $3, $4)`,
-        [now, item.item_id, item.qty, item.list_price]
+        `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price) VALUES ${vals}`,
+        params
       );
-      total++;
+      total += bazaar.length;
     }
   } catch (err) {
     console.warn('[portfolio] Bazaar snapshot failed:', err.message);
+    failedCategories.push('bazaar');
   }
 
-  await sleep(300);
+  await sleep(500);
 
+  // Display
   try {
-    const display = await fetchDisplay(apiKey);
-    for (const item of display) {
+    const display = await retryOnRateLimit(() => fetchDisplay(apiKey), 'display');
+    if (display.length > 0) {
+      const vals = display.map((_, i) =>
+        `($1, $${i * 2 + 2}, 'display', $${i * 2 + 3}, NULL)`
+      ).join(', ');
+      const params = [now];
+      display.forEach(item => { params.push(item.item_id, item.qty); });
       await db.query(
-        `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price)
-         VALUES ($1, $2, 'display', $3, NULL)`,
-        [now, item.item_id, item.qty]
+        `INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty, list_price) VALUES ${vals}`,
+        params
       );
-      total++;
+      total += display.length;
     }
   } catch (err) {
     console.warn('[portfolio] Display snapshot failed:', err.message);
+    failedCategories.push('display');
   }
 
+  if (failedCategories.length > 0) {
+    console.warn(`[portfolio] Snapshot complete with failures: ${failedCategories.join(', ')}`);
+  }
   await setSyncState('last_snapshot_ts', Math.floor(Date.now() / 1000));
   console.log(`[portfolio] Inventory snapshot: ${total} entries`);
 }
@@ -219,7 +245,7 @@ async function runLogSync() {
   logSyncRunning = true;
   try {
     await syncLogs(apiKey);
-    await processLots();
+    // await processLots();
   } catch (err) {
     console.error('[portfolio] Log sync error:', err.message);
   } finally {
@@ -253,4 +279,4 @@ async function runSync() {
   }
 }
 
-module.exports = { runSync, runLogSync };
+module.exports = { runSync, runLogSync, syncItemCatalog, snapshotInventory };

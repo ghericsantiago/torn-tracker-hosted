@@ -10,6 +10,8 @@ const {
   DUMP_TYPE_SET,
   TRADE_IN_TYPE_SET,
   TRADE_OUT_TYPE_SET,
+  MUSEUM_EXCHANGE_TYPE_SET,
+  MUSEUM_SETS,
 } = require('./log-types');
 
 const TAX = 0.05;
@@ -19,14 +21,16 @@ const TAX = 0.05;
 // Two Torn API shapes:
 //   data.items[]  — buy/sell/receive/trade (array, may have multiple items)
 //   data.item     — integer item ID, qty always 1 (use events)
+//   data.set      — string set name, data.quantity = number of sets (museum exchange)
 // For multi-item logs cost_total is absent/zero, so unit_cost is 0 (cost unknown).
 // For single-item buy logs cost_total / qty gives the correct unit cost.
 function extractItems(data) {
   if (Array.isArray(data.items) && data.items.length > 0) {
     // Only attribute cost_total when there is a single item — otherwise it's
     // the combined total across all items and can't be split reliably.
+    // Some bazaar sell variants (1222) use data.price instead of data.cost_total.
     const costTotal = data.items.length === 1
-      ? Number(data.cost_total ?? 0) || 0
+      ? Number(data.cost_total ?? data.price ?? 0) || 0
       : 0;
     return data.items.map(it => {
       const itemId = Number(it.id ?? it.ID);
@@ -36,13 +40,41 @@ function extractItems(data) {
     }).filter(Boolean);
   }
   if (data.item != null) {
-    const itemId = Number(data.item);
-    if (!itemId) return [];
-    // Old-format logs store quantity in data.quantity (not inside an items array).
-    // cost_total is present for buy/sell types; 0 for use/misc types.
-    const qty       = Number(data.quantity ?? 1) || 1;
-    const costTotal = Number(data.cost_total ?? 0) || 0;
-    return [{ item_id: itemId, qty, cost_total: costTotal }];
+    // Shape 1: data.item = integer ID — old format with data.quantity
+    if (typeof data.item === 'number' || (typeof data.item === 'string' && data.item !== '')) {
+      const itemId = Number(data.item);
+      if (!itemId) return [];
+      const qty       = Number(data.quantity ?? 1) || 1;
+      const costTotal = Number(data.cost_total ?? data.price ?? 0) || 0;
+      return [{ item_id: itemId, qty, cost_total: costTotal }];
+    }
+    // Shape 2: data.item = [{id, qty, uid}] — array-wrapped single item (type 1103)
+    if (Array.isArray(data.item) && data.item.length > 0) {
+      const costTotal = data.item.length === 1
+        ? Number(data.cost_total ?? data.cost ?? data.price ?? 0) || 0
+        : 0;
+      return data.item.map(it => {
+        const itemId = Number(it.id);
+        const qty    = Number(it.qty ?? 1);
+        if (!itemId || qty <= 0) return null;
+        return { item_id: itemId, qty, cost_total: costTotal };
+      }).filter(Boolean);
+    }
+    return [];
+  }
+  // Museum exchange: data.set = "Plushie Set", data.quantity = number of sets
+  if (typeof data.set === 'string' && data.set.length > 0) {
+    const setItems = MUSEUM_SETS[data.set];
+    if (!setItems) {
+      console.warn(`[lots] Unknown museum set "${data.set}" — cannot expand items`);
+      return [];
+    }
+    const setQty = Math.max(1, Number(data.quantity ?? 1) || 1);
+    return setItems.flatMap(si => ({
+      item_id:   si.item_id,
+      qty:       si.qty * setQty,
+      cost_total: 0,
+    }));
   }
   return [];
 }
@@ -135,6 +167,21 @@ async function processEntry(client, { id, log_type, happened_at, data }) {
   const items = extractItems(data);
   if (!items.length) return;
 
+  // Quick check: warn once per log for unrecognised types (avoids per-item spam)
+  // Types intentionally ignored: trade staging + display management don't move real inventory
+  const KNOWN_IGNORED = new Set([4447, 4448, 4482, 4483, 1300, 1301, 1302, 1303]);
+  if (KNOWN_IGNORED.has(log_type)) return;
+
+  const ALL_SETS = [
+    BUY_TYPE_SET, SELL_TYPE_SET, RECEIVE_TYPE_SET,
+    SEND_TYPE_SET, USE_TYPE_SET, DUMP_TYPE_SET,
+    TRADE_IN_TYPE_SET, TRADE_OUT_TYPE_SET, MUSEUM_EXCHANGE_TYPE_SET,
+  ];
+  if (!ALL_SETS.some(s => s.has(log_type))) {
+    console.warn(`[lots] Unrecognised log_type ${log_type} on log ${id} — not processed`);
+    return;
+  }
+
   for (const item of items) {
     if (BUY_TYPE_SET.has(log_type)) {
       await createLot(client, {
@@ -216,8 +263,17 @@ async function processEntry(client, { id, log_type, happened_at, data }) {
         log_id:       id,
         happened_at,
       });
+
+    } else if (MUSEUM_EXCHANGE_TYPE_SET.has(log_type)) {
+      await consumeFifo(client, {
+        item_id:      item.item_id,
+        qty:          item.qty,
+        unit_revenue: 0,
+        reason:       'museum_exchange',
+        log_id:       id,
+        happened_at,
+      });
     }
-    // Unknown log types are silently skipped
   }
 }
 
@@ -243,12 +299,18 @@ async function processLots() {
   }
 
   let processed = 0;
+  const total = logs.length;
   for (const log of logs) {
     try {
       await withTx(client => processEntry(client, log));
       processed++;
+      if (processed % 5000 === 0 || processed === total) {
+        const pct = ((processed / total) * 100).toFixed(1);
+        process.stdout.write(`\r[lots] ${processed}/${total} (${pct}%) processed${processed === total ? '\n' : ''}`);
+      }
     } catch (err) {
       console.error(`[lots] Error on log ${log.id} (type ${log.log_type}):`, err.message);
+      processed++;
     }
   }
 

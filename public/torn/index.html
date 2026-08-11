@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torn Portfolio Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07080f;
+      --glass:    rgba(255,255,255,0.035);
+      --border:   rgba(255,255,255,0.07);
+      --accent:   #6ee7f7;
+      --pos:      #4ade80;
+      --neg:      #f87171;
+      --warn:     #fbbf24;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --heading:  'Space Grotesk', sans-serif;
+      --mono:     'JetBrains Mono', monospace;
+      --body:     'Inter', sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .header h1 {
+      font-family: var(--heading);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.3px;
+    }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sync-time {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .btn-sync {
+      background: rgba(110,231,247,0.08);
+      border: 1px solid rgba(110,231,247,0.25);
+      color: var(--accent);
+      font-family: var(--heading);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-sync:hover { background: rgba(110,231,247,0.15); border-color: rgba(110,231,247,0.4); }
+    .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Glass panel */
+    .glass {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    /* Summary tiles */
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .tiles { grid-template-columns: 1fr; } }
+
+    .tile { padding: 18px 20px; }
+    .tile-label {
+      font-family: var(--heading);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .tile-value {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1;
+    }
+    .tile-value.pos { color: var(--pos); }
+    .tile-value.neg { color: var(--neg); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      font-family: var(--heading);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent);
+      background: rgba(110,231,247,0.07);
+      border-color: rgba(110,231,247,0.2);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Table section */
+    .section-title {
+      font-family: var(--heading);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+
+    /* Holdings controls bar */
+    .holdings-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 160px;
+      max-width: 320px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 13px;
+      padding: 7px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-input:focus { border-color: rgba(110,231,247,0.4); }
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .toggle-label input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+    .holdings-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: rgba(255,255,255,0.025);
+      padding: 11px 14px;
+      text-align: right;
+      font-family: var(--heading);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid var(--border);
+      transition: color 0.15s;
+    }
+    thead th:first-child { text-align: left; }
+    thead th:hover { color: var(--accent); }
+    thead th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+    thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    td {
+      padding: 11px 14px;
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    td:first-child { text-align: left; font-family: var(--body); }
+
+    .item-name { font-weight: 500; color: var(--text); }
+    .item-type {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+    .source-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+    .source-badge.pre { background: rgba(251,191,36,0.12); color: var(--warn); }
+    tr.sale-group-start td { border-top: 1px solid rgba(255,255,255,0.1); }
+    .cell-pos { color: var(--pos); }
+    .cell-neg { color: var(--neg); }
+    .cell-muted { color: var(--muted); }
+
+    /* Sales toolbar */
+    .sales-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .sales-stat {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .sales-stat strong { color: var(--text); }
+    .pagination {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn-page {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-page:disabled { opacity: 0.35; cursor: not-allowed; }
+    .page-info { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+    /* Backfill status bar */
+    .backfill-bar {
+      margin-bottom: 20px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(251,191,36,0.25);
+      background: rgba(251,191,36,0.05);
+      display: none;
+    }
+    .backfill-bar.visible { display: block; }
+    .backfill-title {
+      font-family: var(--heading);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--warn);
+      margin-bottom: 6px;
+    }
+    .backfill-detail {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .backfill-detail strong { color: var(--text); }
+    .progress-track {
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--warn);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      animation: pulse-bar 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-bar {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+    .backfill-actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+    .btn-backfill {
+      background: rgba(251,191,36,0.1);
+      border: 1px solid rgba(251,191,36,0.3);
+      color: var(--warn);
+      font-family: var(--heading);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    .btn-backfill:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Chart section */
+    .chart-section { margin-top: 24px; padding: 20px 24px; }
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(30,35,55,0.95);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-family: var(--body);
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    .empty { padding: 48px; text-align: center; color: var(--muted); }
+
+    /* Lot detail modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: #0f1120;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: min(680px, 95vw);
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--heading);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body {
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .modal-summary {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: var(--glass);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .modal-stat { display: flex; flex-direction: column; gap: 2px; }
+    .modal-stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .modal-stat-value { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--text); }
+    .lot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lot-table th {
+      text-align: right;
+      padding: 6px 10px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .lot-table th:first-child { text-align: left; }
+    .lot-table td {
+      padding: 7px 10px;
+      text-align: right;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .lot-table td:first-child { text-align: left; font-family: var(--body); }
+    .lot-table tr:last-child td { border-bottom: none; }
+    .qty-clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+    .qty-clickable:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <h1>Torn Portfolio Tracker</h1>
+    </div>
+    <div class="header-meta">
+      <span class="sync-time" id="sync-time">Loading…</span>
+      <button class="btn-sync" id="btn-sync" onclick="triggerSync()">Sync Now</button>
+    </div>
+  </div>
+
+  <!-- Summary tiles -->
+  <div class="tiles">
+    <div class="tile glass">
+      <div class="tile-label">Total Value</div>
+      <div class="tile-value" id="tile-value">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Cost Basis</div>
+      <div class="tile-value" id="tile-cost">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Realized P&amp;L</div>
+      <div class="tile-value" id="tile-realized">—</div>
+    </div>
+    <div class="tile glass">
+      <div class="tile-label">Unrealized P&amp;L</div>
+      <div class="tile-value" id="tile-unrealized">—</div>
+    </div>
+  </div>
+
+  <!-- Backfill status bar (hidden when idle) -->
+  <div class="backfill-bar" id="backfill-bar">
+    <div class="backfill-title" id="backfill-title">Fetching historical logs…</div>
+    <div class="backfill-detail" id="backfill-detail">Loading status…</div>
+    <div class="progress-track"><div class="progress-fill" id="backfill-fill" style="width:5%"></div></div>
+    <div class="backfill-actions">
+      <button class="btn-backfill" id="btn-backfill" onclick="startBackfill()">Start Full History Fetch</button>
+      <span class="sync-time" id="backfill-hint"></span>
+    </div>
+  </div>
+
+  <!-- Tab navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('holdings')">Holdings</button>
+    <button class="tab-btn"        onclick="switchTab('sales')">Sales History</button>
+  </div>
+
+  <!-- Holdings tab -->
+  <div id="tab-holdings" class="tab-panel active">
+    <div class="holdings-controls">
+      <input
+        id="holdings-search"
+        class="search-input"
+        type="search"
+        placeholder="Search items…"
+        oninput="renderTable()"
+        autocomplete="off"
+      >
+      <label class="toggle-label">
+        <input type="checkbox" id="hide-zero" onchange="renderTable()" checked>
+        Hide zero qty
+      </label>
+      <span class="holdings-count" id="holdings-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="portfolio-table">
+        <thead>
+          <tr>
+            <th data-col="name"           data-type="str" style="min-width:160px">Item</th>
+            <th data-col="inv_qty"        data-type="num">Inv</th>
+            <th data-col="baz_qty"        data-type="num">Baz</th>
+            <th data-col="disp_qty"       data-type="num">Disp</th>
+            <th data-col="remaining"      data-type="num">Total Held</th>
+            <th data-col="avg_cost"       data-type="num">Avg Cost</th>
+            <th data-col="break_even"     data-type="num">Break Even</th>
+            <th data-col="market_price"   data-type="num">Mkt Price</th>
+            <th data-col="unrealized_pnl" data-type="num">Unrealized P&amp;L</th>
+            <th data-col="realized_pnl"   data-type="num">Realized P&amp;L</th>
+            <th data-col="total_pnl"      data-type="num">Total P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody id="portfolio-body">
+          <tr><td colspan="11" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- P&L over time chart -->
+    <div class="chart-section glass">
+      <div class="section-title" style="margin-bottom:16px">Portfolio Value Over Time</div>
+      <div class="chart-wrap">
+        <canvas id="history-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sales History tab -->
+  <div id="tab-sales" class="tab-panel">
+    <div class="sales-bar">
+      <div class="sales-stat" id="sales-stat">—</div>
+      <div class="pagination">
+        <button class="btn-page" id="btn-prev" onclick="salesPage(-1)" disabled>← Prev</button>
+        <span class="page-info" id="page-info">Page 1</span>
+        <button class="btn-page" id="btn-next" onclick="salesPage(1)">Next →</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="sales-table">
+        <thead>
+          <tr>
+            <th style="min-width:140px;text-align:left">Item</th>
+            <th>Sale Date</th>
+            <th>Qty</th>
+            <th>Lot Bought</th>
+            <th>Unit Cost</th>
+            <th>Unit Revenue</th>
+            <th>Total Revenue</th>
+            <th>P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody id="sales-body">
+          <tr><td colspan="8" class="empty">Click "Sales History" tab to load</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<!-- Lot detail modal -->
+<div id="lot-modal" class="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="modal-title">Lot Details</span>
+      <button class="modal-close" onclick="document.getElementById('lot-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="modal-body" class="modal-body">Loading…</div>
+  </div>
+</div>
+
+<script>
+  let portfolioData = [];
+  let sortCol  = 'unrealized_pnl';
+  let sortDir  = -1; // -1 = desc, 1 = asc
+  let histChart = null;
+
+  // Sales pagination state
+  let salesOffset  = 0;
+  const SALES_PAGE = 50;
+  let salesTotalRows = 0;
+  let salesLoaded  = false;
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function fmt(n, dp = 0) {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(dp);
+  }
+
+  function fmtPnl(n) {
+    if (n == null || isNaN(n)) return '—';
+    const s = fmt(n);
+    return n >= 0 ? '+' + s : s;
+  }
+
+  function pnlClass(n) {
+    if (n == null) return '';
+    return n > 0 ? 'cell-pos' : (n < 0 ? 'cell-neg' : '');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Tile updates ──────────────────────────────────────────────────────────
+  function setTile(id, val, signed = false) {
+    const el = document.getElementById(id);
+    el.textContent = signed ? fmtPnl(val) : fmt(val);
+    if (signed) el.className = 'tile-value ' + (val >= 0 ? 'pos' : 'neg');
+    else el.className = 'tile-value';
+  }
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', ['holdings','sales'][i] === tab);
+    });
+    document.getElementById('tab-holdings').classList.toggle('active', tab === 'holdings');
+    document.getElementById('tab-sales').classList.toggle('active', tab === 'sales');
+
+    if (tab === 'sales' && !salesLoaded) {
+      loadSales();
+    }
+  }
+
+  // ── Holdings table ────────────────────────────────────────────────────────
+  function renderTable() {
+    const query    = (document.getElementById('holdings-search')?.value ?? '').trim().toLowerCase();
+    const hideZero = document.getElementById('hide-zero')?.checked ?? true;
+
+    let rows = portfolioData;
+
+    if (hideZero) {
+      rows = rows.filter(r => {
+        const total = (r.inv_qty || 0) + (r.baz_qty || 0) + (r.disp_qty || 0);
+        return total > 0;
+      });
+    }
+
+    if (query) {
+      rows = rows.filter(r => (r.name ?? '').toLowerCase().includes(query));
+    }
+
+    const sorted = [...rows].sort((a, b) => {
+      const av = a[sortCol], bv = b[sortCol];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+      return sortDir * (av - bv);
+    });
+
+    const countEl = document.getElementById('holdings-count');
+    if (countEl) countEl.textContent = `${sorted.length} item${sorted.length !== 1 ? 's' : ''}`;
+
+    const tbody = document.getElementById('portfolio-body');
+    if (!sorted.length) {
+      tbody.innerHTML = `<tr><td colspan="11" class="empty">${
+        query ? `No items matching "${esc(query)}"` : 'No holdings found. Run a sync to populate data.'
+      }</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = sorted.map(r => {
+      const bazLabel = r.baz_qty
+        ? (r.baz_price ? `${r.baz_qty} <span class="cell-muted" style="font-size:11px">(${fmt(r.baz_price)} ea)</span>` : r.baz_qty)
+        : '—';
+      return `<tr>
+        <td>
+          <span class="item-name">${esc(r.name ?? 'Unknown')}</span>
+          ${r.type ? `<span class="item-type">${esc(r.type)}</span>` : ''}
+        </td>
+        <td>${r.inv_qty  ? `<span class="qty-clickable" onclick="openLotModal(${r.item_id},'${esc(r.name)}','Inventory')">${r.inv_qty}</span>`  : '—'}</td>
+        <td>${r.baz_qty  ? `<span class="qty-clickable" onclick="openLotModal(${r.item_id},'${esc(r.name)}','Bazaar')">${bazLabel}</span>`    : '—'}</td>
+        <td>${r.disp_qty ? `<span class="qty-clickable" onclick="openLotModal(${r.item_id},'${esc(r.name)}','Display')">${r.disp_qty}</span>` : '—'}</td>
+        <td>${r.remaining ? `<span class="qty-clickable" onclick="openLotModal(${r.item_id},'${esc(r.name)}','All')">${r.remaining}</span>` : '—'}</td>
+        <td class="cell-muted">${fmt(r.avg_cost)}</td>
+        <td class="cell-muted">${fmt(r.break_even)}</td>
+        <td>${fmt(r.market_price)}</td>
+        <td class="${pnlClass(r.unrealized_pnl)}">${fmtPnl(r.unrealized_pnl)}</td>
+        <td class="${pnlClass(r.realized_pnl)}">${r.realized_pnl ? `<span class="qty-clickable" onclick="openPnlModal(${r.item_id},'${esc(r.name)}')">${fmtPnl(r.realized_pnl)}</span>` : '—'}</td>
+        <td class="${pnlClass(r.total_pnl)}"><strong>${fmtPnl(r.total_pnl)}</strong></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Sort click handlers for holdings table
+  document.querySelectorAll('#portfolio-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) { sortDir = -sortDir; }
+      else { sortCol = col; sortDir = th.dataset.type === 'str' ? 1 : -1; }
+      document.querySelectorAll('#portfolio-table thead th').forEach(h => h.className = '');
+      th.className = sortDir === 1 ? 'sort-asc' : 'sort-desc';
+      renderTable();
+    });
+  });
+  document.querySelector('#portfolio-table th[data-col="unrealized_pnl"]').className = 'sort-desc';
+
+  // ── Sales table ───────────────────────────────────────────────────────────
+  function renderSales(data) {
+    const tbody = document.getElementById('sales-body');
+    if (!data.sales.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No sales recorded yet.</td></tr>';
+      return; // stat bar still needs updating even on empty — fall through via restructure below
+    }
+
+    // Update stat bar
+    const totalPages = Math.ceil(salesTotalRows / SALES_PAGE);
+    const curPage    = Math.floor(salesOffset / SALES_PAGE) + 1;
+    document.getElementById('sales-stat').innerHTML =
+      `<strong>${salesTotalRows.toLocaleString()}</strong> sales &nbsp;·&nbsp;` +
+      `Total P&L: <strong class="${pnlClass(data.total_pnl)}">${fmtPnl(data.total_pnl)}</strong> &nbsp;·&nbsp;` +
+      `Revenue: <strong>${fmt(data.total_revenue)}</strong>`;
+    document.getElementById('page-info').textContent = `Page ${curPage} / ${totalPages}`;
+    document.getElementById('btn-prev').disabled = salesOffset === 0;
+    document.getElementById('btn-next').disabled = salesOffset + SALES_PAGE >= salesTotalRows;
+
+    // Group consecutive rows by log_id so FIFO splits are visible
+    const groups = [];
+    for (const s of data.sales) {
+      if (!groups.length || groups.at(-1)[0].log_id !== s.log_id) groups.push([s]);
+      else groups.at(-1).push(s);
+    }
+
+    tbody.innerHTML = groups.map(group => {
+      const isSplit = group.length > 1;
+      return group.map((s, i) => {
+        const isPre    = s.lot_source === 'pre_tracking';
+        const lotDate  = isPre ? '<span class="source-badge pre">pre-tracking</span>'
+                               : `<span class="cell-muted">${fmtDate(s.lot_acquired_at)}</span>`;
+        const splitTag = (isSplit && i === 0)
+          ? ` <span class="source-badge" title="This sale consumed ${group.length} different purchase lots (FIFO)">${group.length} lots</span>`
+          : (isSplit ? '<span class="cell-muted" style="font-size:10px">↳ split</span>' : '');
+        return `<tr class="${i === 0 && groups.indexOf(group) > 0 ? 'sale-group-start' : ''}">
+          <td>
+            <span class="item-name">${esc(s.item_name ?? 'Unknown')}</span>
+            ${splitTag}
+          </td>
+          <td>${i === 0 ? fmtDate(s.happened_at) : '<span class="cell-muted" style="font-size:10px">same txn</span>'}</td>
+          <td>${s.qty}</td>
+          <td>${lotDate}</td>
+          <td class="cell-muted">${fmt(s.unit_cost)}</td>
+          <td>${fmt(s.unit_revenue)}</td>
+          <td>${fmt(s.total_revenue)}</td>
+          <td class="${pnlClass(s.pnl)}"><strong>${fmtPnl(s.pnl)}</strong></td>
+        </tr>`;
+      }).join('');
+    }).join('');
+  }
+
+  function salesPage(dir) {
+    salesOffset = Math.max(0, salesOffset + dir * SALES_PAGE);
+    loadSales();
+  }
+
+  // ── Chart ─────────────────────────────────────────────────────────────────
+  function renderChart(history) {
+    const labels = history.map(d => d.day.split('T')[0]);
+    const values = history.map(d => d.total_value);
+
+    if (histChart) histChart.destroy();
+
+    histChart = new Chart(document.getElementById('history-chart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Portfolio Value',
+          data: values,
+          borderColor: '#6ee7f7',
+          backgroundColor: 'rgba(110,231,247,0.06)',
+          borderWidth: 2,
+          pointRadius: history.length > 60 ? 0 : 3,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(7,8,15,0.9)',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            titleColor: '#94a3b8',
+            bodyColor: '#e2e8f0',
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            callbacks: { label: ctx => ' ' + fmt(ctx.raw) },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 11 } },
+            grid:  { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            ticks: {
+              color: '#64748b',
+              font: { family: 'JetBrains Mono', size: 11 },
+              callback: v => fmt(v),
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+        },
+      },
+    });
+  }
+
+  // ── Lot detail modal ──────────────────────────────────────────────────────
+  function closeModal(e) {
+    if (e.target === document.getElementById('lot-modal')) {
+      document.getElementById('lot-modal').classList.remove('open');
+    }
+  }
+
+  async function openLotModal(itemId, itemName, location) {
+    const modal = document.getElementById('lot-modal');
+    document.getElementById('modal-title').textContent = `${itemName} — Lot Breakdown`;
+    document.getElementById('modal-body').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Loading…</div>';
+    modal.classList.add('open');
+
+    try {
+      const res  = await fetch(`/torn/api/lots/${itemId}`);
+      const data = await res.json();
+
+      if (data.error || !data.lots) {
+        document.getElementById('modal-body').innerHTML = `<div class="empty">Error: ${data.error ?? 'unknown'}</div>`;
+        return;
+      }
+
+      const lots = data.lots;
+      if (!lots.length) {
+        document.getElementById('modal-body').innerHTML = '<div class="empty">No open lots found for this item.</div>';
+        return;
+      }
+
+      const totalRemaining = lots.reduce((s, l) => s + l.qty_remaining, 0);
+      const totalCost      = lots.reduce((s, l) => s + l.qty_remaining * l.unit_cost, 0);
+      const avgCost        = totalRemaining > 0 ? totalCost / totalRemaining : 0;
+
+      const LOT_SOURCE_DETAIL = {
+        1103: 'Item Market (old)', 1112: 'Item Market',
+        1220: 'Bazaar (old)',      1225: 'Bazaar',
+        1301: 'Abroad / Display',  1302: 'Abroad / Display',
+        1500: "Big Al's Bunker",   1501: "Big Al's Bunker",
+        4200: 'Item Shop',         4201: 'Abroad Shop',
+        4320: 'Auction House',
+        4447: 'Trade (received)',   4482: 'Trade (received)',
+      };
+      const sourceLabel = {
+        buy:          'Purchased',
+        trade_in:     'Trade (received)',
+        received:     'Gift / Drop / Event',
+        pre_tracking: 'Pre-tracking (unknown)',
+      };
+
+      document.getElementById('modal-body').innerHTML = `
+        <div class="modal-summary">
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Remaining</span>
+            <span class="modal-stat-value">${totalRemaining.toLocaleString()}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Cost Basis</span>
+            <span class="modal-stat-value">${fmt(totalCost)}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Avg Unit Cost</span>
+            <span class="modal-stat-value">${totalCost > 0 ? fmt(avgCost) : '—'}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Open Lots</span>
+            <span class="modal-stat-value">${lots.length}</span>
+          </div>
+        </div>
+        <table class="lot-table">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Acquired</th>
+              <th>Qty Bought</th>
+              <th>Qty Left</th>
+              <th>Unit Cost</th>
+              <th>Cost Basis</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lots.map(l => {
+              const isPre      = l.source === 'pre_tracking';
+              const detailLabel = isPre
+                ? 'Pre-tracking (unknown)'
+                : (LOT_SOURCE_DETAIL[l.log_type] ?? sourceLabel[l.source] ?? l.source);
+              return `<tr>
+                <td><span class="source-badge ${isPre ? 'pre' : ''}">${detailLabel}</span></td>
+                <td>${isPre ? '<span class="cell-muted">before tracking</span>' : fmtDate(l.acquired_at)}</td>
+                <td>${l.qty_original.toLocaleString()}</td>
+                <td><strong>${l.qty_remaining.toLocaleString()}</strong></td>
+                <td class="cell-muted">${l.unit_cost > 0 ? fmt(l.unit_cost) : '—'}</td>
+                <td>${l.unit_cost > 0 ? fmt(l.qty_remaining * l.unit_cost) : '—'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      document.getElementById('modal-body').innerHTML = `<div class="empty">Failed to load: ${err.message}</div>`;
+    }
+  }
+
+  async function openPnlModal(itemId, itemName) {
+    const modal = document.getElementById('lot-modal');
+    document.getElementById('modal-title').textContent = `${itemName} — Realized P&L Breakdown`;
+    document.getElementById('modal-body').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Loading…</div>';
+    modal.classList.add('open');
+
+    try {
+      const res  = await fetch(`/torn/api/sales?item_id=${itemId}&limit=500`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('modal-body').innerHTML = `<div class="empty">Error: ${data.error}</div>`;
+        return;
+      }
+
+      const sales = data.sales ?? [];
+      if (!sales.length) {
+        document.getElementById('modal-body').innerHTML = '<div class="empty">No sales recorded for this item.</div>';
+        return;
+      }
+
+      const totalQty     = sales.reduce((s, r) => s + r.qty, 0);
+      const totalRevenue = sales.reduce((s, r) => s + r.total_revenue, 0);
+      const totalPnl     = sales.reduce((s, r) => s + r.pnl, 0);
+
+      document.getElementById('modal-body').innerHTML = `
+        <div class="modal-summary">
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Sold</span>
+            <span class="modal-stat-value">${totalQty.toLocaleString()}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Total Revenue</span>
+            <span class="modal-stat-value">${fmt(totalRevenue)}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Realized P&amp;L</span>
+            <span class="modal-stat-value ${pnlClass(totalPnl)}">${fmtPnl(totalPnl)}</span>
+          </div>
+          <div class="modal-stat">
+            <span class="modal-stat-label">Transactions</span>
+            <span class="modal-stat-value">${sales.length}</span>
+          </div>
+        </div>
+        <table class="lot-table">
+          <thead>
+            <tr>
+              <th>Sale Date</th>
+              <th>Qty</th>
+              <th>Lot Date</th>
+              <th>Unit Cost</th>
+              <th>Unit Revenue</th>
+              <th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sales.map(s => {
+              const isPre = s.lot_source === 'pre_tracking';
+              return `<tr>
+                <td>${fmtDate(s.happened_at)}</td>
+                <td>${s.qty.toLocaleString()}</td>
+                <td>${isPre ? '<span class="cell-muted">pre-tracking</span>' : fmtDate(s.lot_acquired_at)}</td>
+                <td class="cell-muted">${s.unit_cost > 0 ? fmt(s.unit_cost) : '—'}</td>
+                <td>${fmt(s.unit_revenue)}</td>
+                <td class="${pnlClass(s.pnl)}">${fmtPnl(s.pnl)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      document.getElementById('modal-body').innerHTML = `<div class="empty">Failed to load: ${err.message}</div>`;
+    }
+  }
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  async function loadPortfolio() {
+    const res  = await fetch('/torn/api/portfolio');
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('portfolio-body').innerHTML =
+        `<tr><td colspan="11" class="empty" style="color:var(--neg)">${esc(data.error)}</td></tr>`;
+      return;
+    }
+
+    portfolioData = data.items;
+    const t = data.totals;
+
+    setTile('tile-value',      t.total_value);
+    setTile('tile-cost',       t.cost_basis);
+    setTile('tile-realized',   t.realized_pnl,   true);
+    setTile('tile-unrealized', t.unrealized_pnl, true);
+
+    const syncEl = document.getElementById('sync-time');
+    syncEl.textContent = data.syncedAt
+      ? 'Last sync: ' + new Date(data.syncedAt).toLocaleString()
+      : 'Never synced';
+
+    renderTable();
+  }
+
+  async function loadSales() {
+    document.getElementById('sales-body').innerHTML =
+      '<tr><td colspan="8" class="empty">Loading…</td></tr>';
+
+    const url = `/torn/api/sales?limit=${SALES_PAGE}&offset=${salesOffset}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('sales-body').innerHTML =
+        `<tr><td colspan="8" class="empty" style="color:var(--neg)">${esc(data.error)}</td></tr>`;
+      return;
+    }
+
+    salesTotalRows = data.total;
+    salesLoaded    = true;
+    renderSales(data);
+  }
+
+  async function loadHistory() {
+    const res  = await fetch('/torn/api/history');
+    const data = await res.json();
+    if (Array.isArray(data)) renderChart(data);
+  }
+
+  async function triggerSync() {
+    const btn = document.getElementById('btn-sync');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    try {
+      await fetch('/torn/api/sync', { method: 'POST' });
+      showToast('Sync started — may take a few minutes on first run');
+    } catch {
+      showToast('Failed to trigger sync');
+    }
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = 'Sync Now';
+      salesLoaded = false; // allow refresh when tab is reopened
+    }, 3000);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // ── Backfill status ───────────────────────────────────────────────────────
+  let backfillPollTimer = null;
+
+  async function loadBackfillStatus() {
+    const res  = await fetch('/torn/api/backfill-status');
+    const data = await res.json();
+
+    const bar     = document.getElementById('backfill-bar');
+    const title   = document.getElementById('backfill-title');
+    const detail  = document.getElementById('backfill-detail');
+    const fill    = document.getElementById('backfill-fill');
+    const btn     = document.getElementById('btn-backfill');
+    const hint    = document.getElementById('backfill-hint');
+
+    const total   = data.total_logs;
+    const oldest  = data.oldest_log ? new Date(data.oldest_log).toLocaleDateString() : '?';
+    const newest  = data.newest_log ? new Date(data.newest_log).toLocaleDateString() : '?';
+
+    if (data.running) {
+      bar.classList.add('visible');
+      title.textContent  = 'Fetching historical logs…';
+      detail.innerHTML   =
+        `<strong>${total.toLocaleString()}</strong> logs stored &nbsp;·&nbsp;` +
+        `Going back to <strong>${data.oldest_ts ? new Date(data.oldest_ts).toLocaleDateString() : '…'}</strong> &nbsp;·&nbsp;` +
+        `Page <strong>${data.pages}</strong>`;
+      fill.style.width   = '100%'; // animated pulse looks better than fake %
+      fill.style.animation = 'pulse-bar 1.5s ease-in-out infinite';
+      btn.disabled       = true;
+      btn.textContent    = 'Running…';
+      hint.textContent   = 'Logs are being fetched in the background';
+
+      // Keep polling every 3s while running
+      if (!backfillPollTimer) {
+        backfillPollTimer = setInterval(loadBackfillStatus, 3000);
+      }
+    } else {
+      // Stop polling
+      if (backfillPollTimer) { clearInterval(backfillPollTimer); backfillPollTimer = null; }
+      fill.style.animation = 'none';
+
+      bar.classList.add('visible');
+
+      if (data.completed) {
+        // Backfill ran to completion (reached beginning of account history)
+        title.textContent     = 'Log history complete';
+        detail.innerHTML      =
+          `<strong>${total.toLocaleString()}</strong> logs &nbsp;·&nbsp;` +
+          `Coverage: <strong>${oldest}</strong> → <strong>${newest}</strong>`;
+        fill.style.width      = '100%';
+        fill.style.background = 'var(--pos)';
+        fill.style.animation  = 'none';
+        btn.style.display     = 'none';
+        hint.textContent      = '';
+      } else {
+        // Not yet run or incomplete — show start button
+        title.textContent = 'Historical logs incomplete';
+        detail.innerHTML  =
+          `<strong>${total.toLocaleString()}</strong> logs in DB &nbsp;·&nbsp;` +
+          `Coverage: <strong>${oldest}</strong> → <strong>${newest}</strong> &nbsp;·&nbsp;` +
+          `Fetch your full account history to improve cost tracking`;
+        fill.style.width  = '20%';
+        btn.disabled      = false;
+        btn.textContent   = 'Start Full History Fetch';
+        btn.style.display = '';
+        hint.textContent  = 'Takes a few minutes · safe to leave running';
+      }
+    }
+  }
+
+  async function startBackfill() {
+    const btn = document.getElementById('btn-backfill');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    try {
+      const res  = await fetch('/torn/api/backfill/start', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        showToast('Backfill started — fetching full log history');
+        loadBackfillStatus(); // kick off polling
+      } else {
+        showToast(data.message || 'Failed to start backfill');
+        btn.disabled = false;
+        btn.textContent = 'Start Full History Fetch';
+      }
+    } catch {
+      showToast('Failed to start backfill');
+      btn.disabled = false;
+      btn.textContent = 'Start Full History Fetch';
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadPortfolio();
+  loadHistory();
+  loadBackfillStatus();
+</script>
+</body>
+</html>

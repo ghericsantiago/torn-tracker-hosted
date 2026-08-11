@@ -22,6 +22,9 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
+// Serve static files (torn.js, etc.) from public/torn/
+router.use(express.static(path.join(__dirname, '../public/torn')));
+
 router.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/torn/index.html'));
 });
