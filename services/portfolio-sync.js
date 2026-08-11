@@ -245,7 +245,7 @@ async function runLogSync() {
   logSyncRunning = true;
   try {
     await syncLogs(apiKey);
-    // await processLots();
+    await processLots();
   } catch (err) {
     console.error('[portfolio] Log sync error:', err.message);
   } finally {
