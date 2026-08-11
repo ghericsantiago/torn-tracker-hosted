@@ -36,7 +36,7 @@ async function retryOnRateLimit(fn, label) {
       return await fn();
     } catch (err) {
       if (err instanceof TornApiError && err.isRateLimit) {
-        console.warn(`[portfolio] Rate limited on ${label} — waiting 60s`);
+        console.warn(`[portfolio] Transient error on ${label} (code ${err.code}) — waiting 60s`);
         await sleep(60_000);
         continue;
       }
@@ -101,7 +101,7 @@ async function syncLogs(apiKey) {
       ({ entries, prevUrl } = await fetchUserLogPage(url, apiKey));
     } catch (err) {
       if (err instanceof TornApiError && err.isRateLimit) {
-        console.warn(`[portfolio] Rate limited (code ${err.code}) — waiting 60s`);
+        console.warn(`[portfolio] Transient error (code ${err.code}) — waiting 60s`);
         await sleep(60_000);
         continue;
       }
@@ -240,7 +240,7 @@ let logSyncRunning = false;
 // Lightweight: only fetch new logs and process lots (1-2 API calls)
 async function runLogSync() {
   const apiKey = process.env.TORN_API_KEY;
-  if (!apiKey) return;
+  if (!apiKey) { console.warn('[portfolio] TORN_API_KEY not set — skipping log sync'); return; }
   if (logSyncRunning || syncRunning) return; // full sync covers this too
   logSyncRunning = true;
   try {

@@ -11,15 +11,15 @@ function resolveUrl(url) {
   return url;
 }
 
-// Torn API errors that are transient and should NOT count as item failures
-const RATE_LIMIT_CODES = new Set([5, 8, 14]);
+// Torn API errors that are transient and should be retried
+const RETRYABLE_CODES = new Set([5, 8, 14, 17]);
 
 class TornApiError extends Error {
   constructor(code, message) {
     super(message);
     this.name = 'TornApiError';
     this.code = code;
-    this.isRateLimit = RATE_LIMIT_CODES.has(code);
+    this.isRateLimit = RETRYABLE_CODES.has(code);
   }
 }
 
