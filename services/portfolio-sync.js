@@ -236,6 +236,7 @@ async function snapshotInventory(apiKey) {
 
 let syncRunning    = false;
 let logSyncRunning = false;
+let lastSnapshotMs = 0;
 
 // Lightweight: only fetch new logs and process lots (1-2 API calls)
 async function runLogSync() {
@@ -246,6 +247,11 @@ async function runLogSync() {
   try {
     await syncLogs(apiKey);
     await processLots();
+    // Refresh inventory snapshot every 5 min to keep INV counts current
+    if (Date.now() - lastSnapshotMs >= 5 * 60_000) {
+      lastSnapshotMs = Date.now();
+      await snapshotInventory(apiKey);
+    }
   } catch (err) {
     console.error('[portfolio] Log sync error:', err.message);
   } finally {
