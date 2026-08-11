@@ -236,7 +236,6 @@ async function snapshotInventory(apiKey) {
 
 let syncRunning    = false;
 let logSyncRunning = false;
-let lastSnapshotMs = 0;
 
 // Lightweight: only fetch new logs and process lots (1-2 API calls)
 async function runLogSync() {
@@ -246,16 +245,81 @@ async function runLogSync() {
   logSyncRunning = true;
   try {
     await syncLogs(apiKey);
-    await processLots();
-    // Refresh inventory snapshot every 5 min to keep INV counts current
-    if (Date.now() - lastSnapshotMs >= 5 * 60_000) {
-      lastSnapshotMs = Date.now();
-      await snapshotInventory(apiKey);
+    const processed = await processLots();
+    // If lots changed, sync the snapshot table directly (no API calls needed)
+    if (processed > 0) {
+      await syncSnapshotFromLots();
     }
   } catch (err) {
     console.error('[portfolio] Log sync error:', err.message);
   } finally {
     logSyncRunning = false;
+  }
+}
+
+// Update inventory snapshot entries to match current lot totals.
+// Avoids calling snapshotInventory (24 API calls) on every log sync.
+async function syncSnapshotFromLots() {
+  const now = new Date().toISOString();
+
+  const { rows: lotTotals } = await db.query(`
+    SELECT item_id, SUM(qty_remaining) AS total
+    FROM torn_lots WHERE qty_remaining > 0
+    GROUP BY item_id
+  `);
+
+  const { rows: snapTotals } = await db.query(`
+    WITH latest AS (
+      SELECT DISTINCT ON (item_id, location) item_id, location, qty
+      FROM torn_inventory_snapshots
+      ORDER BY item_id, location, taken_at DESC
+    )
+    SELECT item_id, SUM(qty) AS total
+    FROM latest GROUP BY item_id
+  `);
+
+  const snapMap = new Map(snapTotals.map(r => [r.item_id, Number(r.total)]));
+  let updated = 0;
+
+  for (const row of lotTotals) {
+    const lotTotal = Number(row.total);
+    const snapTotal = snapMap.get(row.item_id) || 0;
+    const delta = lotTotal - snapTotal;
+    if (delta === 0) continue;
+
+    const { rows: latest } = await db.query(`
+      SELECT location, qty FROM torn_inventory_snapshots
+      WHERE item_id = $1 ORDER BY taken_at DESC LIMIT 1
+    `, [row.item_id]);
+
+    const location = latest[0]?.location || 'inventory';
+    const newQty   = Math.max(0, (Number(latest[0]?.qty) || 0) + delta);
+
+    await db.query(`
+      INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
+      VALUES ($1, $2, $3, $4)
+    `, [now, row.item_id, location, newQty]);
+    updated++;
+  }
+
+  // Handle items only in snapshots (fully consumed)
+  for (const row of snapTotals) {
+    if (Number(row.total) > 0 && !lotTotals.find(l => l.item_id === row.item_id)) {
+      const { rows: latest } = await db.query(`
+        SELECT location FROM torn_inventory_snapshots
+        WHERE item_id = $1 ORDER BY taken_at DESC LIMIT 1
+      `, [row.item_id]);
+
+      await db.query(`
+        INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
+        VALUES ($1, $2, $3, 0)
+      `, [now, row.item_id, latest[0]?.location || 'inventory']);
+      updated++;
+    }
+  }
+
+  if (updated > 0) {
+    console.log(`[portfolio] Snapshot synced from lots: ${updated} items updated`);
   }
 }
 
