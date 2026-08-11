@@ -569,8 +569,58 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 @media (max-width: 900px) {
   .dashboard-grid { grid-template-columns: 1fr; }
   .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .nav { padding: 0 1rem; }
+  .table-search { width: 150px; }
 }
-@media (max-width: 600px) {
-  .dashboard { padding: 1rem; }
+
+@media (max-width: 640px) {
+  .dashboard { padding: 1rem; gap: 1rem; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 0.65rem; }
+
+  /* Stat cards: more compact */
+  .stat-card { padding: 0.85rem 0.75rem; }
+  .stat-value { font-size: 1.35rem; }
+  .stat-label { font-size: 0.65rem; }
+
+  /* Nav: hide "View Client" link, keep Settings + Logout */
+  .nav-right a.btn { display: none; }
+  .nav { padding: 0 0.85rem; }
+  .nav-inner { height: 50px; }
+
+  /* Table: hide less critical columns to fit screen */
+  #itemsTable thead th:nth-child(1),
+  #itemsTable tbody td:nth-child(1) { display: none; } /* Item ID */
+  #itemsTable thead th:nth-child(6),
+  #itemsTable tbody td:nth-child(6) { display: none; } /* Retries */
+  #itemsTable thead th:nth-child(7),
+  #itemsTable tbody td:nth-child(7) { display: none; } /* Records */
+
+  /* Table cells: tighter padding */
+  tbody td { padding: 0.6rem 0.5rem; font-size: 0.8rem; }
+  thead th  { padding: 0 0.5rem 0.6rem; }
+
+  /* Table controls: stack search under heading */
+  .table-header { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .table-controls { width: 100%; }
+  .table-search { width: 100%; flex: 1; }
+
+  /* Buttons: larger touch targets */
+  .btn { padding: 0.6rem 1rem; }
+  .btn-sm { padding: 0.5rem 0.85rem; }
+
+  /* Add card: full-width */
+  .add-card { padding: 1.25rem; }
+
+  /* Modal: full-width on small screens */
+  .modal-card { width: calc(100vw - 2rem); padding: 1.25rem; }
+  .settings-modal-card { width: calc(100vw - 2rem); }
+}
+
+@media (max-width: 480px) {
   .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .stat-value { font-size: 1.2rem; }
+  .nav-brand { font-size: 0.88rem; }
+
+  /* Action buttons: icon-only to save space */
+  .actions .btn-icon { padding: 0.35rem; font-size: 1.1rem; }
 }
