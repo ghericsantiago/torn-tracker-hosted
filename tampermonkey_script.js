@@ -863,10 +863,7 @@
         activeTab = btn.dataset.tab;
         panel.querySelectorAll('.pt-tab').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        if (!loadedTabs.has(activeTab) && (activeTab === 'buy' || activeTab === 'sell')) {
-          if (!loadedTabs.has('buy')) { startCooldown(); loadData(); return; }
-        }
-        if (!loadedTabs.has(activeTab)) { startCooldown(); loadData(); return; }
+        if (!loadedTabs.has(activeTab)) { loadData(); return; }
         rerender();
       });
     });
@@ -948,7 +945,6 @@
     startCooldown();
 
     showLoading(true);
-    apiCallCount = 0;
     const badge = document.getElementById('pt-api-badge');
     if (badge) { badge.textContent = 'DB'; badge.classList.remove('active'); }
 
@@ -971,44 +967,32 @@
 
       const fromTs = toUnix(from, false);
       const toTs   = toUnix(to,   true);
-      setStatus('Fetching transaction logs…');
-      const tab = activeTab;
+      setStatus('Fetching all transaction logs…');
 
-      if (tab === 'buy' || tab === 'sell') {
-        const [buyRaw, sellRaw] = await Promise.all([
-          gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${BUY_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}`),
-          gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${SELL_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}`),
-        ]);
-        if (buyRaw.error)  throw new Error(buyRaw.error.error || buyRaw.error);
-        if (sellRaw.error) throw new Error(sellRaw.error.error || sellRaw.error);
-        originalBuyData  = processLogs(buyRaw.log || []);
-        originalSellData = processLogs(sellRaw.log || []);
-        loadedTabs.add('buy').add('sell');
-        setStatus(`${originalBuyData.length} buys · ${originalSellData.length} sells`, 'ok');
-      } else if (tab === 'trades') {
-        const tradeRaw = await gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${TRADE_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}`);
-        if (tradeRaw.error) throw new Error(tradeRaw.error.error || tradeRaw.error);
-        tradeData = processTrades(tradeRaw.log || []);
-        loadedTabs.add('trades');
-        setStatus(`${tradeData.length} trades`, 'ok');
-      } else if (tab === 'free') {
-        const freeRaws = await Promise.all(FREE_LOG_GROUPS.map(g =>
-          gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${g.join(',')}&from=${fromTs}&to=${toTs}`)
-        ));
-        for (const r of freeRaws) { if (r.error) throw new Error(r.error.error || r.error); }
-        freeItemsData = processFreeItems(freeRaws.flatMap(r => r.log || []));
-        loadedTabs.add('free');
-        setStatus(`${freeItemsData.length} free items`, 'ok');
-      } else if (tab === 'usage') {
-        const usageRaws = await Promise.all(USAGE_LOG_GROUPS.map(g =>
-          gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${g.join(',')}&from=${fromTs}&to=${toTs}`)
-        ));
-        for (const r of usageRaws) { if (r.error) throw new Error(r.error.error || r.error); }
-        usageData = processUsageItems(usageRaws.flatMap(r => r.log || []));
-        loadedTabs.add('usage');
-        setStatus(`${usageData.length} items used`, 'ok');
-      }
+      // Fetch all log types in parallel — no Torn API rate limits anymore
+      const [buyRaw, sellRaw, tradeRaw, freeRaw, usageRaw] = await Promise.all([
+        gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${BUY_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}&limit=5000`),
+        gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${SELL_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}&limit=5000`),
+        gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${TRADE_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}&limit=5000`),
+        gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${ALL_FREE_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}&limit=5000`),
+        gmFetch(`${serverUrl}/api/portfolio/logs?logTypes=${ALL_USAGE_LOG_TYPES.join(',')}&from=${fromTs}&to=${toTs}&limit=5000`),
+      ]);
 
+      if (buyRaw.error)   throw new Error(buyRaw.error.error   || buyRaw.error);
+      if (sellRaw.error)  throw new Error(sellRaw.error.error  || sellRaw.error);
+      if (tradeRaw.error) throw new Error(tradeRaw.error.error || tradeRaw.error);
+      if (freeRaw.error)  throw new Error(freeRaw.error.error  || freeRaw.error);
+      if (usageRaw.error) throw new Error(usageRaw.error.error || usageRaw.error);
+
+      originalBuyData  = processLogs(buyRaw.log || []);
+      originalSellData = processLogs(sellRaw.log || []);
+      tradeData        = processTrades(tradeRaw.log || []);
+      freeItemsData    = processFreeItems(freeRaw.log || []);
+      usageData        = processUsageItems(usageRaw.log || []);
+
+      loadedTabs.add('buy').add('sell').add('trades').add('free').add('usage');
+
+      setStatus(`${originalBuyData.length} buys · ${originalSellData.length} sells · ${tradeData.length} trades · ${freeItemsData.length} free · ${usageData.length} used`, 'ok');
       rerender();
     } catch (e) {
       if (cooldownTimer) { clearInterval(cooldownTimer); cooldownTimer = null; }
