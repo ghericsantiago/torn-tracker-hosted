@@ -79,6 +79,7 @@ async function backfill() {
 
     pages++;
 
+    let pageInserted = 0;
     for (const entry of entries) {
       const logType = entry.details?.id;
       if (!logType) continue;
@@ -90,17 +91,24 @@ async function backfill() {
          ON CONFLICT (id) DO NOTHING`,
         [logId, logType, entry.timestamp, JSON.stringify(entry.data ?? {})]
       );
-      if (result.rowCount > 0) inserted++;
+      if (result.rowCount > 0) { inserted++; pageInserted++; }
     }
 
-    // Oldest entry on this page becomes the to= cursor for the next page
+    // Oldest entry on this page becomes the to= cursor for the next page.
+    // Use oldestTs (not -1) so we re-fetch entries at the same second on the
+    // next page — multiple entries can share a timestamp and the page boundary
+    // can split them. ON CONFLICT (id) DO NOTHING handles the overlap safely.
+    // If the cursor didn't advance and nothing new was inserted, all entries at
+    // this timestamp are already captured — subtract 1 to move past it.
     const oldestTs = entries.at(-1).timestamp;
     const oldest   = new Date(oldestTs * 1000).toISOString().slice(0, 10);
     const newest   = new Date(entries[0].timestamp * 1000).toISOString().slice(0, 10);
     console.log(`[backfill] Page ${pages}: ${newest} → ${oldest} | +${inserted} new total`);
 
-    // Checkpoint
-    const nextToTs = oldestTs - 1;
+    const nextToTs = (pageInserted === 0 && toTs !== null && oldestTs === toTs)
+      ? oldestTs - 1  // stuck at same boundary with nothing new — advance past it
+      : oldestTs;     // re-fetch this second to catch any remaining entries
+
     await setState('backfill_to_cursor', nextToTs);
     await setState('backfill_pages',     pages);
     await setState('backfill_oldest_ts', oldestTs);
