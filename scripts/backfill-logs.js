@@ -6,6 +6,9 @@ const TORN_BASE = 'https://api.torn.com';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Target ~50 req/min (Torn limit is 100/min). Override with BACKFILL_SLEEP_MS env var.
+const SLEEP_MS = Number(process.env.BACKFILL_SLEEP_MS ?? 900);
+
 async function getState(key) {
   const { rows } = await db.query('SELECT value FROM torn_sync_state WHERE key = $1', [key]);
   return rows[0]?.value ?? null;
@@ -116,7 +119,7 @@ async function backfill() {
     await setState('backfill_oldest_ts', oldestTs);
 
     toTs = nextToTs;
-    await sleep(1500);
+    await sleep(SLEEP_MS);
   }
 
   // Cleanup and finalize
