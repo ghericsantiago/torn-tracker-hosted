@@ -94,20 +94,18 @@ async function backfill() {
       if (result.rowCount > 0) { inserted++; pageInserted++; }
     }
 
-    // Oldest entry on this page becomes the to= cursor for the next page.
-    // Use oldestTs (not -1) so we re-fetch entries at the same second on the
-    // next page — multiple entries can share a timestamp and the page boundary
-    // can split them. ON CONFLICT (id) DO NOTHING handles the overlap safely.
-    // If the cursor didn't advance and nothing new was inserted, all entries at
-    // this timestamp are already captured — subtract 1 to move past it.
+    // The Torn API `to=` parameter is EXCLUSIVE (returns ts < to, not ts ≤ to),
+    // and the page size is capped at 100 entries regardless of limit=.
+    // To include all entries at ts=oldestTs on the next page, use oldestTs+1.
+    // If we're stuck (full page, nothing new, same cursor), force-advance past
+    // this second to avoid an infinite loop (>100 events in one second).
     const oldestTs = entries.at(-1).timestamp;
     const oldest   = new Date(oldestTs * 1000).toISOString().slice(0, 10);
     const newest   = new Date(entries[0].timestamp * 1000).toISOString().slice(0, 10);
     console.log(`[backfill] Page ${pages}: ${newest} → ${oldest} | +${inserted} new total`);
 
-    const nextToTs = (pageInserted === 0 && toTs !== null && oldestTs === toTs)
-      ? oldestTs - 1  // stuck at same boundary with nothing new — advance past it
-      : oldestTs;     // re-fetch this second to catch any remaining entries
+    const stuck = pageInserted === 0 && entries.length >= 100 && toTs === oldestTs + 1;
+    const nextToTs = stuck ? oldestTs : oldestTs + 1;
 
     await setState('backfill_to_cursor', nextToTs);
     await setState('backfill_pages',     pages);

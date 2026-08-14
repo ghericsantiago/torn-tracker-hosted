@@ -133,9 +133,9 @@ async function fetchUserLogPage(url, apiKey) {
   return { entries, prevUrl };
 }
 
-// log=0 returns all log types; limit=1000 is the max per page
+// log=0 returns all log types. API caps pages at 100 entries regardless of limit.
 function buildUserLogUrl(apiKey) {
-  return `${TORN_BASE}/v2/user/log?log=0&limit=1000&sort=desc&key=${apiKey}`;
+  return `${TORN_BASE}/v2/user/log?log=0&limit=100&sort=desc&key=${apiKey}`;
 }
 
 module.exports = {
