@@ -7,9 +7,9 @@
 BEGIN;
 
 -- Clear derived tables first (lot_events references lots)
-TRUNCATE torn_lot_events RESTART IDENTITY;
-TRUNCATE torn_lots       RESTART IDENTITY;
-TRUNCATE torn_logs;
+DELETE FROM torn_lot_events;
+DELETE FROM torn_lots;
+DELETE FROM torn_logs;
 
 -- Clear all sync cursors so the next run starts a fresh backfill
 DELETE FROM torn_sync_state
