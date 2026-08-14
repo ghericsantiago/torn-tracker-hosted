@@ -104,7 +104,11 @@ async function backfill() {
     const newest   = new Date(entries[0].timestamp * 1000).toISOString().slice(0, 10);
     console.log(`[backfill] Page ${pages}: ${newest} → ${oldest} | +${inserted} new total`);
 
-    const stuck = pageInserted === 0 && entries.length >= 100 && toTs === oldestTs + 1;
+    // If no new entries were inserted AND the cursor didn't advance past this second
+    // (toTs === oldestTs + 1 means we already tried this boundary), force-advance past
+    // oldestTs to avoid looping. The entries.length >= 100 guard is omitted because
+    // the API may return <100 entries at the boundary while still having all duplicates.
+    const stuck = pageInserted === 0 && toTs !== null && toTs === oldestTs + 1;
     const nextToTs = stuck ? oldestTs : oldestTs + 1;
 
     await setState('backfill_to_cursor', nextToTs);
