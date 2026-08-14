@@ -24,7 +24,6 @@ const SELL_TYPES = [
   1110,        // Item market sell (uses data.price instead of cost_total)
   1212,        // Bazaar sell (legacy — older variant)
   1221, 1226,  // Bazaar sell (legacy, new)
-  1222,        // Bazaar sell (variant, uses data.price instead of cost_total)
   1500,        // Big Al's bunker sell
   4210,        // Item shop sell
   4220,        // Item shop sell points

@@ -114,7 +114,7 @@ async function syncLogs(apiKey) {
       const ts      = entry.timestamp;
       const logType = entry.details?.id;
       if (!logType) continue;
-      if (stopAt && ts <= stopAt) { done = true; break; }
+      if (stopAt && ts < stopAt) { done = true; break; }
 
       const logId = entry.id ?? `${ts}_${logType}`;
       await db.query(
@@ -287,33 +287,48 @@ async function syncSnapshotFromLots() {
     const delta = lotTotal - snapTotal;
     if (delta === 0) continue;
 
+    // Re-insert all location rows to preserve inv/baz/disp split,
+    // then apply delta to 'inventory' (the default catch-all)
     const { rows: latest } = await db.query(`
       SELECT location, qty FROM torn_inventory_snapshots
-      WHERE item_id = $1 ORDER BY taken_at DESC LIMIT 1
+      WHERE item_id = $1 AND taken_at = (
+        SELECT MAX(taken_at) FROM torn_inventory_snapshots WHERE item_id = $1
+      )
     `, [row.item_id]);
 
-    const location = latest[0]?.location || 'inventory';
-    const newQty   = Math.max(0, (Number(latest[0]?.qty) || 0) + delta);
+    // Copy all location rows forward to current timestamp
+    for (const loc of latest) {
+      await db.query(`
+        INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
+        VALUES ($1, $2, $3, $4)
+      `, [now, row.item_id, loc.location, loc.qty]);
+    }
 
+    // Apply delta to inventory
+    const invQty = Math.max(0, (Number(latest.find(l => l.location === 'inventory')?.qty) || 0) + delta);
     await db.query(`
       INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
-      VALUES ($1, $2, $3, $4)
-    `, [now, row.item_id, location, newQty]);
+      VALUES ($1, $2, 'inventory', $3)
+    `, [now, row.item_id, invQty]);
     updated++;
   }
 
-  // Handle items only in snapshots (fully consumed)
+  // Handle items only in snapshots (fully consumed since last snapshot)
   for (const row of snapTotals) {
     if (Number(row.total) > 0 && !lotTotals.find(l => l.item_id === row.item_id)) {
       const { rows: latest } = await db.query(`
-        SELECT location FROM torn_inventory_snapshots
-        WHERE item_id = $1 ORDER BY taken_at DESC LIMIT 1
+        SELECT location, qty FROM torn_inventory_snapshots
+        WHERE item_id = $1 AND taken_at = (
+          SELECT MAX(taken_at) FROM torn_inventory_snapshots WHERE item_id = $1
+        )
       `, [row.item_id]);
 
-      await db.query(`
-        INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
-        VALUES ($1, $2, $3, 0)
-      `, [now, row.item_id, latest[0]?.location || 'inventory']);
+      for (const loc of latest) {
+        await db.query(`
+          INSERT INTO torn_inventory_snapshots (taken_at, item_id, location, qty)
+          VALUES ($1, $2, $3, 0)
+        `, [now, row.item_id, loc.location]);
+      }
       updated++;
     }
   }

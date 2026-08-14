@@ -1027,7 +1027,7 @@
     logs.forEach(log => {
       const d       = log.data || {};
       const logType = log.log ?? log.log_type ?? log.type ?? log.details?.id;
-      let itemId    = d.item ?? d.items?.[0]?.id;
+      let itemId    = (Array.isArray(d.item) ? d.item[0]?.id : d.item) ?? d.items?.[0]?.id;
 
       if (!itemId && POINTS_LOG_TYPES.has(logType)) itemId = '__points__';
       if (!itemId) return;
