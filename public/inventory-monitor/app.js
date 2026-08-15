@@ -3,7 +3,7 @@ const TZ = 'America/New_York';   // Torn City timezone (ET)
 const FMT_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 const FMT_START = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-function fmtTime(tsMs) { return tsMs ? FMT_TIME.format(new Date(tsMs)) : 'â€”'; }
+function fmtTime(tsMs) { return tsMs ? FMT_TIME.format(new Date(tsMs)) : '—'; }
 function fmtQty(n) { return (n || 0).toLocaleString(); }
 function fmt$(n) {
   if (!n) return '$0';
@@ -57,11 +57,11 @@ function render() {
   const dot = $('st-poll');
   const p = state.poll || {};
   if (p.inProgress) {
-    dot.innerHTML = '<span class="dot busy"></span>pollingâ€¦';
+    dot.innerHTML = '<span class="dot busy"></span>polling…';
   } else if (!state.apiKeySet) { dot.innerHTML = '<span class="dot bad"></span>API key not set'; }
   else if (p.lastOk) {
     const ago = p.lastTs ? Math.round((Date.now() - p.lastTs) / 1000) : 0;
-    dot.innerHTML = `<span class="dot ok"></span>${esc(p.lastMsg || 'OK')} Â· ${ago}s ago`;
+    dot.innerHTML = `<span class="dot ok"></span>${esc(p.lastMsg || 'OK')} · ${ago}s ago`;
   } else {
     dot.innerHTML = `<span class="dot bad"></span>${esc(p.lastMsg || 'poll failed')}`;
   }
@@ -70,7 +70,7 @@ function render() {
     const pct = Math.max(0, Math.min(100, Math.round(pr.current / pr.total * 100)));
     $('poll-progress').style.display = '';
     $('poll-progress-fill').style.width = pct + '%';
-    $('poll-progress-label').textContent = `${pr.label} Â· ${pct}%`;
+    $('poll-progress-label').textContent = `${pr.label} · ${pct}%`;
   } else {
     $('poll-progress').style.display = 'none';
   }
@@ -88,7 +88,7 @@ function render() {
   if (view === 'museum') { renderMuseum(q); return; }
   if (view === 'transfers') { renderTransfers(q); return; }
 
-  // â”€â”€ Monitor view â”€â”€
+  // ── Monitor view ──
   const inItems  = sortRows(state.items.filter(it => it.in > 0 && matches(it)), 'tb-in').slice(0, 200);
   const outItems = sortRows(state.items.filter(it => it.out > 0 && matches(it)), 'tb-out').slice(0, 200);
   $('in-count').textContent  = state.items.filter(it => it.in > 0 && matches(it)).length;
@@ -96,7 +96,7 @@ function render() {
 
   $('tb-in').innerHTML = inItems.length ? inItems.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
       <td class="gold">${fmt$(it.value * it.in)}</td>
       <td class="dim">${topSources(it.sourcesIn)}</td>
@@ -106,8 +106,8 @@ function render() {
 
   $('tb-out').innerHTML = outItems.length ? outItems.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">âš–</button></td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out">âˆ’${fmtQty(it.out)}</td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="gold">${fmt$(it.value * it.out)}</td>
       <td class="dim">${topSources(it.sourcesOut)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
@@ -118,9 +118,9 @@ function render() {
   $('activity').innerHTML = acts.length ? acts.map(a => `
     <div class="act">
       <span class="t">${fmtTime(a.ts)}</span>
-      <span class="dir ${a.dir}">${a.dir === 'in' ? 'â–²' : 'â–¼'}</span>
+      <span class="dir ${a.dir}">${a.dir === 'in' ? '▲' : '▼'}</span>
       <span class="item">${esc(a.name)}</span>
-      <span class="qty">${a.dir === 'in' ? '+' : 'âˆ’'}${fmtQty(a.qty)}</span>
+      <span class="qty">${a.dir === 'in' ? '+' : '−'}${fmtQty(a.qty)}</span>
       <span class="lg">${esc(a.source)}</span>
       <span class="src">${esc(a.title || '')}</span>
     </div>`).join('')
@@ -133,7 +133,7 @@ function render() {
   updateSortIndicators();
 }
 
-// â”€â”€ Inventory view: the ledger (baseline zero + net flows) â”€â”€
+// ── Inventory view: the ledger (baseline zero + net flows) ──
 function renderInventory(q) {
   const cur = state.current || {};
   $('iv-items').textContent = fmtQty(cur.stockItems);
@@ -151,17 +151,17 @@ function renderInventory(q) {
 
   $('tb-inv').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out">âˆ’${fmtQty(it.out)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No inventory yet â€” nothing has moved since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="6" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Bazaar view: separate stock ledger (added âˆ’ sold âˆ’ removed) â”€â”€
+// ── Bazaar view: separate stock ledger (added − sold − removed) ──
 function renderBazaar(q) {
   const bz = state.bazaar || { items: [], revenue: 0, unitsSold: 0 };
   $('bz-rev').textContent   = fmt$(bz.revenue);
@@ -179,10 +179,10 @@ function renderBazaar(q) {
 
   $('tb-bz').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Bazaar Added">+${fmtQty(it.in)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Sold">âˆ’${fmtQty(it.sold)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Removed">âˆ’${fmtQty(it.removed)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Sold">−${fmtQty(it.sold)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
@@ -190,13 +190,13 @@ function renderBazaar(q) {
     : '<tr><td colspan="7" class="empty">No bazaar activity yet since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Display Case view: separate stock ledger (added âˆ’ removed) â”€â”€
+// ── Display Case view: separate stock ledger (added − removed) ──
 function renderDisplay(q) {
   const disp = state.display || { items: [], unitsIn: 0, unitsOut: 0, netUnits: 0, stockItems: 0 };
   $('disp-items').textContent = fmtQty(disp.stockItems);
   $('disp-net').textContent   = (disp.netUnits >= 0 ? '+' : '') + fmtQty(disp.netUnits);
   $('disp-in').textContent    = '+' + fmtQty(disp.unitsIn);
-  $('disp-out').textContent   = 'âˆ’' + fmtQty(disp.unitsOut);
+  $('disp-out').textContent   = '−' + fmtQty(disp.unitsOut);
 
   let items = (disp.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-disp');
@@ -208,9 +208,9 @@ function renderDisplay(q) {
 
   $('tb-disp').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Display Added">+${fmtQty(it.in)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Display Removed">âˆ’${fmtQty(it.removed)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Display Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
@@ -218,7 +218,7 @@ function renderDisplay(q) {
     : '<tr><td colspan="6" class="empty">No display case activity yet since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Item Market view: separate listing ledger (listed âˆ’ sold âˆ’ removed) â”€â”€
+// ── Item Market view: separate listing ledger (listed − sold − removed) ──
 function renderMarket(q) {
   const mkt = state.market || { items: [], revenue: 0, unitsSold: 0, unitsIn: 0, unitsOut: 0, netUnits: 0, stockItems: 0 };
   $('mkt-rev').textContent  = fmt$(mkt.revenue);
@@ -226,7 +226,7 @@ function renderMarket(q) {
   $('mkt-net').textContent  = (mkt.netUnits >= 0 ? '+' : '') + fmtQty(mkt.netUnits);
   $('mkt-in').textContent   = '+' + fmtQty(mkt.unitsIn);
   $('mkt-sold').textContent = fmtQty(mkt.unitsSold);
-  $('mkt-out').textContent  = 'âˆ’' + fmtQty(mkt.unitsOut);
+  $('mkt-out').textContent  = '−' + fmtQty(mkt.unitsOut);
 
   let items = (mkt.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-mkt');
@@ -238,10 +238,10 @@ function renderMarket(q) {
 
   $('tb-mkt').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Market Added">+${fmtQty(it.in)}</td>
       <td class="gold hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Sold">${fmtQty(it.sold)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Removed">âˆ’${fmtQty(it.removed)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
@@ -249,12 +249,12 @@ function renderMarket(q) {
     : '<tr><td colspan="7" class="empty">No item market activity yet since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Trading view: trade events (4445 out / 4446 in) â”€â”€
+// ── Trading view: trade events (4445 out / 4446 in) ──
 function renderTrades(q) {
   const trd = state.trades || { trades: [], items: [], countOut: 0, countIn: 0, sentQty: 0, receivedQty: 0, moneyOut: 0, moneyIn: 0 };
   $('trd-out-count').textContent = fmtQty(trd.countOut);
   $('trd-in-count').textContent  = fmtQty(trd.countIn);
-  $('trd-sent').textContent      = 'âˆ’' + fmtQty(trd.sentQty);
+  $('trd-sent').textContent      = '−' + fmtQty(trd.sentQty);
   $('trd-recv').textContent      = '+' + fmtQty(trd.receivedQty);
   $('trd-money-out').textContent = fmt$(trd.moneyOut);
   $('trd-money-in').textContent  = fmt$(trd.moneyIn);
@@ -269,32 +269,32 @@ function renderTrades(q) {
   const sideSummary = side => {
     const parts = [];
     if (side.money > 0) parts.push(fmt$(side.money));
-    if (side.items.length === 1) parts.push(`${fmtQty(side.items[0].qty)}Ã— ${esc(side.items[0].name)}`);
+    if (side.items.length === 1) parts.push(`${fmtQty(side.items[0].qty)}× ${esc(side.items[0].name)}`);
     else if (side.items.length > 1) parts.push(`${fmtQty(side.items.reduce((s, i) => s + i.qty, 0))} items`);
     if (side.properties > 0) parts.push(`${side.properties} prop.`);
-    return parts.join(' + ') || '<span class="dim">â€”</span>';
+    return parts.join(' + ') || '<span class="dim">—</span>';
   };
   const tradeLink = id => `<a class="trade-link" href="https://www.torn.com/trade.php#step=view&amp;ID=${encodeURIComponent(id)}" target="_blank" rel="noopener">#${esc(id)}</a>`;
   const playerLink = id => `<a class="trade-link" href="https://www.torn.com/profiles.php?XID=${id}" target="_blank" rel="noopener">Player #${id}</a>`;
   const sideList = side => {
     const lines = [];
-    if (side.money > 0) lines.push(`<div class="trade-item"><span class="trade-item-qty">ðŸ’°</span>${fmt$(side.money)}</div>`);
+    if (side.money > 0) lines.push(`<div class="trade-item"><span class="trade-item-qty">💰</span>${fmt$(side.money)}</div>`);
     side.items.forEach(i => {
       const price = i.value ? ` <span class="trade-item-price">@ ${fmt$(i.value)} ea</span>` : '';
-      lines.push(`<div class="trade-item"><span class="trade-item-qty">${fmtQty(i.qty)}Ã—</span>${esc(i.name || i.itemId)}${price}</div>`);
+      lines.push(`<div class="trade-item"><span class="trade-item-qty">${fmtQty(i.qty)}×</span>${esc(i.name || i.itemId)}${price}</div>`);
     });
-    for (let p = 0; p < side.properties; p++) lines.push('<div class="trade-item"><span class="trade-item-qty">ðŸ </span>Property</div>');
-    return lines.join('') || '<div class="trade-item dim">â€”</div>';
+    for (let p = 0; p < side.properties; p++) lines.push('<div class="trade-item"><span class="trade-item-qty">🏠</span>Property</div>');
+    return lines.join('') || '<div class="trade-item dim">—</div>';
   };
 
   $('tb-trd').innerHTML = groups.length ? groups.map((t, i) => `
     <tr class="trade-row" data-idx="${i}" style="cursor:pointer">
       <td class="dim">${fmtTime(t.ts)}</td>
       <td>${tradeLink(t.tradeId)}</td>
-      <td class="dim">${t.counterpartId ? playerLink(t.counterpartId) : 'â€”'}</td>
+      <td class="dim">${t.counterpartId ? playerLink(t.counterpartId) : '—'}</td>
       <td class="red">${sideSummary(t.gave)}</td>
       <td class="green">${sideSummary(t.received)}</td>
-      <td class="trade-arrow">â–¶</td>
+      <td class="trade-arrow">▶</td>
     </tr>
     <tr class="trade-detail" id="trd-det-${i}" style="display:none">
       <td colspan="6" class="trade-detail-cell">
@@ -314,7 +314,7 @@ function renderTrades(q) {
       const arrow  = row.querySelector('.trade-arrow');
       const open   = detail.style.display !== 'none';
       detail.style.display = open ? 'none' : 'table-row';
-      arrow.textContent = open ? 'â–¶' : 'â–¼';
+      arrow.textContent = open ? '▶' : '▼';
     });
   });
 
@@ -324,9 +324,9 @@ function renderTrades(q) {
   items = items.slice(0, 300);
   $('tb-trd-items').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">âš–</button></td>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out">âˆ’${fmtQty(it.out)}</td>
+      <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
@@ -334,7 +334,7 @@ function renderTrades(q) {
     : '<tr><td colspan="6" class="empty">No trades yet since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Museum view: exchange rewards (points_received) â”€â”€
+// ── Museum view: exchange rewards (points_received) ──
 function renderMuseum(q) {
   const mus = state.museum || { pointsReceived: 0, swapCount: 0, unitsSpent: 0, swaps: [] };
   $('mus-points').textContent = fmtQty(mus.pointsReceived);
@@ -357,11 +357,11 @@ function renderMuseum(q) {
     : '<tr><td colspan="5" class="empty">No museum exchanges yet since 02:00 AM.</td></tr>';
 }
 
-// â”€â”€ Transfers view: locationâ†’location moves â”€â”€
+// ── Transfers view: location→location moves ──
 function renderTransfers(q) {
   const tr = state.transfers || { counts: {}, items: [] };
   const counts = tr.counts || {};
-  const dirs = ['Inventory â†’ Bazaar', 'Bazaar â†’ Inventory', 'Inventory â†’ Display', 'Display â†’ Inventory', 'Inventory â†’ Market', 'Market â†’ Inventory', 'Bazaar â†’ Sold', 'Market â†’ Sold'];
+  const dirs = ['Inventory → Bazaar', 'Bazaar → Inventory', 'Inventory → Display', 'Display → Inventory', 'Inventory → Market', 'Market → Inventory', 'Bazaar → Sold', 'Market → Sold'];
   $('tr-tiles').innerHTML = dirs.map(d => `
     <div class="tile ${d.includes('Sold') ? 'gold' : 'blue'}">
       <div class="lbl">${esc(d)}</div>
@@ -377,7 +377,7 @@ function renderTransfers(q) {
     <tr>
       <td class="dim">${fmtTime(t.ts)}</td>
       <td class="item">${esc(t.name || t.itemId)}</td>
-      <td><span class="badge">${esc(t.from)}</span>&nbsp;â†’&nbsp;<span class="badge">${esc(t.to)}</span></td>
+      <td><span class="badge">${esc(t.from)}</span>&nbsp;→&nbsp;<span class="badge">${esc(t.to)}</span></td>
       <td class="gold r">${fmtQty(t.qty)}</td>
       <td class="dim">${esc(t.title || '')}</td>
     </tr>`).join('')
@@ -398,7 +398,7 @@ async function load() {
   }
 }
 
-// â”€â”€ Hover popup: per-item IN/OUT breakdown (When Â· Source Â· Qty) â”€â”€
+// ── Hover popup: per-item IN/OUT breakdown (When · Source · Qty) ──
 const hoverCache = new Map();
 let hoverPopVisible = false;
 let hoverPopCell = null;   // the cell the open popup belongs to
@@ -438,19 +438,19 @@ async function showHoverPop(cell) {
   const events = hoverCache.get(key);
   const name = (cell.closest('tr') && cell.closest('tr').querySelector('.item') || {}).textContent || itemId;
   const title = source || (dir === 'both' ? 'History' : (dir === 'in' ? 'IN' : 'OUT'));
-  renderPop(`${title} Â· ${name} Â· ${events.length} event${events.length === 1 ? '' : 's'}`,
-    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : 'âˆ’' })));
+  renderPop(`${title} · ${name} · ${events.length} event${events.length === 1 ? '' : 's'}`,
+    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : '−' })));
   positionPop(cell);
 }
-// Transfers tab: route-count tile â†’ list of transfers for that route (client-side data)
+// Transfers tab: route-count tile → list of transfers for that route (client-side data)
 function showRoutePop(cell) {
   const route = cell.dataset.route;
-  const parts = route.split(' â†’ ');
+  const parts = route.split(' → ');
   const rows = (state.transfers && state.transfers.items || [])
     .filter(t => t.from === parts[0] && t.to === parts[1])
     .slice(0, 100)
     .map(t => ({ ts: t.ts, label: t.name || t.itemId, cat: 'Transfer', type: t.logType, qty: t.qty, sign: '+' }));
-  renderPop(`${route} Â· ${rows.length} move${rows.length === 1 ? '' : 's'}`, rows);
+  renderPop(`${route} · ${rows.length} move${rows.length === 1 ? '' : 's'}`, rows);
   positionPop(cell);
 }
 function hideHoverPop() {
@@ -459,8 +459,8 @@ function hideHoverPop() {
   hoverPopCell = null;
   $('hover-pop').style.display = 'none';
 }
-// Click an IN/OUT number (or a Transfers route tile) â†’ open/toggle the popup;
-// click elsewhere (or the Ã—) â†’ close.
+// Click an IN/OUT number (or a Transfers route tile) → open/toggle the popup;
+// click elsewhere (or the ×) → close.
 document.addEventListener('click', async e => {
   const routeCell = e.target.closest && e.target.closest('[data-route]');
   if (routeCell && routeCell.dataset.route) {
@@ -481,8 +481,8 @@ document.addEventListener('click', async e => {
 });
 $('hover-pop-close').addEventListener('click', hideHoverPop);
 
-// â”€â”€ Sortable columns: click any header to sort (click again to reverse) â”€â”€
-const sortState = {};   // tbodyId â†’ { key, dir }
+// ── Sortable columns: click any header to sort (click again to reverse) ──
+const sortState = {};   // tbodyId → { key, dir }
 const SORTS = {
   'tb-in':   { item: r => r.name, in: r => r.in, val: r => r.value * r.in, src: r => Object.keys(r.sourcesIn || {}).join(','), last: r => r.lastTs },
   'tb-out':  { item: r => r.name, out: r => r.out, val: r => r.value * r.out, src: r => Object.keys(r.sourcesOut || {}).join(','), last: r => r.lastTs },
@@ -493,7 +493,7 @@ const SORTS = {
   'tb-trd':  { date: r => r.ts, trade: r => String(r.tradeId), counterpart: r => r.counterpartId || 0, gave: r => r.gave.money + r.gave.items.reduce((s, i) => s + i.qty, 0), received: r => r.received.money + r.received.items.reduce((s, i) => s + i.qty, 0) },
   'tb-trd-items': { item: r => r.name, received: r => r.in, sent: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
   'tb-mus':  { date: r => r.ts, set: r => r.set, qty: r => r.quantity, points: r => r.pointsReceived },
-  'tb-tr':   { date: r => r.ts, item: r => r.name || r.itemId, route: r => (r.from || '') + 'â†’' + (r.to || ''), qty: r => r.qty },
+  'tb-tr':   { date: r => r.ts, item: r => r.name || r.itemId, route: r => (r.from || '') + '→' + (r.to || ''), qty: r => r.qty },
   'adj-list':{ date: r => r.ts, item: r => r.name || r.itemId, qty: r => r.qty, label: r => r.label },
 };
 function sortRows(rows, tbodyId) {
@@ -533,7 +533,7 @@ document.addEventListener('click', e => {
   render();
 });
 
-// â”€â”€ Manual adjustments modal â”€â”€
+// ── Manual adjustments modal ──
 function openAdjModal() { $('adj-modal').style.display = 'flex'; renderAdjList(); }
 function closeAdjModal() { $('adj-modal').style.display = 'none'; $('adj-err').style.display = 'none'; }
 function renderAdjList() {
@@ -542,9 +542,9 @@ function renderAdjList() {
     <tr>
       <td class="dim">${fmtTime(a.ts)}</td>
       <td class="item">${esc(a.name || a.itemId)}</td>
-      <td class="${a.dir === 'in' ? 'green' : 'red'}">${a.dir === 'in' ? '+' : 'âˆ’'}${fmtQty(a.qty)}</td>
+      <td class="${a.dir === 'in' ? 'green' : 'red'}">${a.dir === 'in' ? '+' : '−'}${fmtQty(a.qty)}</td>
       <td>${esc(a.label)}</td>
-      <td><button class="adj-del" data-del="${a.id}" title="Delete">ðŸ—‘</button></td>
+      <td><button class="adj-del" data-del="${a.id}" title="Delete">🗑</button></td>
     </tr>`).join('')
     : '<tr><td colspan="5" class="empty">None yet.</td></tr>';
   $('adj-list').querySelectorAll('[data-del]').forEach(b => {
@@ -564,7 +564,7 @@ document.querySelectorAll('input[name="adj-mode"]').forEach(r => {
 $('btn-adjust').addEventListener('click', openAdjModal);
 $('adj-close').addEventListener('click', closeAdjModal);
 $('adj-modal').addEventListener('click', e => { if (e.target === $('adj-modal')) closeAdjModal(); });
-// Per-item âš– reconcile button â†’ open the modal pre-filled (item + current balance, reconcile mode)
+// Per-item ⚖ reconcile button → open the modal pre-filled (item + current balance, reconcile mode)
 document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-adj');
   if (!btn) return;
