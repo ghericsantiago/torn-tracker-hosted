@@ -14,6 +14,22 @@ function fmt$(n) {
 }
 function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+function invNetBtn(itemId, itemName) {
+  const inv = state && state.items ? state.items.find(x => x.id === itemId) : null;
+  const n = inv ? inv.net : null;
+  const badge = n != null ? ` <span class="btn-adj-net">${n >= 0 ? '+' : ''}${fmtQty(n)}</span>` : '';
+  return `<button class="btn-adj" data-item-id="${itemId}" data-item-name="${esc(itemName)}" data-net="${n != null ? n : 0}" title="Reconcile inventory balance">⚖${badge}</button>`;
+}
+
+let _toastTimer;
+function showToast(msg, ms = 2500) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
 function topSources(sources, n = 2) {
   return Object.entries(sources || {})
     .sort((a, b) => b[1] - a[1])
@@ -179,7 +195,7 @@ function renderBazaar(q) {
 
   $('tb-bz').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
+      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Bazaar Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Sold">−${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Removed">−${fmtQty(it.removed)}</td>
@@ -208,7 +224,7 @@ function renderDisplay(q) {
 
   $('tb-disp').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
+      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Display Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Display Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
@@ -238,7 +254,7 @@ function renderMarket(q) {
 
   $('tb-mkt').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
+      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Market Added">+${fmtQty(it.in)}</td>
       <td class="gold hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Sold">${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Removed">−${fmtQty(it.removed)}</td>
@@ -324,7 +340,7 @@ function renderTrades(q) {
   items = items.slice(0, 300);
   $('tb-trd-items').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${(state.items.find(x => x.id === it.id) || {}).net || 0}" title="Reconcile">⚖</button></td>
+      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
@@ -595,6 +611,7 @@ $('adj-save').addEventListener('click', async () => {
     const j = await r.json();
     if (!j.ok) { $('adj-err').textContent = j.error || 'Failed to save.'; $('adj-err').style.display = ''; return; }
     closeAdjModal();
+    showToast('Adjustment saved');
     load();
   } catch (e) { $('adj-err').textContent = 'Network error: ' + e.message; $('adj-err').style.display = ''; }
 });

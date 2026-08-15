@@ -172,3 +172,39 @@
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
   .warn { background: rgba(217,88,88,.1); border: 1px solid rgba(217,88,88,.3); color: var(--red); padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; }
+
+  /* inv net badge inside ⚖ button on Bazaar/Display/Market/Trading tabs */
+  .btn-adj-net { font-size: 10px; opacity: .65; margin-left: 3px; font-weight: 700; }
+
+  /* success toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: #1d2540; border: 1px solid var(--line2); color: var(--text);
+    padding: 8px 20px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    z-index: 9999; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Mobile responsive ─────────────────────────────── */
+  @media (max-width: 640px) {
+    body { padding: 8px; }
+    header { gap: 6px; }
+    header h1 { font-size: 14px; }
+    header h1 span { display: none; }
+    .spacer { min-width: 0; flex: none; }
+    .btn { padding: 6px 10px; font-size: 11px; }
+    .tabbar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .tab { flex-shrink: 0; padding: 6px 10px; white-space: nowrap; }
+    .tab .n { display: none; }
+    .tiles { grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+    .tile { padding: 8px 10px; }
+    .tile .val { font-size: 15px; }
+    .tile .sub { display: none; }
+    .card { overflow-x: auto; }
+    table { min-width: 420px; }
+    .search-row input { min-width: 0; }
+    .adj-cols { flex-direction: column; gap: 8px; }
+    .modal { width: 98vw; max-width: 98vw; }
+    #hover-pop { max-width: 90vw; left: 5vw !important; right: 5vw !important; }
+  }
