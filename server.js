@@ -39,6 +39,9 @@ const server = app.listen(PORT, () => {
 // Start scheduler (cron every minute)
 require('./scheduler').start();
 
+// Guard inventory monitor behind the same admin session auth
+app.use('/admin/inventory', require('./middleware/auth'));
+
 // Mount inventory monitor (async — starts its own poll loop after server is up)
 require('./inventory-monitor').mount(app).catch(e => {
   console.error('[inventory] failed to start:', e.message);

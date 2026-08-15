@@ -386,7 +386,7 @@ function renderTransfers(q) {
 
 async function load() {
   try {
-    const r = await fetch('/inventory/api/state');
+    const r = await fetch('/admin/inventory/api/state');
     state = await r.json();
     render();
     // Fast-refresh while a poll is running so the progress bar stays live
@@ -431,7 +431,7 @@ async function showHoverPop(cell) {
   if (!hoverCache.has(key)) {
     try {
       const qs = `itemId=${encodeURIComponent(itemId)}&dir=${dir}${source ? '&source=' + encodeURIComponent(source) : ''}&limit=100`;
-      const r = await fetch('/inventory/api/item-events?' + qs);
+      const r = await fetch('/admin/inventory/api/item-events?' + qs);
       hoverCache.set(key, (await r.json()).events || []);
     } catch { hoverCache.set(key, []); }
   }
@@ -549,7 +549,7 @@ function renderAdjList() {
     : '<tr><td colspan="5" class="empty">None yet.</td></tr>';
   $('adj-list').querySelectorAll('[data-del]').forEach(b => {
     b.addEventListener('click', async () => {
-      await fetch('/inventory/api/adjust/' + b.dataset.del, { method: 'DELETE' });
+      await fetch('/admin/inventory/api/adjust/' + b.dataset.del, { method: 'DELETE' });
       load();
     });
   });
@@ -587,7 +587,7 @@ $('adj-save').addEventListener('click', async () => {
   if (mode === 'balance') body.balance = $('adj-bal').value;
   else { body.dir = $('adj-dir').value; body.qty = $('adj-qty').value; }
   try {
-    const r = await fetch('/inventory/api/adjust', {
+    const r = await fetch('/admin/inventory/api/adjust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -603,7 +603,7 @@ $('adj-save').addEventListener('click', async () => {
 $('btn-poll').addEventListener('click', async () => {
   $('btn-poll').disabled = true;
   try {
-    const r = await fetch('/inventory/api/poll', { method: 'POST' });
+    const r = await fetch('/admin/inventory/api/poll', { method: 'POST' });
     const j = await r.json();
     if (j.state) state = j.state;
     render();
@@ -613,7 +613,7 @@ $('btn-poll').addEventListener('click', async () => {
 
 $('btn-reset').addEventListener('click', async () => {
   if (!confirm('Reset all tracked IN/OUT data and start fresh from the monitor start time?')) return;
-  const r = await fetch('/inventory/api/reset', { method: 'POST' });
+  const r = await fetch('/admin/inventory/api/reset', { method: 'POST' });
   const j = await r.json();
   if (j.state) state = j.state;
   render();

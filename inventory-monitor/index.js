@@ -54,19 +54,19 @@ async function mount(app) {
   const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog });
   const summary   = createSummary({ state, catalog, config });
 
-  // Serve static frontend files at /inventory (before the API router so
+  // Serve static frontend files at /admin/inventory (before the API router so
   // index.html is found by the directory-index fallback).
-  app.use('/inventory', express.static(config.publicDir));
+  app.use('/admin/inventory', express.static(config.publicDir));
 
-  // Mount API routes at /inventory/api/*
-  app.use('/inventory', createRoutes({ state, catalog, summary, poller, db }));
+  // Mount API routes at /admin/inventory/api/*
+  app.use('/admin/inventory', createRoutes({ state, catalog, summary, poller, db }));
 
   // Start background poll loop
   const r = await poller.poll();
   if (r && r.skipped && !config.logsServer) console.log('[inventory] waiting for LOGS_SERVER…');
   setInterval(() => { poller.poll().catch(e => console.error('[inventory poll]', e.message)); }, config.pollInterval);
 
-  console.log(`[inventory] Torn Inventory Monitor mounted at /inventory`);
+  console.log(`[inventory] Torn Inventory Monitor mounted at /admin/inventory`);
   console.log(`[inventory] tracking since ${new Date(state.startTs * 1000).toISOString()} (configured ${config.startIso})`);
   if (Math.floor(Date.parse(config.startIso) / 1000) !== state.startTs) {
     console.warn('[inventory] NOTE: MONITOR_START differs from stored DB start — DB value wins.');

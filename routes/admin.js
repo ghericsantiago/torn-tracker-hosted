@@ -9,14 +9,15 @@ const { cleanupOldRecords } = require('../scheduler');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
 
-function requireAuth(req, res, next) {
-  if (req.session && req.session.authenticated) return next();
-  res.redirect('/admin');
-}
+const requireAuth = require('../middleware/auth');
 
 // Login page
 router.get('/', (req, res) => {
-  if (req.session && req.session.authenticated) return res.redirect('/admin/dashboard');
+  if (req.session && req.session.authenticated) {
+    const next = req.session.returnTo || '/admin/dashboard';
+    delete req.session.returnTo;
+    return res.redirect(next);
+  }
   res.sendFile('index.html', { root: 'public/admin' });
 });
 
@@ -27,7 +28,9 @@ router.post('/login', async (req, res) => {
   const passMatch = await bcrypt.compare(password, req.app.locals.adminHash);
   if (userMatch && passMatch) {
     req.session.authenticated = true;
-    return res.json({ ok: true });
+    const next = req.session.returnTo || '/admin/dashboard';
+    delete req.session.returnTo;
+    return res.json({ ok: true, next });
   }
   res.status(401).json({ error: 'Invalid credentials' });
 });
