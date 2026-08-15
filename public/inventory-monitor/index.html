@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torn Inventory Monitor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>🧾 Torn Inventory Monitor <span>— what's in / what's out</span></h1>
+  <span class="status" id="st-since">…</span>
+  <span class="spacer"></span>
+  <span class="status" id="st-poll"><span class="dot idle"></span>waiting…</span>
+  <button class="btn blue" id="btn-poll">↻ Refresh now</button>
+  <button class="btn green" id="btn-adjust">＋ Adjust</button>
+  <button class="btn gray" id="btn-reset">Reset</button>
+</header>
+<div class="poll-progress" id="poll-progress" style="display:none">
+  <div class="poll-progress-track"><div class="poll-progress-fill" id="poll-progress-fill"></div></div>
+  <div class="poll-progress-label" id="poll-progress-label"></div>
+</div>
+
+<div id="hover-pop" style="display:none">
+  <h4 id="hover-pop-title"><span id="hover-pop-title-text"></span><button id="hover-pop-close" title="Close">×</button></h4>
+  <div class="pop-scroll">
+    <table><thead><tr><th>When</th><th>Source</th><th>Category</th><th class="r">Qty</th></tr></thead>
+    <tbody id="hover-pop-body"></tbody></table>
+  </div>
+</div>
+
+<!-- Manual adjustments / reconciliation modal -->
+<datalist id="adj-items"></datalist>
+<div class="modal-backdrop" id="adj-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Manual adjustment</h3>
+      <button class="btn gray" id="adj-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="adj-modes">
+        <label><input type="radio" name="adj-mode" value="record" checked> Add in/out record</label>
+        <label><input type="radio" name="adj-mode" value="balance"> Reconcile to balance</label>
+      </div>
+
+      <div class="adj-row">
+        <label>Item <span class="dim">(name or id)</span></label>
+        <input type="text" id="adj-item" list="adj-items" placeholder="e.g. Chamois Plushie" autocomplete="off">
+      </div>
+
+      <div id="adj-record">
+        <div class="adj-row adj-cols">
+          <div>
+            <label>Direction</label>
+            <select id="adj-dir">
+              <option value="in">IN (added to inventory)</option>
+              <option value="out">OUT (removed from inventory)</option>
+            </select>
+          </div>
+          <div>
+            <label>Quantity</label>
+            <input type="number" id="adj-qty" min="1" step="1" placeholder="1">
+          </div>
+        </div>
+      </div>
+
+      <div id="adj-balance" style="display:none">
+        <div class="adj-row">
+          <label>Current balance in inventory <span class="dim">(adjusts in/out to match)</span></label>
+          <input type="number" id="adj-bal" min="0" step="1" placeholder="0">
+        </div>
+      </div>
+
+      <div class="adj-row adj-cols">
+        <div>
+          <label>Label <span class="dim">(source shown in tables)</span></label>
+          <input type="text" id="adj-label" value="Manual" placeholder="Manual" maxlength="60">
+        </div>
+        <div>
+          <label>Note <span class="dim">(optional)</span></label>
+          <input type="text" id="adj-note" placeholder="why / what counted" maxlength="300">
+        </div>
+      </div>
+
+      <div class="adj-err" id="adj-err" style="display:none"></div>
+
+      <div class="adj-actions">
+        <button class="btn green" id="adj-save">Save adjustment</button>
+      </div>
+
+      <div class="adj-recent">
+        <h4>Recent adjustments</h4>
+        <table>
+          <thead><tr><th data-sort="date">When</th><th data-sort="item">Item</th><th class="r" data-sort="qty">Qty</th><th data-sort="label">Label</th><th></th></tr></thead>
+          <tbody id="adj-list"><tr><td colspan="5" class="empty">None yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="warn" id="warn-key" style="display:none">
+  ⚠️ Log source not configured. Create <b>inventory-monitor/.env</b> (copy from <b>.env.example</b>) and set
+  <b>LOGS_SERVER</b> (hosted portfolio server), then restart.
+</div>
+
+<div class="tabbar">
+  <button class="tab active" data-view="monitor">Monitor <span class="n">IN / OUT</span></button>
+  <button class="tab" data-view="inventory">Inventory <span class="n" id="inv-badge">0</span></button>
+  <button class="tab" data-view="bazaar">Bazaar <span class="n" id="bz-badge">0</span></button>
+  <button class="tab" data-view="display">Display <span class="n" id="disp-badge">0</span></button>
+  <button class="tab" data-view="market">Market <span class="n" id="mkt-badge">0</span></button>
+  <button class="tab" data-view="trading">Trading <span class="n" id="trd-badge">0</span></button>
+  <button class="tab" data-view="museum">Museum <span class="n" id="mus-badge">0</span></button>
+  <button class="tab" data-view="transfers">Transfers <span class="n" id="tr-badge">0</span></button>
+</div>
+
+<div class="search-row">
+  <input id="search" type="text" placeholder="🔍 Filter items / sources…">
+</div>
+
+<!-- ── Monitor view ─────────────────────────────────────────── -->
+<div id="view-monitor">
+  <div class="tiles">
+    <div class="tile green"><div class="lbl">Total In (qty)</div><div class="val" id="t-in">—</div><div class="sub" id="t-in-items">0 unique items</div></div>
+    <div class="tile red"><div class="lbl">Total Out (qty)</div><div class="val" id="t-out">—</div><div class="sub" id="t-out-items">0 unique items</div></div>
+    <div class="tile gold"><div class="lbl">Net (in − out)</div><div class="val" id="t-net">—</div></div>
+    <div class="tile blue"><div class="lbl">Value In</div><div class="val" id="t-val-in">—</div></div>
+    <div class="tile blue"><div class="lbl">Value Out</div><div class="val" id="t-val-out">—</div></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h2 class="in">IN — received / added <span class="n" id="in-count">0</span></h2>
+      <table>
+        <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="in">Qty In</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
+        <tbody id="tb-in"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2 class="out">OUT — removed / used <span class="n" id="out-count">0</span></h2>
+      <table>
+        <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="out">Qty Out</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
+        <tbody id="tb-out"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recent activity <span class="n">newest first</span></h2>
+    <div id="activity"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<!-- ── Inventory view (ledger: baseline zero + net flows) ───── -->
+<div id="view-inventory" style="display:none">
+  <div class="tiles">
+    <div class="tile green"><div class="lbl">In Stock (items)</div><div class="val" id="iv-items">—</div><div class="sub">net &gt; 0 since 02:00 AM</div></div>
+    <div class="tile green"><div class="lbl">Stock Qty</div><div class="val" id="iv-qty">—</div></div>
+    <div class="tile gold"><div class="lbl">Stock Value</div><div class="val" id="iv-val">—</div></div>
+    <div class="tile red"><div class="lbl">Overdrawn Items</div><div class="val" id="iv-neg">—</div><div class="sub">used from pre-existing stock</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Current inventory <span class="n" id="inv-count">0 items</span></h2>
+    <table>
+      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last moved</th></tr></thead>
+      <tbody id="tb-inv"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Ledger:</b> current = baseline (zero at monitor start, shown in Torn time) + IN − OUT from logs. Net &gt; 0 = you hold this many now;
+      Net &lt; 0 (overdrawn) = used more than acquired since the start, drawn from pre-existing stock — true balance unknown.
+      This ledger becomes your real inventory as log activity accumulates.
+    </div>
+  </div>
+</div>
+
+<!-- ── Bazaar view (separate stock ledger) ──────────────────── -->
+<div id="view-bazaar" style="display:none">
+  <div class="tiles">
+    <div class="tile green"><div class="lbl">Bazaar Revenue</div><div class="val" id="bz-rev">—</div><div class="sub">from sales since 02:00 AM</div></div>
+    <div class="tile green"><div class="lbl">Units Sold</div><div class="val" id="bz-sold">—</div></div>
+    <div class="tile blue"><div class="lbl">In Stock (items)</div><div class="val" id="bz-items">—</div><div class="sub">net &gt; 0 on the bazaar</div></div>
+    <div class="tile gold"><div class="lbl">Net Units</div><div class="val" id="bz-net">—</div><div class="sub">added − sold − removed</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Bazaar stock <span class="n" id="bz-count">0 items</span></h2>
+    <table>
+      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-bz"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Bazaar ledger:</b> tracks your bazaar stock only — <b>Added</b> (1210/1222, items moved from your inventory onto
+      the bazaar), <b>Sold</b> (1221/1226, players bought from you), <b>Removed</b> (1211/1223, taken off the bazaar back to
+      inventory). Baseline = zero at 02:00 AM; Net &lt; 0 means pre-existing bazaar stock was sold/removed. Adding to the
+      bazaar moves items OUT of your person inventory (see the Inventory tab).
+    </div>
+  </div>
+</div>
+
+<!-- ── Display Case view (separate stock ledger) ────────────── -->
+<div id="view-display" style="display:none">
+  <div class="tiles">
+    <div class="tile blue"><div class="lbl">On Display (items)</div><div class="val" id="disp-items">—</div><div class="sub">net &gt; 0 on the display case</div></div>
+    <div class="tile gold"><div class="lbl">Net Units</div><div class="val" id="disp-net">—</div><div class="sub">added − removed</div></div>
+    <div class="tile green"><div class="lbl">Units Added</div><div class="val" id="disp-in">—</div></div>
+    <div class="tile red"><div class="lbl">Units Removed</div><div class="val" id="disp-out">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Display Case stock <span class="n" id="disp-count">0 items</span></h2>
+    <table>
+      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-disp"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Display Case ledger:</b> tracks what you place on your display case — <b>Added</b> (1300/1302, moved from your
+      inventory onto the display) and <b>Removed</b> (1301/1303, taken off back to inventory). Baseline = zero at 02:00 AM.
+      Placing an item on display moves it OUT of your person inventory (see the Inventory tab).
+    </div>
+  </div>
+</div>
+
+<!-- ── Item Market view (listing ledger) ────────────────────── -->
+<div id="view-market" style="display:none">
+  <div class="tiles">
+    <div class="tile gold"><div class="lbl">Revenue</div><div class="val" id="mkt-rev">—</div><div class="sub">from market sales (net of tax)</div></div>
+    <div class="tile blue"><div class="lbl">Listed (items)</div><div class="val" id="mkt-items">—</div><div class="sub">net &gt; 0 currently listed</div></div>
+    <div class="tile blue"><div class="lbl">Net Units</div><div class="val" id="mkt-net">—</div><div class="sub">listed − sold − removed</div></div>
+    <div class="tile green"><div class="lbl">Units Listed</div><div class="val" id="mkt-in">—</div></div>
+    <div class="tile gold"><div class="lbl">Units Sold</div><div class="val" id="mkt-sold">—</div></div>
+    <div class="tile red"><div class="lbl">Units Removed</div><div class="val" id="mkt-out">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Item Market listings <span class="n" id="mkt-count">0 items</span></h2>
+    <table>
+      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="listed">Listed</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-mkt"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Item Market ledger:</b> tracks your listings — <b>Listed</b> (1100/1110, moved from your inventory to the
+      market), <b>Sold</b> (1104/1113, a player bought your listing → you get the money) and <b>Removed</b> (1101/1111,
+      listing taken down back to inventory). Baseline = zero at 02:00 AM. Listing an item moves it OUT of your person
+      inventory (see the Inventory tab); a market sell does NOT return it to inventory — it's gone, converted to cash.
+    </div>
+  </div>
+</div>
+
+<!-- ── Trading view (4445/4446 trade events) ────────────────── -->
+<div id="view-trading" style="display:none">
+  <div class="tiles">
+    <div class="tile red"><div class="lbl">Trades Out</div><div class="val" id="trd-out-count">—</div></div>
+    <div class="tile green"><div class="lbl">Trades In</div><div class="val" id="trd-in-count">—</div></div>
+    <div class="tile red"><div class="lbl">Items Sent</div><div class="val" id="trd-sent">—</div></div>
+    <div class="tile green"><div class="lbl">Items Received</div><div class="val" id="trd-recv">—</div></div>
+    <div class="tile gold"><div class="lbl">Money Sent</div><div class="val" id="trd-money-out">—</div></div>
+    <div class="tile gold"><div class="lbl">Money Received</div><div class="val" id="trd-money-in">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Trade events <span class="n" id="trd-count">0 trades</span></h2>
+    <table>
+      <thead><tr><th data-sort="date">Date</th><th data-sort="trade">Trade #</th><th data-sort="counterpart">Counterpart</th><th data-sort="gave">You Gave</th><th data-sort="received">You Received</th><th style="width:24px"></th></tr></thead>
+      <tbody id="tb-trd"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Trading:</b> each completed trade (grouped by <code>parsed_trade_id</code>) shows what you
+      <b>gave</b> (money 4440, items 4445, property 4450) and <b>received</b> (money 4441, items 4446,
+      property 4451). Item sides still move your inventory (Monitor IN/OUT, source <code>Trade</code>).
+      Click a row to expand the full item-by-item detail with market prices.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Trade totals per item</h2>
+    <table>
+      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="received">Received</th><th class="r" data-sort="sent">Sent</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-trd-items"><tr><td colspan="6" class="empty">No trades yet since 02:00 AM.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Museum view (exchange rewards) ───────────────────────── -->
+<div id="view-museum" style="display:none">
+  <div class="tiles">
+    <div class="tile gold"><div class="lbl">Museum Points</div><div class="val" id="mus-points">—</div><div class="sub">total points received from swaps</div></div>
+    <div class="tile blue"><div class="lbl">Swaps</div><div class="val" id="mus-count">—</div><div class="sub">sets converted</div></div>
+    <div class="tile red"><div class="lbl">Items Spent</div><div class="val" id="mus-spent">—</div><div class="sub">set items removed from inventory</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Museum exchanges <span class="n" id="mus-title-count">0 swaps</span></h2>
+    <table>
+      <thead><tr><th data-sort="date">Date</th><th data-sort="set">Set</th><th class="r" data-sort="qty">Qty</th><th class="r" data-sort="points">Points Received</th><th>Log</th></tr></thead>
+      <tbody id="tb-mus"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Museum:</b> every <b>7000 "Museum exchange"</b> converts a set — the component items leave
+      your inventory (Monitor OUT, source <code>Museum: &lt;set&gt;</code>) and you earn <b>museum points</b>
+      (<code>points_received</code> in the log, e.g. 1000× Plushie Set = 10,000 points). Points are a
+      separate currency used in the Museum shop — they're tracked here, not as inventory.
+    </div>
+  </div>
+</div>
+
+<!-- ── Transfers view (location→location moves) ─────────────── -->
+<div id="view-transfers" style="display:none">
+  <div class="tiles" id="tr-tiles"></div>
+
+  <div class="card">
+    <h2>Item transfers <span class="n" id="tr-count">0 moves</span></h2>
+    <table>
+      <thead><tr><th data-sort="date">Date</th><th data-sort="item">Item</th><th data-sort="route">From → To</th><th class="r" data-sort="qty">Qty</th><th>Log</th></tr></thead>
+      <tbody id="tb-tr"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div class="note">
+      <b>Transfers:</b> every move between your locations — <b>Inventory → Bazaar</b> (bazaar add),
+      <b>Bazaar → Inventory</b> (bazaar remove), <b>Inventory → Display</b> (display add),
+      <b>Display → Inventory</b> (display remove), <b>Inventory → Market</b> (item market listing),
+      <b>Market → Inventory</b> (listing removed), and <b>Bazaar → Sold</b> / <b>Market → Sold</b>
+      (a player bought from you). Each move is also reflected in the Monitor tab's IN/OUT tables and
+      the activity feed, so the location ledgers (Inventory / Bazaar / Display / Market) always stay consistent.
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

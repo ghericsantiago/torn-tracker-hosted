@@ -32,9 +32,14 @@ app.use('/admin/torn',  require('./routes/torn'));
 app.use('/torn',       require('./routes/torn'));
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Torn Tracker running at http://localhost:${PORT}`);
 });
 
 // Start scheduler (cron every minute)
 require('./scheduler').start();
+
+// Mount inventory monitor (async — starts its own poll loop after server is up)
+require('./inventory-monitor').mount(app).catch(e => {
+  console.error('[inventory] failed to start:', e.message);
+});
