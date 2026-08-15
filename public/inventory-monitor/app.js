@@ -574,7 +574,7 @@ document.addEventListener('click', e => {
   balRadio.checked = true;
   balRadio.dispatchEvent(new Event('change'));
   $('adj-item').value = btn.dataset.itemName || btn.dataset.itemId;
-  $('adj-bal').value = btn.dataset.net;
+  $('adj-bal').value = Math.max(0, parseInt(btn.dataset.net) || 0);
   $('adj-label').value = 'Reconcile';
   $('adj-note').value = '';
   $('adj-err').style.display = 'none';
@@ -594,8 +594,7 @@ $('adj-save').addEventListener('click', async () => {
     });
     const j = await r.json();
     if (!j.ok) { $('adj-err').textContent = j.error || 'Failed to save.'; $('adj-err').style.display = ''; return; }
-    $('adj-err').style.display = 'none';
-    $('adj-item').value = ''; $('adj-qty').value = ''; $('adj-bal').value = ''; $('adj-note').value = '';
+    closeAdjModal();
     load();
   } catch (e) { $('adj-err').textContent = 'Network error: ' + e.message; $('adj-err').style.display = ''; }
 });
