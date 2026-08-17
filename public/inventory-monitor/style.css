@@ -232,4 +232,10 @@
     /* IN / OUT tab switcher — hide subtitle text, keep icon + count */
     .io-tab { padding: 8px 10px; text-align: center; font-size: 12px; }
     .io-tab .dim2 { display: none; }
+    /* IO tables: hide Category (col 2) and Sources (col 5) — Item/Qty/Value/Last fit without scroll */
+    #io-in-table th:nth-child(2),  #io-in-table td:nth-child(2),
+    #io-in-table th:nth-child(5),  #io-in-table td:nth-child(5),
+    #io-out-table th:nth-child(2), #io-out-table td:nth-child(2),
+    #io-out-table th:nth-child(5), #io-out-table td:nth-child(5) { display: none; }
+    #io-in-table, #io-out-table { min-width: 0; }
   }
