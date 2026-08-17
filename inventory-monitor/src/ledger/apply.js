@@ -35,6 +35,7 @@ function createApplyLog({ catalog, config }) {
         state.items[key] = {
           id: key,
           name: catalog.itemName(f.itemId),
+          category: catalog.itemCategory(f.itemId),
           value: catalog.itemValue(f.itemId),
           in: 0, out: 0, net: 0,
           lastTs: 0,
@@ -65,7 +66,7 @@ function createApplyLog({ catalog, config }) {
       const key = String(f.itemId);
       if (!state.bazaar.items[key]) {
         state.bazaar.items[key] = {
-          id: key, name: catalog.itemName(f.itemId), value: catalog.itemValue(f.itemId),
+          id: key, name: catalog.itemName(f.itemId), category: catalog.itemCategory(f.itemId), value: catalog.itemValue(f.itemId),
           in: 0, sold: 0, removed: 0, out: 0, net: 0,
           lastTs: 0, sources: {},
         };
@@ -89,7 +90,7 @@ function createApplyLog({ catalog, config }) {
       });
       state.locationEvents.bazaar.unshift({ ts, itemId: key, kind: f.kind, qty: f.qty });
       if (f.from && f.to) {
-        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, qty: f.qty, from: f.from, to: f.to });
+        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, category: it.category, qty: f.qty, from: f.from, to: f.to });
       }
     });
 
@@ -99,7 +100,7 @@ function createApplyLog({ catalog, config }) {
       const key = String(f.itemId);
       if (!state.display.items[key]) {
         state.display.items[key] = {
-          id: key, name: catalog.itemName(f.itemId), value: catalog.itemValue(f.itemId),
+          id: key, name: catalog.itemName(f.itemId), category: catalog.itemCategory(f.itemId), value: catalog.itemValue(f.itemId),
           in: 0, removed: 0, net: 0, lastTs: 0,
         };
       }
@@ -114,7 +115,7 @@ function createApplyLog({ catalog, config }) {
       });
       state.locationEvents.display.unshift({ ts, itemId: key, kind: f.kind, qty: f.qty });
       if (f.from && f.to) {
-        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, qty: f.qty, from: f.from, to: f.to });
+        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, category: it.category, qty: f.qty, from: f.from, to: f.to });
       }
     });
 
@@ -124,7 +125,7 @@ function createApplyLog({ catalog, config }) {
       const key = String(f.itemId);
       if (!state.market.items[key]) {
         state.market.items[key] = {
-          id: key, name: catalog.itemName(f.itemId), value: catalog.itemValue(f.itemId),
+          id: key, name: catalog.itemName(f.itemId), category: catalog.itemCategory(f.itemId), value: catalog.itemValue(f.itemId),
           in: 0, sold: 0, removed: 0, out: 0, net: 0,
           lastTs: 0, sources: {},
         };
@@ -148,7 +149,7 @@ function createApplyLog({ catalog, config }) {
       });
       state.locationEvents.market.unshift({ ts, itemId: key, kind: f.kind, qty: f.qty });
       if (f.from && f.to) {
-        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, qty: f.qty, from: f.from, to: f.to });
+        state.transfers.unshift({ ts, logId: log.id, logType, title, itemId: key, name: it.name, category: it.category, qty: f.qty, from: f.from, to: f.to });
       }
     });
 

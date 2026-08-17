@@ -29,7 +29,7 @@ function createSummary({ state, catalog, config }) {
       if (scope === 'bazaar') {
         let it = bazaarById.get(a.itemId);
         if (!it) {
-          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), category: catalog.itemCategory(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
           bazaarById.set(a.itemId, it);
         }
         if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
@@ -38,7 +38,7 @@ function createSummary({ state, catalog, config }) {
       } else if (scope === 'display') {
         let it = displayById.get(a.itemId);
         if (!it) {
-          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, removed: 0, net: 0, lastTs: 0 };
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), category: catalog.itemCategory(a.itemId), value: catalog.itemValue(a.itemId), in: 0, removed: 0, net: 0, lastTs: 0 };
           displayById.set(a.itemId, it);
         }
         if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
@@ -47,7 +47,7 @@ function createSummary({ state, catalog, config }) {
       } else if (scope === 'market') {
         let it = marketById.get(a.itemId);
         if (!it) {
-          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), category: catalog.itemCategory(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
           marketById.set(a.itemId, it);
         }
         if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
@@ -57,7 +57,7 @@ function createSummary({ state, catalog, config }) {
         // inventory (default)
         let it = itemsById.get(a.itemId);
         if (!it) {
-          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, out: 0, net: 0, lastTs: 0, sourcesIn: {}, sourcesOut: {} };
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), category: catalog.itemCategory(a.itemId), value: catalog.itemValue(a.itemId), in: 0, out: 0, net: 0, lastTs: 0, sourcesIn: {}, sourcesOut: {} };
           itemsById.set(a.itemId, it);
         }
         if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; it.sourcesIn[label] = (it.sourcesIn[label] || 0) + a.qty; }
@@ -134,7 +134,7 @@ function createSummary({ state, catalog, config }) {
     const tradeItems = Object.values(state.items)
       .filter(it => (it.sourcesIn?.Trade || 0) > 0 || (it.sourcesOut?.Trade || 0) > 0)
       .map(it => ({
-        id: it.id, name: it.name, value: it.value,
+        id: it.id, name: it.name, category: it.category || '', value: it.value,
         in: it.sourcesIn?.Trade || 0,
         out: it.sourcesOut?.Trade || 0,
         net: (it.sourcesIn?.Trade || 0) - (it.sourcesOut?.Trade || 0),

@@ -176,6 +176,9 @@
   .note { font-size: 11px; color: var(--dim2); padding: 10px 14px; border-top: 1px solid var(--line); line-height: 1.5; }
   .note b { color: var(--dim); }
 
+  /* category column — keep compact */
+  td.cat { white-space: nowrap; font-size: 11px; }
+
   /* activity */
   #activity { padding: 6px 0; }
   .act-spinner { text-align: center; padding: 10px 0; font-size: 11px; color: var(--dim); }

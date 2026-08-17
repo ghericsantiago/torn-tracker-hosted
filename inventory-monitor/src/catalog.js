@@ -18,6 +18,7 @@ function createCatalog(config) {
       (catalog.items || []).forEach(i => items.set(i.id, {
         name: i.name,
         market_price: (i.value && i.value.market_price) || 0,
+        category: i.type || '',
       }));
       console.log(`[init] item catalog: ${items.size} items`);
     } catch (e) {
@@ -50,6 +51,11 @@ function createCatalog(config) {
     return it ? (it.market_price || 0) : 0;
   }
 
+  function itemCategory(id) {
+    const it = items.get(id) || items.get(Number(id));
+    return it ? (it.category || '') : '';
+  }
+
   // Resolve a manual-record item input (numeric id or item name) → item id
   // (string, matching state.items keys).
   function resolveItemId(input) {
@@ -69,7 +75,7 @@ function createCatalog(config) {
     return { error: `No item named "${s}" found.` };
   }
 
-  return { items, museum, load, itemName, itemValue, resolveItemId };
+  return { items, museum, load, itemName, itemValue, itemCategory, resolveItemId };
 }
 
 module.exports = { createCatalog };

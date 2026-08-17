@@ -139,11 +139,11 @@
       </div>
       <div class="card" id="io-card">
         <table id="io-in-table">
-          <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="in">Qty In</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
+          <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="in">Qty In</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
           <tbody id="tb-in"></tbody>
         </table>
         <table id="io-out-table" style="display:none">
-          <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="out">Qty Out</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
+          <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="out">Qty Out</th><th class="r" data-sort="val">Value</th><th data-sort="src">Sources</th><th class="r" data-sort="last">Last</th></tr></thead>
           <tbody id="tb-out"></tbody>
         </table>
         <div id="io-spinner" class="act-spinner" style="display:none">Loading…</div>
@@ -173,8 +173,8 @@
   <div class="card">
     <h2>Current inventory <span class="n" id="inv-count">0 items</span></h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last moved</th></tr></thead>
-      <tbody id="tb-inv"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last moved</th></tr></thead>
+      <tbody id="tb-inv"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Ledger:</b> current = baseline (zero at monitor start, shown in Torn time) + IN − OUT from logs. Net &gt; 0 = you hold this many now;
@@ -196,8 +196,8 @@
   <div class="card">
     <h2>Bazaar stock <span class="n" id="bz-count">0 items</span></h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
-      <tbody id="tb-bz"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-bz"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Bazaar ledger:</b> tracks your bazaar stock only — <b>Added</b> (1210/1222, items moved from your inventory onto
@@ -220,8 +220,8 @@
   <div class="card">
     <h2>Display Case stock <span class="n" id="disp-count">0 items</span></h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
-      <tbody id="tb-disp"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="added">Added</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-disp"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Display Case ledger:</b> tracks what you place on your display case — <b>Added</b> (1300/1302, moved from your
@@ -245,8 +245,8 @@
   <div class="card">
     <h2>Item Market listings <span class="n" id="mkt-count">0 items</span></h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="listed">Listed</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
-      <tbody id="tb-mkt"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="listed">Listed</th><th class="r" data-sort="sold">Sold</th><th class="r" data-sort="removed">Removed</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-mkt"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Item Market ledger:</b> tracks your listings — <b>Listed</b> (1100/1110, moved from your inventory to the
@@ -285,8 +285,8 @@
   <div class="card">
     <h2>Trade totals per item</h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th class="r" data-sort="received">Received</th><th class="r" data-sort="sent">Sent</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
-      <tbody id="tb-trd-items"><tr><td colspan="6" class="empty">No trades yet since 02:00 AM.</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="received">Received</th><th class="r" data-sort="sent">Sent</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last</th></tr></thead>
+      <tbody id="tb-trd-items"><tr><td colspan="7" class="empty">No trades yet since 02:00 AM.</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -321,8 +321,8 @@
   <div class="card">
     <h2>Item transfers <span class="n" id="tr-count">0 moves</span></h2>
     <table>
-      <thead><tr><th data-sort="date">Date</th><th data-sort="item">Item</th><th data-sort="route">From → To</th><th class="r" data-sort="qty">Qty</th><th>Log</th></tr></thead>
-      <tbody id="tb-tr"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="date">Date</th><th data-sort="item">Item</th><th data-sort="cat">Category</th><th data-sort="route">From → To</th><th class="r" data-sort="qty">Qty</th><th>Log</th></tr></thead>
+      <tbody id="tb-tr"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Transfers:</b> every move between your locations — <b>Inventory → Bazaar</b> (bazaar add),

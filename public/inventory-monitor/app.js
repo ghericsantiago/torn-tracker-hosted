@@ -69,12 +69,13 @@ function loadIOPage(dir) {
   const page   = items.slice(offset, offset + IO_LIMIT);
   const isIn   = dir === 'in';
   if (page.length === 0 && offset === 0) {
-    $('tb-' + dir).innerHTML = `<tr><td colspan="5" class="empty">Nothing ${isIn ? 'came in' : 'went out'} yet.</td></tr>`;
+    $('tb-' + dir).innerHTML = `<tr><td colspan="6" class="empty">Nothing ${isIn ? 'came in' : 'went out'} yet.</td></tr>`;
     return;
   }
   $('tb-' + dir).insertAdjacentHTML('beforeend', page.map(it => `
     <tr>
       <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="${isIn ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="${isIn ? 'in' : 'out'}">${isIn ? '+' : '−'}${fmtQty(isIn ? it.in : it.out)}</td>
       <td class="gold">${fmt$(it.value * (isIn ? it.in : it.out))}</td>
       <td class="dim">${topSources(isIn ? it.sourcesIn : it.sourcesOut)}</td>
@@ -88,7 +89,7 @@ function resetIOTables(matches) {
   if (!matches) {
     const q = ($('search').value || '').toLowerCase();
     const srcKeys = it => Object.keys(it.sourcesIn || {}).concat(Object.keys(it.sourcesOut || {}));
-    matches = it => !q || it.name.toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
+    matches = it => !q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
   }
   buildIOCache(matches);
   ioPaging.in = 0; ioPaging.out = 0;
@@ -191,7 +192,7 @@ function render() {
 
   const q = ($('search').value || '').toLowerCase();
   const srcKeys = it => Object.keys(it.sourcesIn || {}).concat(Object.keys(it.sourcesOut || {}));
-  const matches = it => !q || it.name.toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
+  const matches = it => !q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
 
   if (view === 'inventory') { renderInventory(q); return; }
   if (view === 'bazaar') { renderBazaar(q); return; }
@@ -222,24 +223,25 @@ function renderInventory(q) {
   $('iv-val').textContent   = fmt$(cur.stockValue);
   $('iv-neg').textContent   = fmtQty(cur.overdrawnItems);
 
-  let items = state.items.filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
+  let items = state.items.filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-inv');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
   items = items.slice(0, 300);
 
-  $('inv-count').textContent = state.items.filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q))).length + ' items';
+  $('inv-count').textContent = state.items.filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))).length + ' items';
   $('inv-badge').textContent = state.items.filter(it => it.net > 0).length;
 
   $('tb-inv').innerHTML = items.length ? items.map(it => `
     <tr>
       <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="7" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>';
 }
 
 // ── Bazaar view: separate stock ledger (added − sold − removed) ──
@@ -250,17 +252,18 @@ function renderBazaar(q) {
   $('bz-items').textContent = fmtQty(bz.stockItems);
   $('bz-net').textContent   = (bz.netUnits >= 0 ? '+' : '') + fmtQty(bz.netUnits);
 
-  let items = (bz.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
+  let items = (bz.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-bz');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
   items = items.slice(0, 300);
 
-  $('bz-count').textContent = (bz.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q))).length + ' items';
+  $('bz-count').textContent = (bz.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))).length + ' items';
   $('bz-badge').textContent = (bz.items || []).filter(it => it.net > 0).length;
 
   $('tb-bz').innerHTML = items.length ? items.map(it => `
     <tr>
       <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'bazaar')}</td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Bazaar Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Sold">−${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Removed">−${fmtQty(it.removed)}</td>
@@ -268,7 +271,7 @@ function renderBazaar(q) {
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="7" class="empty">No bazaar activity yet since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="8" class="empty">No bazaar activity yet since 02:00 AM.</td></tr>';
 }
 
 // ── Display Case view: separate stock ledger (added − removed) ──
@@ -279,24 +282,25 @@ function renderDisplay(q) {
   $('disp-in').textContent    = '+' + fmtQty(disp.unitsIn);
   $('disp-out').textContent   = '−' + fmtQty(disp.unitsOut);
 
-  let items = (disp.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
+  let items = (disp.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-disp');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
   items = items.slice(0, 300);
 
-  $('disp-count').textContent = (disp.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q))).length + ' items';
+  $('disp-count').textContent = (disp.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))).length + ' items';
   $('disp-badge').textContent = (disp.items || []).filter(it => it.net > 0).length;
 
   $('tb-disp').innerHTML = items.length ? items.map(it => `
     <tr>
       <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'display')}</td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Display Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Display Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No display case activity yet since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="7" class="empty">No display case activity yet since 02:00 AM.</td></tr>';
 }
 
 // ── Item Market view: separate listing ledger (listed − sold − removed) ──
@@ -309,17 +313,18 @@ function renderMarket(q) {
   $('mkt-sold').textContent = fmtQty(mkt.unitsSold);
   $('mkt-out').textContent  = '−' + fmtQty(mkt.unitsOut);
 
-  let items = (mkt.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
+  let items = (mkt.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-mkt');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
   items = items.slice(0, 300);
 
-  $('mkt-count').textContent = (mkt.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q))).length + ' items';
+  $('mkt-count').textContent = (mkt.items || []).filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))).length + ' items';
   $('mkt-badge').textContent = (mkt.items || []).filter(it => it.net > 0).length;
 
   $('tb-mkt').innerHTML = items.length ? items.map(it => `
     <tr>
       <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'market')}</td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Market Added">+${fmtQty(it.in)}</td>
       <td class="gold hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Sold">${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Removed">−${fmtQty(it.removed)}</td>
@@ -327,7 +332,7 @@ function renderMarket(q) {
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="7" class="empty">No item market activity yet since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="8" class="empty">No item market activity yet since 02:00 AM.</td></tr>';
 }
 
 // ── Trading view: trade events (4445 out / 4446 in) ──
@@ -399,20 +404,21 @@ function renderTrades(q) {
     });
   });
 
-  let items = (trd.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q)));
+  let items = (trd.items || []).filter(it => it.net !== 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q)));
   const sortedItems = sortRows(items, 'tb-trd-items');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
   items = items.slice(0, 300);
   $('tb-trd-items').innerHTML = items.length ? items.map(it => `
     <tr>
       <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
+      <td class="cat dim">${esc(it.category || '')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
       <td class="gold">${fmt$(it.net * it.value)}</td>
       <td class="dim r">${fmtTime(it.lastTs)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No trades yet since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="7" class="empty">No trades yet since 02:00 AM.</td></tr>';
 }
 
 // ── Museum view: exchange rewards (points_received) ──
@@ -450,7 +456,7 @@ function renderTransfers(q) {
     </div>`).join('');
 
   const items = sortRows((tr.items || [])
-    .filter(t => !q || (t.name || '').toLowerCase().includes(q) || (t.itemId || '').includes(q)), 'tb-tr');
+    .filter(t => !q || (t.name || '').toLowerCase().includes(q) || (t.category || '').toLowerCase().includes(q) || (t.itemId || '').includes(q)), 'tb-tr');
   $('tr-count').textContent = items.length + ' moves';
   $('tr-badge').textContent = (tr.items || []).length;
 
@@ -458,11 +464,12 @@ function renderTransfers(q) {
     <tr>
       <td class="dim">${fmtTime(t.ts)}</td>
       <td class="item">${esc(t.name || t.itemId)}</td>
+      <td class="cat dim">${esc(t.category || '')}</td>
       <td><span class="badge">${esc(t.from)}</span>&nbsp;→&nbsp;<span class="badge">${esc(t.to)}</span></td>
       <td class="gold r">${fmtQty(t.qty)}</td>
       <td class="dim">${esc(t.title || '')}</td>
     </tr>`).join('')
-    : '<tr><td colspan="5" class="empty">No transfers yet since 02:00 AM.</td></tr>';
+    : '<tr><td colspan="6" class="empty">No transfers yet since 02:00 AM.</td></tr>';
 }
 
 async function load() {
@@ -566,16 +573,16 @@ $('hover-pop-close').addEventListener('click', hideHoverPop);
 // ── Sortable columns: click any header to sort (click again to reverse) ──
 const sortState = {};   // tbodyId → { key, dir }
 const SORTS = {
-  'tb-in':   { item: r => r.name, in: r => r.in, val: r => r.value * r.in, src: r => Object.keys(r.sourcesIn || {}).join(','), last: r => r.lastTs },
-  'tb-out':  { item: r => r.name, out: r => r.out, val: r => r.value * r.out, src: r => Object.keys(r.sourcesOut || {}).join(','), last: r => r.lastTs },
-  'tb-inv':  { item: r => r.name, in: r => r.in, out: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
-  'tb-bz':   { item: r => r.name, added: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
-  'tb-disp': { item: r => r.name, added: r => r.in, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
-  'tb-mkt':  { item: r => r.name, listed: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-in':   { item: r => r.name, cat: r => r.category || '', in: r => r.in, val: r => r.value * r.in, src: r => Object.keys(r.sourcesIn || {}).join(','), last: r => r.lastTs },
+  'tb-out':  { item: r => r.name, cat: r => r.category || '', out: r => r.out, val: r => r.value * r.out, src: r => Object.keys(r.sourcesOut || {}).join(','), last: r => r.lastTs },
+  'tb-inv':  { item: r => r.name, cat: r => r.category || '', in: r => r.in, out: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-bz':   { item: r => r.name, cat: r => r.category || '', added: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-disp': { item: r => r.name, cat: r => r.category || '', added: r => r.in, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-mkt':  { item: r => r.name, cat: r => r.category || '', listed: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
   'tb-trd':  { date: r => r.ts, trade: r => String(r.tradeId), counterpart: r => r.counterpartId || 0, gave: r => r.gave.money + r.gave.items.reduce((s, i) => s + i.qty, 0), received: r => r.received.money + r.received.items.reduce((s, i) => s + i.qty, 0) },
-  'tb-trd-items': { item: r => r.name, received: r => r.in, sent: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-trd-items': { item: r => r.name, cat: r => r.category || '', received: r => r.in, sent: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
   'tb-mus':  { date: r => r.ts, set: r => r.set, qty: r => r.quantity, points: r => r.pointsReceived },
-  'tb-tr':   { date: r => r.ts, item: r => r.name || r.itemId, route: r => (r.from || '') + '→' + (r.to || ''), qty: r => r.qty },
+  'tb-tr':   { date: r => r.ts, item: r => r.name || r.itemId, cat: r => r.category || '', route: r => (r.from || '') + '→' + (r.to || ''), qty: r => r.qty },
   'adj-list':{ date: r => r.ts, item: r => r.name || r.itemId, qty: r => r.qty, label: r => r.label },
 };
 function sortRows(rows, tbodyId) {
