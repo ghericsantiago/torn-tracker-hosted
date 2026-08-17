@@ -49,7 +49,7 @@ const { createRoutes } = require('./routes');
   };
 
   await applySchema(pool, config);     // schema + idempotent migrations
-  await loadState(pool, state, config);
+  await loadState(pool, state, config, catalog);
 
   const logClient = createLogClient(config);
   const ledger    = createLedger({ catalog, config });

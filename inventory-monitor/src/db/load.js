@@ -6,7 +6,7 @@
  * Number() (avoiding "5" + 1 = "51" style corruption).
  */
 
-async function loadState(pool, state, config) {
+async function loadState(pool, state, config, catalog) {
   const meta = await pool.query('SELECT * FROM monitor_meta WHERE id = 1');
   if (meta.rows.length) {
     const m = meta.rows[0];
@@ -19,7 +19,7 @@ async function loadState(pool, state, config) {
   const items = {};
   totals.rows.forEach(r => {
     items[r.item_id] = {
-      id: r.item_id, name: r.name,
+      id: r.item_id, name: r.name, category: catalog ? catalog.itemCategory(r.item_id) : '',
       value: Number(r.value), in: Number(r.in_qty), out: Number(r.out_qty),
       net: Number(r.in_qty) - Number(r.out_qty),
       lastTs: Number(r.last_ts), sourcesIn: {}, sourcesOut: {},
@@ -48,7 +48,7 @@ async function loadState(pool, state, config) {
   bzTotals.rows.forEach(r => {
     const inQ = Number(r.in_qty), soldQ = Number(r.sold_qty), remQ = Number(r.removed_qty);
     state.bazaar.items[r.item_id] = {
-      id: r.item_id, name: r.name, value: Number(r.value),
+      id: r.item_id, name: r.name, category: catalog ? catalog.itemCategory(r.item_id) : '', value: Number(r.value),
       in: inQ, sold: soldQ, removed: remQ, out: soldQ + remQ, net: inQ - soldQ - remQ,
       lastTs: Number(r.last_ts),
       sources: { Added: inQ, Sold: soldQ, Removed: remQ },
@@ -66,7 +66,7 @@ async function loadState(pool, state, config) {
   dispTotals.rows.forEach(r => {
     const inQ = Number(r.in_qty), remQ = Number(r.removed_qty);
     state.display.items[r.item_id] = {
-      id: r.item_id, name: r.name, value: Number(r.value),
+      id: r.item_id, name: r.name, category: catalog ? catalog.itemCategory(r.item_id) : '', value: Number(r.value),
       in: inQ, removed: remQ, net: inQ - remQ, lastTs: Number(r.last_ts),
     };
   });
@@ -77,7 +77,7 @@ async function loadState(pool, state, config) {
   mktTotals.rows.forEach(r => {
     const inQ = Number(r.in_qty), soldQ = Number(r.sold_qty), remQ = Number(r.removed_qty);
     state.market.items[r.item_id] = {
-      id: r.item_id, name: r.name, value: Number(r.value),
+      id: r.item_id, name: r.name, category: catalog ? catalog.itemCategory(r.item_id) : '', value: Number(r.value),
       in: inQ, sold: soldQ, removed: remQ, out: soldQ + remQ, net: inQ - soldQ - remQ,
       lastTs: Number(r.last_ts),
       sources: { Added: inQ, Sold: soldQ, Removed: remQ },
@@ -114,7 +114,8 @@ async function loadState(pool, state, config) {
   const trRows = await pool.query(`SELECT * FROM transfers ORDER BY ts DESC, id DESC LIMIT ${config.transferMax}`);
   state.transfers = trRows.rows.map(r => ({
     ts: Number(r.ts), logId: r.log_id, logType: r.log_type === null ? null : Number(r.log_type),
-    title: r.title, itemId: r.item_id, name: r.item_name, qty: Number(r.qty), from: r.from_loc, to: r.to_loc,
+    title: r.title, itemId: r.item_id, name: r.item_name, category: catalog ? catalog.itemCategory(r.item_id) : '',
+    qty: Number(r.qty), from: r.from_loc, to: r.to_loc,
   }));
 
   // Location-ledger events (per-scope per-item history for the Bazaar/Display/Market popups)
