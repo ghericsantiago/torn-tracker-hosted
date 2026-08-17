@@ -41,12 +41,13 @@ function createCatalog(config) {
       }
       if (id.startsWith('__set__')) return id.slice(7);
     }
-    const it = items.get(id);
+    const it = items.get(id) || items.get(Number(id));
     return it ? it.name : `Item ${id}`;
   }
 
   function itemValue(id) {
-    return typeof id === 'number' ? (items.get(id)?.market_price || 0) : 0;
+    const it = items.get(id) || items.get(Number(id));
+    return it ? (it.market_price || 0) : 0;
   }
 
   // Resolve a manual-record item input (numeric id or item name) → item id
