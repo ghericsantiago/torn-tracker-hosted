@@ -59,6 +59,7 @@ const FREE_LOG_TYPES = new Set([
   6731, 6733, 6746, 6751, 6752, 6753,
   6797, 4101, 4103, 4105, 4001, 4320,
   6749, 8945, 8946,
+  7900,   // Missions buy reward item
 ]);
 const FREE_SOURCE_MAP = {
   1401: 'Dump', 1404: 'Dump',
@@ -88,6 +89,7 @@ const FREE_SOURCE_MAP = {
   8946: 'Christmas Town',   // coupon exchange → `in` each data.items entry
   5533: 'Stock Ammo',
   6500: 'Company Ammo',
+  7900: 'Missions',         // buy reward item using mission credits (data.item = id, data.quantity)
 };
 
 // ── Item usage — consumption / loss (ITEM_TRACKING.md §3) ─────

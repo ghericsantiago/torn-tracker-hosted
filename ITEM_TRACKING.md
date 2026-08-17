@@ -73,6 +73,11 @@ Log groups + source labels: see `ITEM_EXTRACTION.md` §5. Every one of them is a
 entry. The coupon spend itself (a seasonal currency, `"5 coupons"` string, no item id) is
 not an inventory flow.
 
+**7900 Missions buy reward item** (source `Missions`) — purchasing a reward item from the
+Missions shop using mission credits. Shape: `data.item = <id>` (number), `data.quantity`,
+`data.credits_spent`. The `credits_spent` field is not an inventory flow — only the item
+arriving is tracked as `in`.
+
 **Faction loan receive (6746)** — item enters personal inventory from the faction armory → `in`.
 The companion log 6745 "Faction loan item send" is **not** an inventory flow (see below).
 

@@ -112,6 +112,7 @@ They get `price: 0` (no market value) and are grouped exactly like real items.
 | Parcel | 4001 |
 | Auction Win | 4320 |
 | Christmas Coupon | 8945 |
+| Missions | 7900 |
 
 Each log runs through `extractFreeItems`, then is aggregated by `` `${itemId}:${source}` ``
 and every individual log is kept in `details[]` → **Acquisition History** (Date · Log Type · Qty).
