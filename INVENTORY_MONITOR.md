@@ -407,6 +407,18 @@ How it's written (all in one transaction per poll):
 > (click again to reverse; an arrow shows the active sort). Value columns sort by the
 > computed value (qty × market price). Works on Monitor, Inventory, Bazaar, Display, Market,
 > Trading, Museum, Transfers and the Adjust modal's recent list.
+>
+> **Search / filter:** the search box (top of page) filters all tabs simultaneously — matches
+> item name, **Category**, and source labels. Changing the search term re-renders the active
+> tab from scratch (page 1 of the infinite scroll restarts).
+>
+> **Infinite scroll — all tabs:** every item-list table renders the first **100 rows** on
+> load and appends the next 100 when the user scrolls near the bottom. The full filtered +
+> sorted result set is cached in memory (`tabPaging`); scrolling never re-fetches from the
+> server. Search and sort changes reset to page 1. The **Monitor** IN/OUT tables scroll
+> inside the fixed-height card (`#io-card`); all other tabs use `window` scroll since their
+> cards are full-page-height. The **Recent Activity** sidebar uses server-side paging
+> (`/api/activity?offset=&limit=50`) with its own scroll listener.
 
 Counts in `/api/state`:
 
