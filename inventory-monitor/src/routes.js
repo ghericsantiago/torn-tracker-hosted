@@ -56,6 +56,27 @@ function createRoutes({ state, catalog, summary, poller, db }) {
     res.json({ events: events.slice(0, limit) });
   });
 
+  // Paginated activity feed — merges log activity + manual adjustments, newest first.
+  // Used by the infinite-scroll Recent Activity section.
+  // Query params: offset (int, default 0), limit (int, default 50 max 100), q (search filter).
+  router.get('/api/activity', (req, res) => {
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+    const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const q      = (req.query.q || '').toLowerCase();
+
+    const adjActs = state.adjustments.map(a => ({
+      ts: a.ts, dir: a.dir, itemId: a.itemId, name: catalog.itemName(a.itemId),
+      qty: a.qty, source: `Manual: ${a.label || 'Manual'}`, title: 'Manual adjustment',
+    }));
+
+    let all = state.activity.concat(adjActs).sort((a, b) => b.ts - a.ts);
+    if (q) all = all.filter(a =>
+      (a.name || '').toLowerCase().includes(q) || (a.source || '').toLowerCase().includes(q));
+
+    const total = all.length;
+    res.json({ items: all.slice(offset, offset + limit), total, hasMore: offset + limit < total });
+  });
+
   // Manual adjustments (reconciliation layer):
   //   { item, scope?, dir: 'in'|'out', qty, label?, note? }   — add a manual in/out record
   //   { item, scope?, balance, label?, note? }                 — reconcile: adjust to a target balance

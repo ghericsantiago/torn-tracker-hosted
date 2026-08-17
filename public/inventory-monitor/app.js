@@ -47,6 +47,48 @@ let view = 'monitor';
 let adjScope = 'inventory'; // tracks which ledger scope the open reconcile modal targets
 let fastTimer = null;
 
+// ── Activity infinite scroll ──
+const actPaging = { offset: 0, loading: false, hasMore: true, q: '' };
+
+function actRow(a) {
+  return `<div class="act">
+    <span class="t">${fmtTime(a.ts)}</span>
+    <span class="dir ${a.dir}">${a.dir === 'in' ? '▲' : '▼'}</span>
+    <span class="item">${esc(a.name)}</span>
+    <span class="qty">${a.dir === 'in' ? '+' : '−'}${fmtQty(a.qty)}</span>
+    <span class="lg">${esc(a.source)}</span>
+    <span class="src">${esc(a.title || '')}</span>
+  </div>`;
+}
+
+async function loadActivity(reset) {
+  if (actPaging.loading) return;
+  const q = ($('search').value || '').toLowerCase();
+  if (reset) {
+    actPaging.offset = 0; actPaging.hasMore = true; actPaging.q = q;
+    $('activity').innerHTML = '';
+  } else if (!actPaging.hasMore) {
+    return;
+  }
+  actPaging.loading = true;
+  $('act-spinner').style.display = '';
+  try {
+    const params = new URLSearchParams({ offset: actPaging.offset, limit: 50 });
+    if (q) params.set('q', q);
+    const r = await fetch('/admin/inventory/api/activity?' + params);
+    const j = await r.json();
+    if (j.items && j.items.length) {
+      $('activity').insertAdjacentHTML('beforeend', j.items.map(actRow).join(''));
+    } else if (actPaging.offset === 0) {
+      $('activity').innerHTML = '<div class="empty">No activity yet.</div>';
+    }
+    actPaging.offset += (j.items || []).length;
+    actPaging.hasMore = j.hasMore || false;
+  } catch (e) { console.error('[activity]', e); }
+  actPaging.loading = false;
+  $('act-spinner').style.display = 'none';
+}
+
 function switchView(v) {
   view = v;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === v));
@@ -59,6 +101,7 @@ function switchView(v) {
   $('view-museum').style.display    = v === 'museum' ? '' : 'none';
   $('view-transfers').style.display = v === 'transfers' ? '' : 'none';
   render();
+  if (v === 'monitor') loadActivity(true);
 }
 
 function render() {
@@ -135,17 +178,7 @@ function render() {
     </tr>`).join('')
     : '<tr><td colspan="5" class="empty">Nothing went out yet.</td></tr>';
 
-  const acts = state.activity.filter(a => !q || a.name.toLowerCase().includes(q) || a.source.toLowerCase().includes(q)).slice(0, 120);
-  $('activity').innerHTML = acts.length ? acts.map(a => `
-    <div class="act">
-      <span class="t">${fmtTime(a.ts)}</span>
-      <span class="dir ${a.dir}">${a.dir === 'in' ? '▲' : '▼'}</span>
-      <span class="item">${esc(a.name)}</span>
-      <span class="qty">${a.dir === 'in' ? '+' : '−'}${fmtQty(a.qty)}</span>
-      <span class="lg">${esc(a.source)}</span>
-      <span class="src">${esc(a.title || '')}</span>
-    </div>`).join('')
-    : '<div class="empty">No activity yet.</div>';
+  // Activity is managed by loadActivity() — reset if search filter changed
 
   // refresh the item autocomplete for the adjust modal
   const names = [...new Set((state.items || []).map(it => it.name).filter(Boolean))].slice(0, 2000);
@@ -410,6 +443,7 @@ async function load() {
     const r = await fetch('/admin/inventory/api/state');
     state = await r.json();
     render();
+    if (view === 'monitor') loadActivity(true);
     // Fast-refresh while a poll is running so the progress bar stays live
     if (state.poll && state.poll.inProgress && !fastTimer) {
       fastTimer = setTimeout(() => { fastTimer = null; load(); }, 1500);
@@ -639,12 +673,21 @@ $('btn-reset').addEventListener('click', async () => {
   const j = await r.json();
   if (j.state) state = j.state;
   render();
+  if (view === 'monitor') loadActivity(true);
 });
 
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
 let t;
-$('search').addEventListener('input', () => { clearTimeout(t); t = setTimeout(render, 200); });
+$('search').addEventListener('input', () => {
+  clearTimeout(t);
+  t = setTimeout(() => { render(); if (view === 'monitor') loadActivity(true); }, 200);
+});
+
+// Infinite scroll: load more activity when sentinel enters viewport
+new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting && view === 'monitor') loadActivity(false);
+}, { rootMargin: '300px' }).observe($('act-sentinel'));
 
 load();
 setInterval(load, 30000);   // dashboard auto-refresh
