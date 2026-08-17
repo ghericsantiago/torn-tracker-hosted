@@ -61,6 +61,8 @@ function createCatalog(config) {
   function resolveItemId(input) {
     const s = String(input || '').trim();
     if (!s) return { error: 'Item is required (name or id).' };
+    // Pseudo-items: accept both the display name and the raw id
+    if (s === '__points__' || s.toLowerCase() === 'torn points') return { id: '__points__' };
     if (/^\d+$/.test(s)) {
       if (!items.has(Number(s))) return { error: `No item with id ${s} in the catalog.` };
       return { id: s };
