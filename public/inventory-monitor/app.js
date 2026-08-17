@@ -47,6 +47,55 @@ let view = 'monitor';
 let adjScope = 'inventory'; // tracks which ledger scope the open reconcile modal targets
 let fastTimer = null;
 
+// ── IN / OUT tab + infinite scroll ──
+let ioTab = 'in';
+const ioItemsCache = { in: [], out: [] };
+const ioPaging     = { in: 0, out: 0 };
+const IO_LIMIT = 100;
+
+function buildIOCache(matches) {
+  const defaultSort = dir => (a, b) => (b.value * b[dir]) - (a.value * a[dir]);
+  for (const dir of ['in', 'out']) {
+    const raw = state.items.filter(it => it[dir] > 0 && matches(it));
+    const sorted = sortRows(raw, 'tb-' + dir);
+    ioItemsCache[dir] = sorted === raw ? [...raw].sort(defaultSort(dir)) : sorted;
+  }
+}
+
+function loadIOPage(dir) {
+  dir = dir || ioTab;
+  const offset = ioPaging[dir];
+  const items  = ioItemsCache[dir];
+  const page   = items.slice(offset, offset + IO_LIMIT);
+  const isIn   = dir === 'in';
+  if (page.length === 0 && offset === 0) {
+    $('tb-' + dir).innerHTML = `<tr><td colspan="5" class="empty">Nothing ${isIn ? 'came in' : 'went out'} yet.</td></tr>`;
+    return;
+  }
+  $('tb-' + dir).insertAdjacentHTML('beforeend', page.map(it => `
+    <tr>
+      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+      <td class="${isIn ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="${isIn ? 'in' : 'out'}">${isIn ? '+' : '−'}${fmtQty(isIn ? it.in : it.out)}</td>
+      <td class="gold">${fmt$(it.value * (isIn ? it.in : it.out))}</td>
+      <td class="dim">${topSources(isIn ? it.sourcesIn : it.sourcesOut)}</td>
+      <td class="dim r">${fmtTime(it.lastTs)}</td>
+    </tr>`).join(''));
+  ioPaging[dir] += page.length;
+}
+
+function resetIOTables(matches) {
+  if (!state) return;
+  if (!matches) {
+    const q = ($('search').value || '').toLowerCase();
+    const srcKeys = it => Object.keys(it.sourcesIn || {}).concat(Object.keys(it.sourcesOut || {}));
+    matches = it => !q || it.name.toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
+  }
+  buildIOCache(matches);
+  ioPaging.in = 0; ioPaging.out = 0;
+  $('tb-in').innerHTML = ''; $('tb-out').innerHTML = '';
+  loadIOPage('in'); loadIOPage('out');
+}
+
 // ── Activity infinite scroll ──
 const actPaging = { offset: 0, loading: false, hasMore: true, q: '' };
 
@@ -153,32 +202,10 @@ function render() {
   if (view === 'transfers') { renderTransfers(q); return; }
 
   // ── Monitor view ──
-  const inItems  = sortRows(state.items.filter(it => it.in > 0 && matches(it)), 'tb-in').slice(0, 200);
-  const outItems = sortRows(state.items.filter(it => it.out > 0 && matches(it)), 'tb-out').slice(0, 200);
-  $('in-count').textContent  = state.items.filter(it => it.in > 0 && matches(it)).length;
+  $('in-count').textContent  = state.items.filter(it => it.in > 0  && matches(it)).length;
   $('out-count').textContent = state.items.filter(it => it.out > 0 && matches(it)).length;
-
-  $('tb-in').innerHTML = inItems.length ? inItems.map(it => `
-    <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
-      <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
-      <td class="gold">${fmt$(it.value * it.in)}</td>
-      <td class="dim">${topSources(it.sourcesIn)}</td>
-      <td class="dim r">${fmtTime(it.lastTs)}</td>
-    </tr>`).join('')
-    : '<tr><td colspan="5" class="empty">Nothing came in yet.</td></tr>';
-
-  $('tb-out').innerHTML = outItems.length ? outItems.map(it => `
-    <tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
-      <td class="gold">${fmt$(it.value * it.out)}</td>
-      <td class="dim">${topSources(it.sourcesOut)}</td>
-      <td class="dim r">${fmtTime(it.lastTs)}</td>
-    </tr>`).join('')
-    : '<tr><td colspan="5" class="empty">Nothing went out yet.</td></tr>';
-
-  // Activity is managed by loadActivity() — reset if search filter changed
+  resetIOTables(matches);
+  // Activity is managed by loadActivity()
 
   // refresh the item autocomplete for the adjust modal
   const names = [...new Set((state.items || []).map(it => it.name).filter(Boolean))].slice(0, 2000);
@@ -683,6 +710,22 @@ $('search').addEventListener('input', () => {
   clearTimeout(t);
   t = setTimeout(() => { render(); if (view === 'monitor') loadActivity(true); }, 200);
 });
+
+// IO tab switch
+document.querySelectorAll('.io-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    ioTab = btn.dataset.io;
+    document.querySelectorAll('.io-tab').forEach(b => b.classList.toggle('active', b.dataset.io === ioTab));
+    $('io-in-table').style.display  = ioTab === 'in'  ? '' : 'none';
+    $('io-out-table').style.display = ioTab === 'out' ? '' : 'none';
+  });
+});
+
+// Infinite scroll: load more IO rows when sentinel enters viewport
+new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting && view === 'monitor' && ioPaging[ioTab] < ioItemsCache[ioTab].length)
+    loadIOPage();
+}, { rootMargin: '200px' }).observe($('io-sentinel'));
 
 // Infinite scroll: load more activity when sentinel enters viewport
 new IntersectionObserver(entries => {
