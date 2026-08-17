@@ -122,8 +122,8 @@ and every individual log is kept in `details[]` → **Acquisition History** (Dat
 
 **Sources** (`USAGE_SOURCE_MAP`): Consumed (the 2xxx "Item use" ids in `USAGE_LOG_GROUPS` +
 easter eggs 8981–8989; 2621 → Relic Perish), Dumped (1400/1403), Parceled (4000),
-Sent (4100/4102/4104), Faction Armory/Given/Loaned/Claimed/Payout/Loan Return
-(6725/6728/6732/6745/6747/6750/6796), OC Spent (6768/6769), Museum Swap (7000),
+Sent (4100/4102/4104), Faction Armory/Given/Claimed/Payout/Loan Return
+(6725/6728/6732/6747/6750/6796), OC Spent (6768/6769), Museum Swap (7000),
 Crime Loss (9163/9190/9191), Crime Spent (9300/9301/9302/9304/9305/9309/9310/9361),
 Staff Removal (15021).
 

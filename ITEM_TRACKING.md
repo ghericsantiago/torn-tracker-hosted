@@ -73,6 +73,27 @@ Log groups + source labels: see `ITEM_EXTRACTION.md` §5. Every one of them is a
 entry. The coupon spend itself (a seasonal currency, `"5 coupons"` string, no item id) is
 not an inventory flow.
 
+**Faction loan receive (6746)** — item enters personal inventory from the faction armory → `in`.
+The companion log 6745 "Faction loan item send" is **not** an inventory flow (see below).
+
+---
+
+## 2b. Faction loan send (6745) — no inventory flow
+
+When a faction loan is created, **two log entries** appear on the initiating member's log:
+
+- **6746** Faction loan item receive → `in` (item enters personal inventory from faction armory)
+- **6745** Faction loan item send → **no flow** (item left the faction armory, never personal inventory)
+
+When a member loans an item to themselves, both appear on the same log. Only 6746 generates
+a flow. 6745 is excluded from `USAGE_LOG_TYPES` to prevent a false `out` on personal inventory.
+
+Loan return flows (item leaves personal inventory back to faction armory):
+- **6749** Faction loan item retrieve → `out` (source: `Faction Loan Retrieve`)
+- **6747** Faction loan item return → `out` (source: `Faction Loan Return`)
+
+See `GAME_MECHANICS.md` §11 for the full loan lifecycle.
+
 ---
 
 ## 3. Item use — consumption & transformations

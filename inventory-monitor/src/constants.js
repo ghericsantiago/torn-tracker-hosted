@@ -109,7 +109,7 @@ const USAGE_LOG_TYPES = new Set([
   2611, 2612, 2613, 2615, 2620, 2621,
   8981, 8982, 8983, 8984, 8985, 8986, 8987, 8988, 8989,
   1400, 1403, 4000, 4100, 4102, 4104,
-  6725, 6728, 6732, 6745, 6747, 6750, 6796,
+  6725, 6728, 6732, 6747, 6750, 6796,
   6768, 6769, 7000, 9163, 9190, 9191,
   9300, 9301, 9302, 9304, 9305, 9309, 9310, 9361, 15021,
 ]);
@@ -144,7 +144,7 @@ const USAGE_SOURCE_MAP = {
   4100: 'Sent', 4102: 'Sent', 4104: 'Sent',
   6725: 'Faction Armory', 6728: 'Faction Armory',
   6732: 'Faction Given',
-  6745: 'Faction Loaned', 6747: 'Faction Loan Return',
+  6747: 'Faction Loan Return',
   6750: 'Faction Claimed',
   6768: 'OC Spent', 6769: 'OC Spent',
   6796: 'Faction Payout',

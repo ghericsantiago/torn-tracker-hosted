@@ -264,7 +264,30 @@ The **Viruses** category covers writing computer viruses — a time-based skill 
 - The monitor resolves the name against the catalog (items ending in "Virus") → `in` ×1,
   source `Virus Programming` (`ITEM_TRACKING.md` §6g).
 
-## 11. Racing — car enlist / unenlist
+## 11. Faction loans
+
+Faction loans let members borrow items **from the faction armory** (not from any individual
+member's personal inventory). Two log types fire when a loan is created:
+
+| Log | Title | Who sees it | Personal inventory flow |
+|-----|-------|-------------|-------------------------|
+| **6745** | Faction loan item send | The member who *initiated* the loan (may be the same as the recipient) | **None** — item left the faction armory, not personal inventory |
+| **6746** | Faction loan item receive | The member who *receives* the loaned item | **IN** — item enters personal inventory |
+
+When a member loans an item to themselves (they initiate and receive the same loan), **both
+6745 and 6746 appear on their own log**. Only 6746 is an `in` flow; 6745 is ignored because
+it does not represent a personal-inventory outflow.
+
+Loan lifecycle:
+
+- **6749** "Faction loan item retrieve" — loan returned by the member: `out` from personal inventory, item goes back to faction armory.
+- **6747** "Faction loan item return" (alternative return log) — same effect: `out`.
+
+> ⚠️ Do NOT count 6745 as an `out`. The item came from the faction armory, not the player.
+
+---
+
+## 12. Racing — car enlist / unenlist
 
 Racing requires you to **enlist a car** (from your inventory) and lets you **unenlist** it
 back:
