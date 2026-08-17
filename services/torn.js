@@ -123,19 +123,26 @@ async function fetchDisplay(apiKey) {
   return entries.map(i => ({ item_id: i.ID ?? i.id, qty: i.quantity ?? 1 }));
 }
 
-// Returns { entries: [...], prevUrl: string|null } for one page of user logs.
+// Returns { entries, nextNano, prevUrl } for one page of user logs.
+// nextNano is the nanostamp cursor for the next (older) page; prevUrl is kept
+// for any caller still following the legacy _metadata.links.prev link.
 // Torn strips key= from pagination URLs — re-append before calling.
 async function fetchUserLogPage(url, apiKey) {
   const fetchUrl = url.includes('key=') ? url : `${url}&key=${apiKey}`;
   const data     = await tornFetch(fetchUrl);
   const entries  = Array.isArray(data.log) ? data.log : [];
+  const nextNano = data._metadata?.nanostamp ?? null;
   const prevUrl  = data._metadata?.links?.prev ?? null;
-  return { entries, prevUrl };
+  return { entries, nextNano, prevUrl };
 }
 
-// log=0 returns all log types. API caps pages at 100 entries regardless of limit.
-function buildUserLogUrl(apiKey) {
-  return `${TORN_BASE}/v2/user/log?log=0&limit=100&sort=desc&key=${apiKey}`;
+// Build a log URL. log defaults to 0 (all types). Pass a nanostamp cursor to
+// page backwards through history; omit limit/sort and let the API decide the
+// page size (each response returns the next nanostamp cursor).
+function buildUserLogUrl(apiKey, logTypes, nano) {
+  let url = `${TORN_BASE}/v2/user/log?log=${logTypes ?? '0'}&key=${apiKey}`;
+  if (nano) url += `&nanostamp=${nano}`;
+  return url;
 }
 
 module.exports = {

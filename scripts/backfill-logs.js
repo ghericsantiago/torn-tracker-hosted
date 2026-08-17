@@ -1,8 +1,6 @@
 require('dotenv').config();
 const db = require('../db');
-const { fetchUserLogPage, TornApiError } = require('../services/torn');
-
-const TORN_BASE = 'https://api.torn.com';
+const { fetchUserLogPage, buildUserLogUrl, TornApiError } = require('../services/torn');
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -26,12 +24,6 @@ async function delState(key) {
   await db.query('DELETE FROM torn_sync_state WHERE key = $1', [key]);
 }
 
-// Fetch a page of logs using explicit to= timestamp for backwards pagination
-function buildToUrl(apiKey, toTs) {
-  const to = toTs ? `&to=${toTs}` : '';
-  return `${TORN_BASE}/v2/user/log?log=0&limit=1000&sort=desc${to}&key=${apiKey}`;
-}
-
 async function backfill() {
   const apiKey = process.env.TORN_API_KEY;
   if (!apiKey) { console.error('TORN_API_KEY not set'); process.exit(1); }
@@ -39,32 +31,25 @@ async function backfill() {
   // Mark as running
   await setState('backfill_running', '1');
 
-  // Resume from checkpoint if available
-  const savedToTs   = await getState('backfill_to_cursor');
-  const savedPages  = await getState('backfill_pages');
-  let toTs          = savedToTs ? Number(savedToTs) : null;
-  let pages         = savedPages ? Number(savedPages) : 0;
-  let inserted      = 0;
+  // Resume from checkpoint if available. Nanostamp cursors are numeric strings
+  // (19 digits); older versions stored a 10-digit timestamp, which is ignored
+  // so the run restarts cleanly from the newest logs.
+  const savedNano  = await getState('backfill_to_cursor');
+  const savedPages = await getState('backfill_pages');
+  let nano         = savedNano && /^\d{11,}$/.test(savedNano) ? savedNano : null;
+  let pages        = nano ? Number(savedPages) || 0 : 0;
+  let inserted     = 0;
 
-  // If no checkpoint, start from the oldest log we already have — don't re-fetch
-  if (!savedToTs) {
-    const { rows: oldest } = await db.query('SELECT MIN(happened_at) AS ts FROM torn_logs');
-    if (oldest[0]?.ts) {
-      toTs = Math.floor(new Date(oldest[0].ts).getTime() / 1000) - 1;
-      console.log(`[backfill] DB has logs from ${oldest[0].ts.toISOString().slice(0,10)} — starting from older`);
-    }
-  }
-
-  console.log(savedToTs
-    ? `[backfill] Resuming from ${new Date(toTs * 1000).toISOString()}...`
+  console.log(nano
+    ? '[backfill] Resuming from checkpoint...'
     : '[backfill] Starting full history fetch (newest → oldest)...'
   );
 
   while (true) {
-    const url = buildToUrl(apiKey, toTs);
-    let entries;
+    const url = buildUserLogUrl(apiKey, '0', nano);
+    let entries, nextNano;
     try {
-      ({ entries } = await fetchUserLogPage(url, apiKey));
+      ({ entries, nextNano } = await fetchUserLogPage(url, apiKey));
     } catch (err) {
       if (err instanceof TornApiError && err.isRateLimit) {
         console.warn('[backfill] Rate limited — waiting 60s');
@@ -97,28 +82,18 @@ async function backfill() {
       if (result.rowCount > 0) { inserted++; pageInserted++; }
     }
 
-    // The Torn API `to=` parameter is EXCLUSIVE (returns ts < to, not ts ≤ to),
-    // and the page size is capped at 100 entries regardless of limit=.
-    // To include all entries at ts=oldestTs on the next page, use oldestTs+1.
-    // If we're stuck (full page, nothing new, same cursor), force-advance past
-    // this second to avoid an infinite loop (>100 events in one second).
     const oldestTs = entries.at(-1).timestamp;
     const oldest   = new Date(oldestTs * 1000).toISOString().slice(0, 10);
     const newest   = new Date(entries[0].timestamp * 1000).toISOString().slice(0, 10);
     console.log(`[backfill] Page ${pages}: ${newest} → ${oldest} | +${inserted} new total`);
 
-    // If no new entries were inserted AND the cursor didn't advance past this second
-    // (toTs === oldestTs + 1 means we already tried this boundary), force-advance past
-    // oldestTs to avoid looping. The entries.length >= 100 guard is omitted because
-    // the API may return <100 entries at the boundary while still having all duplicates.
-    const stuck = pageInserted === 0 && toTs !== null && toTs === oldestTs + 1;
-    const nextToTs = stuck ? oldestTs : oldestTs + 1;
+    if (!nextNano || nextNano === '0') break;
 
-    await setState('backfill_to_cursor', nextToTs);
+    nano = nextNano;
+    await setState('backfill_to_cursor', nano);
     await setState('backfill_pages',     pages);
     await setState('backfill_oldest_ts', oldestTs);
 
-    toTs = nextToTs;
     await sleep(SLEEP_MS);
   }
 

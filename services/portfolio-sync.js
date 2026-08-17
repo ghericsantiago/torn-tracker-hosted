@@ -74,18 +74,19 @@ async function syncLogs(apiKey) {
   const stopAt     = lastTs ? Number(lastTs) : 0;
   const isBackfill = !lastTs;
 
-  let url;
+  let nano = null;
   if (isBackfill) {
     const savedCursor = await getSyncState('backfill_cursor');
-    if (savedCursor) {
-      url = savedCursor.includes('key=') ? savedCursor : `${savedCursor}&key=${apiKey}`;
+    // Older versions checkpointed a full URL; nanostamp cursors are numeric.
+    if (savedCursor && /^\d+$/.test(savedCursor)) {
+      nano = savedCursor;
       console.log('[portfolio] Resuming backfill from checkpoint');
+    } else if (savedCursor) {
+      console.log('[portfolio] Stale URL cursor — restarting backfill from newest');
     } else {
-      url = buildUserLogUrl(apiKey);
       console.log('[portfolio] First run — full backfill of all logs');
     }
   } else {
-    url = buildUserLogUrl(apiKey);
     console.log(`[portfolio] Incremental sync from ${new Date(stopAt * 1000).toISOString()}`);
   }
 
@@ -95,10 +96,11 @@ async function syncLogs(apiKey) {
   let newMaxTs = 0;
   let done     = false;
 
-  while (url && !done) {
-    let entries, prevUrl;
+  while (!done) {
+    const url = buildUserLogUrl(apiKey, '0', nano);
+    let entries, nextNano;
     try {
-      ({ entries, prevUrl } = await fetchUserLogPage(url, apiKey));
+      ({ entries, nextNano } = await fetchUserLogPage(url, apiKey));
     } catch (err) {
       if (err instanceof TornApiError && err.isRateLimit) {
         console.warn(`[portfolio] Transient error (code ${err.code}) — waiting 60s`);
@@ -128,18 +130,19 @@ async function syncLogs(apiKey) {
       if (isBackfill && ts > backfillMaxTs) backfillMaxTs = ts;
     }
 
-    if (!done) {
-      url = prevUrl
-        ? (prevUrl.includes('key=') ? prevUrl : `${prevUrl}&key=${apiKey}`)
-        : null;
+    if (done) break;
 
-      if (isBackfill) {
-        if (url) await setSyncState('backfill_cursor', url);
-        if (backfillMaxTs > 0) await setSyncState('backfill_max_ts', backfillMaxTs);
-      }
+    // End of history: empty page or no further cursor.
+    if (entries.length === 0 || !nextNano || nextNano === '0') break;
 
-      if (url) await sleep(1500);
+    nano = nextNano;
+
+    if (isBackfill) {
+      await setSyncState('backfill_cursor', nano);
+      if (backfillMaxTs > 0) await setSyncState('backfill_max_ts', backfillMaxTs);
     }
+
+    await sleep(1500);
   }
 
   if (isBackfill) {
