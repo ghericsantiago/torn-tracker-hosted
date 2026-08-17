@@ -129,7 +129,7 @@ async function loadState(pool, state, config) {
   const adjRows = await pool.query('SELECT * FROM manual_adjustments ORDER BY ts DESC, id DESC');
   state.adjustments = adjRows.rows.map(r => ({
     id: r.id, ts: Number(r.ts), itemId: String(r.item_id), dir: r.dir, qty: Number(r.qty),
-    label: r.label || 'Manual', note: r.note || '',
+    label: r.label || 'Manual', note: r.note || '', scope: r.scope || 'inventory',
   }));
 
   console.log(`[init] DB loaded: ${Object.keys(state.items).length} items, ${Object.keys(state.bazaar.items).length} bazaar, ${Object.keys(state.display.items).length} display, ${Object.keys(state.market.items).length} market, ${state.activity.length} activity, ${state.transfers.length} transfers, ${state.trades.trades.length} trades, ${state.museum.swaps.length} museum swaps, ${state.adjustments.length} adjustments, ${state.processedIds.length} processed, lastTs=${state.lastTs}`);

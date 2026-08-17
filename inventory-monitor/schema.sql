@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS manual_adjustments (
   id         serial  PRIMARY KEY,
   ts         bigint  NOT NULL,             -- unix ms
   item_id    text    NOT NULL,
+  scope      text    NOT NULL DEFAULT 'inventory' CHECK (scope IN ('inventory','bazaar','display','market')),
   dir        text    NOT NULL CHECK (dir IN ('in', 'out')),
   qty        bigint  NOT NULL CHECK (qty > 0),
   label      text    NOT NULL DEFAULT 'Manual',

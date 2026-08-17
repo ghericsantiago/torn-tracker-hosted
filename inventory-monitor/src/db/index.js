@@ -23,6 +23,10 @@ async function applySchema(pool, config) {
   try { await pool.query("ALTER TABLE activity ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT ''"); }
   catch { /* table missing → schema.sql creates it with the column */ }
 
+  // Migration: add scope column to manual_adjustments (defaults to 'inventory' for existing rows).
+  try { await pool.query("ALTER TABLE manual_adjustments ADD COLUMN IF NOT EXISTS scope text NOT NULL DEFAULT 'inventory'"); }
+  catch { /* table missing → schema.sql creates it with the column */ }
+
   // Migration: databases created before item_sources had a `dir` column.
   // The check uses a probe query rather than information_schema (not available on all setups).
   let hasDir = false;

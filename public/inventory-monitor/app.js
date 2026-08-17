@@ -18,7 +18,11 @@ function invNetBtn(itemId, itemName) {
   const inv = state && state.items ? state.items.find(x => x.id === itemId) : null;
   const n = inv ? inv.net : null;
   const badge = n != null ? ` <span class="btn-adj-net">${n >= 0 ? '+' : ''}${fmtQty(n)}</span>` : '';
-  return `<button class="btn-adj" data-item-id="${itemId}" data-item-name="${esc(itemName)}" data-net="${n != null ? n : 0}" title="Reconcile inventory balance">⚖${badge}</button>`;
+  return `<button class="btn-adj" data-item-id="${itemId}" data-item-name="${esc(itemName)}" data-scope="inventory" data-net="${n != null ? n : 0}" title="Reconcile inventory balance">⚖${badge}</button>`;
+}
+function tabAdjBtn(itemId, itemName, net, scope) {
+  const badge = ` <span class="btn-adj-net">${net >= 0 ? '+' : ''}${fmtQty(net)}</span>`;
+  return `<button class="btn-adj" data-item-id="${itemId}" data-item-name="${esc(itemName)}" data-scope="${scope}" data-net="${net}" title="Reconcile ${scope} balance">⚖${badge}</button>`;
 }
 
 let _toastTimer;
@@ -40,6 +44,7 @@ function topSources(sources, n = 2) {
 
 let state = null;
 let view = 'monitor';
+let adjScope = 'inventory'; // tracks which ledger scope the open reconcile modal targets
 let fastTimer = null;
 
 function switchView(v) {
@@ -195,7 +200,7 @@ function renderBazaar(q) {
 
   $('tb-bz').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
+      <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'bazaar')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Bazaar Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Sold">−${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Bazaar Removed">−${fmtQty(it.removed)}</td>
@@ -224,7 +229,7 @@ function renderDisplay(q) {
 
   $('tb-disp').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
+      <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'display')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Display Added">+${fmtQty(it.in)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Display Removed">−${fmtQty(it.removed)}</td>
       <td class="${it.net >= 0 ? 'green' : 'red'}">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
@@ -254,7 +259,7 @@ function renderMarket(q) {
 
   $('tb-mkt').innerHTML = items.length ? items.map(it => `
     <tr>
-      <td class="item">${esc(it.name)}${invNetBtn(it.id, it.name)}</td>
+      <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'market')}</td>
       <td class="green hv-cell" data-item="${it.id}" data-dir="in" data-source="Market Added">+${fmtQty(it.in)}</td>
       <td class="gold hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Sold">${fmtQty(it.sold)}</td>
       <td class="red hv-cell" data-item="${it.id}" data-dir="out" data-source="Market Removed">−${fmtQty(it.removed)}</td>
@@ -559,7 +564,7 @@ function renderAdjList() {
       <td class="dim">${fmtTime(a.ts)}</td>
       <td class="item">${esc(a.name || a.itemId)}</td>
       <td class="${a.dir === 'in' ? 'green' : 'red'}">${a.dir === 'in' ? '+' : '−'}${fmtQty(a.qty)}</td>
-      <td>${esc(a.label)}</td>
+      <td>${esc(a.label)}${a.scope && a.scope !== 'inventory' ? ` <span class="badge">${a.scope}</span>` : ''}</td>
       <td><button class="adj-del" data-del="${a.id}" title="Delete">🗑</button></td>
     </tr>`).join('')
     : '<tr><td colspan="5" class="empty">None yet.</td></tr>';
@@ -585,6 +590,7 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-adj');
   if (!btn) return;
   e.stopPropagation();
+  adjScope = btn.dataset.scope || 'inventory';
   openAdjModal();
   const balRadio = document.querySelector('input[name="adj-mode"][value="balance"]');
   balRadio.checked = true;
@@ -599,7 +605,7 @@ document.addEventListener('click', e => {
 });
 $('adj-save').addEventListener('click', async () => {
   const mode = document.querySelector('input[name="adj-mode"]:checked').value;
-  const body = { item: $('adj-item').value, label: $('adj-label').value, note: $('adj-note').value };
+  const body = { item: $('adj-item').value, label: $('adj-label').value, note: $('adj-note').value, scope: adjScope };
   if (mode === 'balance') body.balance = $('adj-bal').value;
   else { body.dir = $('adj-dir').value; body.qty = $('adj-qty').value; }
   try {

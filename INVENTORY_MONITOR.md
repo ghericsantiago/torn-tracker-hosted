@@ -19,6 +19,7 @@ The backend follows SOLID: modules with one job (SRP), log-type behavior that is
 contracts across ledgers (LSP), narrow injected dependencies (ISP) and a composition root
 that wires everything (DIP).
 
+**Standalone layout** (original, `inventory-monitor/`):
 ```
 inventory-monitor/
 ├── server.js              thin entry — delegates to src/app.js (`npm start` unchanged)
@@ -44,6 +45,23 @@ inventory-monitor/
     ├── summary.js         /api/state read-model (replays manual adjustments on top)
     └── routes.js          HTTP API (thin adapters over the injected deps)
 ```
+
+**Integrated layout** (torn-tracker-hosted):
+```
+torn-tracker-hosted/
+├── inventory-monitor/
+│   ├── index.js           integration adapter — mount(app) wires routes + poll loop into
+│   │                      the existing Express app (no separate HTTP server)
+│   ├── schema.sql         PostgreSQL schema (applied at startup via mount())
+│   ├── reset-db.js        one-shot TRUNCATE script (node inventory-monitor/reset-db.js)
+│   └── src/               identical to standalone; config.js paths adjusted for new root
+└── public/
+    └── inventory-monitor/ frontend files (index.html, style.css, app.js)
+                           — served at /admin/inventory
+```
+Routes are mounted at `/admin/inventory` (dashboard at `/admin/inventory`, API at
+`/admin/inventory/api/*`). `LOGS_SERVER` defaults to `http://localhost:{PORT}` so the
+monitor polls the same server's own `/api/portfolio/logs` endpoint with no external hop.
 - Related implementation: `ITEM_EXTRACTION.md` covers the portfolio tracker userscript
   (`portfolio-tracker.user-v2.js`), which shares the same log-type groups but renders
   per-tab analytics instead of a running inventory.
@@ -80,54 +98,68 @@ Torn API (user log selection)  ──poll 60s──▶  flow extraction  ──�
 ## 2. Requirements
 
 - **Node.js 22+** (uses global `fetch`; Node 24 tested).
-- Access to the **hosted log server** (`LOGS_SERVER` env, default
-  `https://torn-imarket-tracker.gvsantiago.com`) — no Torn API key required.
-- Repo data files (read from the repo root, no network needed):
+- Access to the **hosted log server** (`LOGS_SERVER` env) — no Torn API key required.
+  - Standalone: defaults to `https://torn-imarket-tracker.gvsantiago.com`.
+  - Integrated (torn-tracker-hosted): defaults to `http://localhost:{PORT}` — the same
+    server's own `/api/portfolio/logs` endpoint, no external hop.
+- Repo data files (read from the project root, no network needed):
   `torn_items.json` (item names + market prices), `museum-exchange.json` (set compositions).
 
 ## 3. Setup & run
 
-**Database:** create it once (the schema itself is applied automatically at startup):
+### Integrated (torn-tracker-hosted) — primary deployment
 
+The monitor is mounted automatically by `torn-tracker-hosted/server.js`. No separate process
+or install is needed — it shares the same Node process, PostgreSQL DB, and `.env` file.
+
+Add to `torn-tracker-hosted/.env` (only `MONITOR_START` is typically needed; the rest have
+sensible defaults):
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `MONITOR_START` | `2026-08-12T14:00:00-04:00` | When to begin tracking — any ISO 8601 instant. Used only on first startup (no `monitor_meta` row yet) |
+| `POLL_INTERVAL` | `60000` | Poll interval in ms |
+| `LOGS_SERVER` | `http://localhost:{PORT}` | Log source — defaults to the same server |
+| `API_RATE_INTERVAL` | `0` | Optional pacing (ms) between log-server requests |
+
+Dashboard: **`http://localhost:{PORT}/admin/inventory`**. API at `/admin/inventory/api/*`.
+
+**Start fresh (integrated):** stop the server, then:
 ```bash
-createdb -U torn_user torn_tracker_v2     # or: psql -U torn_user -c 'CREATE DATABASE torn_tracker_v2'
+node inventory-monitor/reset-db.js
 ```
+Then restart. The monitor re-fetches all logs since `MONITOR_START`.
 
-**Run:**
+### Standalone
 
 ```bash
 cd inventory-monitor
 npm install
-cp .env.example .env        # then edit: set DB_* (LOGS_SERVER / PORT / MONITOR_START / POLL_INTERVAL optional)
+cp .env.example .env        # set DB_* + optionally LOGS_SERVER / PORT / MONITOR_START
 npm start                   # → http://localhost:3001
 ```
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `LOGS_SERVER` | `https://torn-imarket-tracker.gvsantiago.com` | Hosted log server (`/api/portfolio/logs`). No Torn API key needed — it handles auth + rate limits |
+| `LOGS_SERVER` | `https://torn-imarket-tracker.gvsantiago.com` | Hosted log server (`/api/portfolio/logs`) |
 | `PORT` | `3001` | Dashboard/API port |
-| `MONITOR_START` | `2026-08-12T14:00:00-04:00` | When to begin tracking — any ISO 8601 instant (the offset is irrelevant to the stored unix timestamp; the dashboard then displays it in **Torn time**, ET). Used only when `monitor_meta` doesn't exist yet (fresh DB) |
+| `MONITOR_START` | `2026-08-12T14:00:00-04:00` | Tracking start — ISO 8601 instant (displayed in Torn time, ET). Used only on fresh DB |
 | `POLL_INTERVAL` | `60000` | Poll interval in ms |
-| `API_RATE_INTERVAL` | `0` | Optional pacing (ms) between log-server requests; default 0 since the hosted server handles Torn's limits |
+| `API_RATE_INTERVAL` | `0` | Optional pacing between log-server requests |
 | `DB_HOST` / `DB_PORT` | `localhost` / `5432` | PostgreSQL host/port |
-| `DB_NAME` | — | **Required.** Database name (e.g. `torn_tracker_v2`) |
+| `DB_NAME` | — | **Required.** Database name |
 | `DB_USER` / `DB_PASS` | — | **Required.** PostgreSQL credentials |
 
 The schema (`schema.sql`) is applied idempotently on every startup. The server exits at
-startup if PostgreSQL is unreachable or the `DB_*` vars are missing (persistence is required
-— the dedupe buffer must survive restarts to avoid double-counting).
+startup if PostgreSQL is unreachable or the `DB_*` vars are missing.
 
-**Start fresh:** `npm run reset-db` (i.e. `node reset-db.js`) clears every table — ledgers,
-dedupe buffer, monitor meta — so the next poll starts from `MONITOR_START`. Stop the server
-first (a running server re-writes its in-memory state on the next poll). Set
-`MONITOR_START` to the current time in `.env` first if you want the ledger to start truly
-empty from now instead of re-processing since 02:00 AM.
+**Start fresh:** `npm run reset-db` clears every table so the next poll starts from
+`MONITOR_START`. Stop the server first.
 
 > **Changing `MONITOR_START` on an existing DB:** the stored `monitor_meta.start_ts` wins on
-> every restart — the env value is only used when the DB has no start yet. So to apply a new
-> start date you must **stop → `npm run reset-db` → start** (the server re-fetches every log
-> since the new start from Torn, so no history is lost). The startup log warns if the
-> configured `MONITOR_START` differs from the stored DB start.
+> every restart — the env value is only used when the DB has no start yet. To apply a new
+> start date: **stop → reset-db → start**. The startup log warns if the configured
+> `MONITOR_START` differs from the stored DB start.
 
 ## 4. Flow rules implemented (extractor registry)
 
@@ -319,7 +351,7 @@ view, rebuilt continuously from polls). Schema applied idempotently at startup:
 | `trade_events` | completed trades (grouped by `parsed_trade_id`): trade_id, counterpart_id, gave_json, received_json | pruned to newest 1000 (§4g) |
 | `museum_swaps` | museum exchanges (7000): set_name, quantity, points_received | pruned to newest 1000 (§4h) |
 | `museum_meta` | single row: total `points_received` | Σ swap points |
-| `manual_adjustments` | manual reconcile records (item_id, dir, qty, label, note) — separate layer, replayed at read time, never merged into item totals | user-added only |
+| `manual_adjustments` | manual reconcile records (item_id, **scope**, dir, qty, label, note) — separate layer, replayed at read time per scope, never merged into item totals. `scope` = `inventory` \| `bazaar` \| `display` \| `market` (default `inventory`) | user-added only |
 
 How it's written (all in one transaction per poll):
 
@@ -339,21 +371,26 @@ How it's written (all in one transaction per poll):
 | `GET /` | Dashboard — eight tabs: **Monitor** (IN/OUT + activity), **Inventory** (person ledger), **Bazaar**, **Display**, **Market**, **Trading** (player trades), **Museum** (exchange rewards), **Transfers** (location moves) |
 | `GET /api/state` | Full JSON: counts, `current` (inventory ledger), `bazaar`, `display`, `market`, `trades`, `museum`, `transfers`, items, activity, poll status |
 | `GET /api/item-events?itemId=&dir=in\|out\|both&source=` | Per-item event breakdown for the **click popups** — newest 100 activity entries for that item as `{events:[{ts, source, qty, dir}]}`. `dir=both` returns the **full chronological history** (oldest first) used by the **Net** column popup. When `source` is a location source (`Bazaar Added`, `Market Sold`, …) the events come from the dedicated `location_events` history (50k/scope) instead of the capped activity feed — so the Bazaar/Display/Market popups never go empty for old items. Without `source`: inventory-ledger flows only. |
-| `POST /api/adjust` | Add a **manual adjustment** (reconciliation): `{item, dir:'in'\|'out', qty, label?, note?}` or `{item, balance, label?, note?}` (reconcile to a target current balance; the server computes the in/out delta). `item` = name or numeric id (resolved against `torn_items.json`). Persisted in `manual_adjustments`, applied on top of the ledger at read time |
+| `POST /api/adjust` | Add a **manual adjustment** (reconciliation): `{item, scope?, dir:'in'\|'out', qty, label?, note?}` or `{item, scope?, balance, label?, note?}` (reconcile to a target balance; the server computes the in/out delta). `scope` = `inventory` (default) \| `bazaar` \| `display` \| `market` — determines which ledger the balance is compared against and which clone is adjusted in `/api/state`. `item` = name or numeric id (resolved against `torn_items.json`). Persisted in `manual_adjustments`, applied on top of the correct ledger at read time |
 | `DELETE /api/adjust/:id` | Remove a manual adjustment (reverts its effect) |
 | `POST /api/poll` | Trigger an immediate poll (returns `{ok, processed, state}`) |
 | `POST /api/reset` | Clear tracked data (incl. manual adjustments) and restart from the monitor start time |
 
 > **Manual adjustments (reconcile):** the **＋ Adjust** button (header) opens a modal with two
 > modes — *Add in/out record* (direction + qty + label) or *Reconcile to balance* (set the
-> item's current inventory to a target; the server computes the delta). Every item row in the
+> item's current balance to a target; the server computes the delta). Every item row in the
 > Monitor IN/OUT, Inventory, Bazaar, Display, Market and Trading tables also has a **⚖
 > Reconcile** button that opens the modal **pre-filled** with that item and its current
-> inventory balance (reconcile mode) — just type the actual count and save. Adjustments are a
-> **separate layer**: they're never written into `item_totals`/`item_sources` (so restarts and
-> re-polls can't double-count them), are applied on top of the log ledger in `/api/state` and
-> the click popups, appear in Recent Activity as `Manual: <label>`, and are fully reversible
-> (delete from the modal's recent list).
+> balance — **scoped to the tab you clicked from**: the Bazaar ⚖ pre-fills and adjusts the
+> bazaar ledger, the Market ⚖ the market ledger, and so on. The Trading tab ⚖ reconciles the
+> inventory scope (trades move inventory). The scope is sent as part of `POST /api/adjust` and
+> stored in `manual_adjustments.scope`; at read time `summary()` routes each adjustment to the
+> correct ledger clone (`inventory` → `itemsById`, `bazaar` → `bazaarById`, etc.). Non-inventory
+> adjustments show a scope badge in the modal's recent list. Adjustments are a **separate
+> layer**: they're never written into `item_totals`/`item_sources` (so restarts and re-polls
+> can't double-count them), are applied on top of the log ledger in `/api/state`, appear in
+> Recent Activity as `Manual: <label>`, and are fully reversible (delete from the modal's
+> recent list).
 
 > **Click popups:** in the **Monitor** IN/OUT tables and the **Inventory** tab, clicking an
 > IN/OUT number opens (and clicking again / pressing × / clicking elsewhere closes) a small

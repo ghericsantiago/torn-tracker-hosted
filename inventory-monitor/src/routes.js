@@ -57,8 +57,9 @@ function createRoutes({ state, catalog, summary, poller, db }) {
   });
 
   // Manual adjustments (reconciliation layer):
-  //   { item, dir: 'in'|'out', qty, label?, note? }   — add a manual in/out record
-  //   { item, balance, label?, note? }                 — reconcile: adjust to a target current balance
+  //   { item, scope?, dir: 'in'|'out', qty, label?, note? }   — add a manual in/out record
+  //   { item, scope?, balance, label?, note? }                 — reconcile: adjust to a target balance
+  //   scope: 'inventory' (default) | 'bazaar' | 'display' | 'market'
   router.post('/api/adjust', async (req, res) => {
     try {
       const body  = req.body || {};
@@ -68,14 +69,22 @@ function createRoutes({ state, catalog, summary, poller, db }) {
       if (r.error) return res.status(400).json({ ok: false, error: r.error });
       const itemId = String(r.id);
 
+      const VALID_SCOPES = new Set(['inventory', 'bazaar', 'display', 'market']);
+      const scope = VALID_SCOPES.has(body.scope) ? body.scope : 'inventory';
+
       let dir, qty;
       if (body.balance !== undefined && body.balance !== null && body.balance !== '') {
-        // Reconcile mode: compute the adjustment needed to hit the target current balance.
+        // Reconcile mode: compute the adjustment needed to hit the target balance for the given scope.
         const target = Math.floor(Number(body.balance));
         if (!Number.isFinite(target) || target < 0)
           return res.status(400).json({ ok: false, error: 'Balance must be a non-negative number.' });
-        let base = state.items[itemId] ? state.items[itemId].net : 0;   // log ledger + prior manual adjustments
-        for (const a of state.adjustments) if (a.itemId === itemId) base += a.dir === 'in' ? a.qty : -a.qty;
+        let base;
+        if (scope === 'bazaar')   base = state.bazaar.items[itemId]  ? state.bazaar.items[itemId].net  : 0;
+        else if (scope === 'display') base = state.display.items[itemId] ? state.display.items[itemId].net : 0;
+        else if (scope === 'market')  base = state.market.items[itemId]  ? state.market.items[itemId].net  : 0;
+        else                          base = state.items[itemId]          ? state.items[itemId].net          : 0;
+        for (const a of state.adjustments)
+          if (a.itemId === itemId && a.scope === scope) base += a.dir === 'in' ? a.qty : -a.qty;
         const diff = target - base;
         if (diff === 0) return res.json({ ok: true, adjustment: null, noop: true });
         dir = diff > 0 ? 'in' : 'out';
@@ -89,10 +98,10 @@ function createRoutes({ state, catalog, summary, poller, db }) {
 
       const ts = Date.now();
       const ins = await db.pool.query(
-        'INSERT INTO manual_adjustments (ts, item_id, dir, qty, label, note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-        [ts, itemId, dir, qty, label, note]
+        'INSERT INTO manual_adjustments (ts, item_id, scope, dir, qty, label, note) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+        [ts, itemId, scope, dir, qty, label, note]
       );
-      const adj = { id: ins.rows[0].id, ts, itemId, dir, qty, label, note };
+      const adj = { id: ins.rows[0].id, ts, itemId, scope, dir, qty, label, note };
       state.adjustments.unshift(adj);
       if (state.adjustments.length > 500) state.adjustments.length = 500;
       res.json({ ok: true, adjustment: { ...adj, name: catalog.itemName(itemId) } });

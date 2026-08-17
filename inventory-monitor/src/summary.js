@@ -8,27 +8,64 @@
 
 function createSummary({ state, catalog, config }) {
   return function summary() {
-    // Deep-ish clone of the log-derived ledger so manual adjustments never mutate live state.
+    // Deep-ish clones of each log-derived ledger so manual adjustments never mutate live state.
     const itemsById = new Map();
     Object.values(state.items).forEach(it => {
       itemsById.set(it.id, { ...it, sourcesIn: { ...it.sourcesIn }, sourcesOut: { ...it.sourcesOut } });
     });
+    const bazaarById = new Map();
+    Object.values(state.bazaar.items).forEach(it => bazaarById.set(it.id, { ...it }));
+    const displayById = new Map();
+    Object.values(state.display.items).forEach(it => displayById.set(it.id, { ...it }));
+    const marketById = new Map();
+    Object.values(state.market.items).forEach(it => marketById.set(it.id, { ...it }));
 
-    // Manual reconciliation layer — applied on top of the log ledger (see manual_adjustments).
-    // Returns the adjustment rows as activity entries so they show in the feed too.
+    // Manual reconciliation layer — applied on top of the log ledger per scope.
     const adjActivity = [];
     for (const a of state.adjustments) {
-      let it = itemsById.get(a.itemId);
-      if (!it) {
-        it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, out: 0, net: 0, lastTs: 0, sourcesIn: {}, sourcesOut: {} };
-        itemsById.set(a.itemId, it);
-      }
+      const scope = a.scope || 'inventory';
       const label = `Manual: ${a.label || 'Manual'}`;
-      if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; it.sourcesIn[label] = (it.sourcesIn[label] || 0) + a.qty; }
-      else                { it.out += a.qty; it.net -= a.qty; it.sourcesOut[label] = (it.sourcesOut[label] || 0) + a.qty; }
-      if (a.ts > it.lastTs) it.lastTs = a.ts;
+
+      if (scope === 'bazaar') {
+        let it = bazaarById.get(a.itemId);
+        if (!it) {
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
+          bazaarById.set(a.itemId, it);
+        }
+        if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
+        else                { it.out += a.qty; it.net -= a.qty; }
+        if (a.ts > it.lastTs) it.lastTs = a.ts;
+      } else if (scope === 'display') {
+        let it = displayById.get(a.itemId);
+        if (!it) {
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, removed: 0, net: 0, lastTs: 0 };
+          displayById.set(a.itemId, it);
+        }
+        if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
+        else                { it.removed += a.qty; it.net -= a.qty; }
+        if (a.ts > it.lastTs) it.lastTs = a.ts;
+      } else if (scope === 'market') {
+        let it = marketById.get(a.itemId);
+        if (!it) {
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, sold: 0, removed: 0, out: 0, net: 0, lastTs: 0 };
+          marketById.set(a.itemId, it);
+        }
+        if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; }
+        else                { it.out += a.qty; it.net -= a.qty; }
+        if (a.ts > it.lastTs) it.lastTs = a.ts;
+      } else {
+        // inventory (default)
+        let it = itemsById.get(a.itemId);
+        if (!it) {
+          it = { id: a.itemId, name: catalog.itemName(a.itemId), value: catalog.itemValue(a.itemId), in: 0, out: 0, net: 0, lastTs: 0, sourcesIn: {}, sourcesOut: {} };
+          itemsById.set(a.itemId, it);
+        }
+        if (a.dir === 'in') { it.in += a.qty; it.net += a.qty; it.sourcesIn[label] = (it.sourcesIn[label] || 0) + a.qty; }
+        else                { it.out += a.qty; it.net -= a.qty; it.sourcesOut[label] = (it.sourcesOut[label] || 0) + a.qty; }
+        if (a.ts > it.lastTs) it.lastTs = a.ts;
+      }
       adjActivity.push({ ts: a.ts, logId: `manual-${a.id}`, logType: null, title: 'Manual adjustment',
-                         dir: a.dir, itemId: a.itemId, name: it.name, qty: a.qty, source: label });
+                         dir: a.dir, itemId: a.itemId, name: catalog.itemName(a.itemId), qty: a.qty, source: label });
     }
 
     const items = [...itemsById.values()];
@@ -50,8 +87,8 @@ function createSummary({ state, catalog, config }) {
       overdrawnItems: overdrawn.length,
     };
 
-    // Bazaar stock ledger (see ITEM_TRACKING.md §6c)
-    const bzItems = Object.values(state.bazaar.items);
+    // Bazaar stock ledger (adjusted clones, see ITEM_TRACKING.md §6c)
+    const bzItems = [...bazaarById.values()];
     const bazaar = {
       revenue: state.bazaar.revenue,
       unitsSold: state.bazaar.unitsSold,
@@ -59,25 +96,21 @@ function createSummary({ state, catalog, config }) {
       unitsOut: bzItems.reduce((s, i) => s + i.out, 0),
       netUnits: bzItems.reduce((s, i) => s + i.net, 0),
       stockItems: bzItems.filter(i => i.net > 0).length,
-      items: bzItems
-        .map(it => ({ ...it }))
-        .sort((a, b) => (b.in + b.out) - (a.in + a.out)),
+      items: bzItems.sort((a, b) => (b.in + b.out) - (a.in + a.out)),
     };
 
-    // Display Case stock ledger (see ITEM_TRACKING.md §6d)
-    const dispItems = Object.values(state.display.items);
+    // Display Case stock ledger (adjusted clones, see ITEM_TRACKING.md §6d)
+    const dispItems = [...displayById.values()];
     const display = {
       unitsIn: dispItems.reduce((s, i) => s + i.in, 0),
       unitsOut: dispItems.reduce((s, i) => s + i.removed, 0),
       netUnits: dispItems.reduce((s, i) => s + i.net, 0),
       stockItems: dispItems.filter(i => i.net > 0).length,
-      items: dispItems
-        .map(it => ({ ...it }))
-        .sort((a, b) => (b.in + b.removed) - (a.in + a.removed)),
+      items: dispItems.sort((a, b) => (b.in + b.removed) - (a.in + a.removed)),
     };
 
-    // Item Market listing ledger (see ITEM_TRACKING.md §6e)
-    const mktItems = Object.values(state.market.items);
+    // Item Market listing ledger (adjusted clones, see ITEM_TRACKING.md §6e)
+    const mktItems = [...marketById.values()];
     const market = {
       revenue: state.market.revenue,
       unitsSold: state.market.unitsSold,
@@ -85,9 +118,7 @@ function createSummary({ state, catalog, config }) {
       unitsOut: mktItems.reduce((s, i) => s + i.out, 0),
       netUnits: mktItems.reduce((s, i) => s + i.net, 0),
       stockItems: mktItems.filter(i => i.net > 0).length,
-      items: mktItems
-        .map(it => ({ ...it }))
-        .sort((a, b) => (b.in + b.out) - (a.in + a.out)),
+      items: mktItems.sort((a, b) => (b.in + b.out) - (a.in + a.out)),
     };
 
     // Transfer events between locations — counts per direction + recent items
@@ -150,7 +181,7 @@ function createSummary({ state, catalog, config }) {
         .map(it => ({ ...it }))
         .sort((a, b) => (b.in + b.out) - (a.in + a.out)),
       activity: state.activity.concat(adjActivity).sort((a, b) => b.ts - a.ts).slice(0, 200),
-      adjustments: state.adjustments.slice(0, 100).map(a => ({ id: a.id, ts: a.ts, itemId: a.itemId, name: catalog.itemName(a.itemId), dir: a.dir, qty: a.qty, label: a.label, note: a.note })),
+      adjustments: state.adjustments.slice(0, 100).map(a => ({ id: a.id, ts: a.ts, itemId: a.itemId, name: catalog.itemName(a.itemId), scope: a.scope || 'inventory', dir: a.dir, qty: a.qty, label: a.label, note: a.note })),
     };
   };
 }
