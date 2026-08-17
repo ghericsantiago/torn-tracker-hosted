@@ -130,8 +130,10 @@
 
   /* Monitor two-column layout */
   .monitor-body { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; margin-bottom: 16px; }
-  .monitor-sidebar #activity { max-height: 72vh; overflow-y: auto; }
-  @media (max-width: 960px) { .monitor-body { grid-template-columns: 1fr; } }
+  .monitor-main .card { height: 72vh; overflow-y: auto; margin-bottom: 0; }
+  .monitor-sidebar .card { height: 72vh; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0; }
+  .monitor-sidebar #activity { flex: 1; overflow-y: auto; max-height: none; }
+  @media (max-width: 960px) { .monitor-body { grid-template-columns: 1fr; } .monitor-main .card, .monitor-sidebar .card { height: auto; max-height: 72vh; } }
 
   /* IN / OUT tab switcher */
   .io-tabbar { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -177,7 +179,6 @@
   /* activity */
   #activity { padding: 6px 0; }
   .act-spinner { text-align: center; padding: 10px 0; font-size: 11px; color: var(--dim); }
-  #act-sentinel { height: 1px; }
   .act { display: flex; gap: 10px; align-items: baseline; padding: 5px 14px; font-size: 12px; border-bottom: 1px solid #1a1d2e; }
   .act .t { color: var(--dim2); font-size: 11px; min-width: 88px; flex-shrink: 0; }
   .act .dir { font-weight: 700; min-width: 30px; }

@@ -721,16 +721,19 @@ document.querySelectorAll('.io-tab').forEach(btn => {
   });
 });
 
-// Infinite scroll: load more IO rows when sentinel enters viewport
-new IntersectionObserver(entries => {
-  if (entries[0].isIntersecting && view === 'monitor' && ioPaging[ioTab] < ioItemsCache[ioTab].length)
-    loadIOPage();
-}, { rootMargin: '200px' }).observe($('io-sentinel'));
+// Infinite scroll: load more IO rows when user scrolls near bottom of the IO card
+$('io-card').addEventListener('scroll', () => {
+  const el = $('io-card');
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200)
+    if (view === 'monitor' && ioPaging[ioTab] < ioItemsCache[ioTab].length) loadIOPage();
+});
 
-// Infinite scroll: load more activity when sentinel enters viewport
-new IntersectionObserver(entries => {
-  if (entries[0].isIntersecting && view === 'monitor') loadActivity(false);
-}, { rootMargin: '300px' }).observe($('act-sentinel'));
+// Infinite scroll: load more activity when user scrolls near bottom of the activity div
+$('activity').addEventListener('scroll', () => {
+  const el = $('activity');
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200)
+    if (view === 'monitor') loadActivity(false);
+});
 
 load();
 setInterval(load, 30000);   // dashboard auto-refresh
