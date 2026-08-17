@@ -47,7 +47,7 @@ async function mount(app) {
   };
 
   await applySchema(pool, config);
-  await loadState(pool, state, config);
+  await loadState(pool, state, config, catalog);
 
   const logClient = createLogClient(config);
   const ledger    = createLedger({ catalog, config });
