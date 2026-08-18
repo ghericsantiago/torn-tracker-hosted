@@ -76,6 +76,9 @@ function fifoIn(log, state, catalog) {
   if (!state.fifo.lots.has(itemId)) state.fifo.lots.set(itemId, []);
   state.fifo.lots.get(itemId).push(lot);
 
+  // Track the most recent non-zero price so the reconciler can price shortfall lots
+  if (unitCost > 0) state.fifo.lastKnownCost.set(itemId, unitCost);
+
   state.fifo.newLots.push(lot);
   return lot;
 }

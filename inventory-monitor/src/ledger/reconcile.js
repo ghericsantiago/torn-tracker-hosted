@@ -5,7 +5,9 @@
  * matches the true inventory net (log ledger + manual inventory adjustments).
  *
  * Gaps are closed automatically:
- *   gap > 0 (FIFO under-counts) → create a $0 "Reconciliation" lot
+ *   gap > 0 (FIFO under-counts) → create a "Reconciliation" lot priced at the last
+ *                                  known purchase price for that item (falls back to $0
+ *                                  if no buy history exists in state.fifo.lastKnownCost)
  *   gap < 0 (FIFO over-counts)  → fifoOut to deplete the oldest lots
  *
  * Called after every poll cycle (silent) and via POST /api/fifo/reconcile (on demand).
@@ -36,7 +38,9 @@ function createFifoReconciler({ catalog }) {
       itemsAffected++;
 
       if (diff > 0) {
-        // FIFO under-counts: insert a $0 Reconciliation lot for the gap
+        // FIFO under-counts: insert a Reconciliation lot priced at the last known
+        // purchase price for this item so the avg cost stays accurate.
+        const unitCost = state.fifo.lastKnownCost.get(String(itemId)) || 0;
         const lot = {
           id:       null,   // filled by persist after INSERT RETURNING id
           ts:       Date.now(),
@@ -46,7 +50,7 @@ function createFifoReconciler({ catalog }) {
           category: catalog.itemCategory(itemId) || '',
           totalQty: diff,
           remaining: diff,
-          unitCost: 0,
+          unitCost,
           source:   'Reconciliation',
         };
         if (!state.fifo.lots.has(itemId)) state.fifo.lots.set(itemId, []);

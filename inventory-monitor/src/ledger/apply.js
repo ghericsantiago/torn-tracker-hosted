@@ -56,9 +56,19 @@ function createApplyLog({ catalog, config }) {
       it.net = it.in - it.out;
       if (ts > it.lastTs) it.lastTs = ts;
 
+      // Capture unit cost for paid acquisitions — shown in the IN popup price column
+      let unitCost = null;
+      if (f.dir === 'in' && (C.BUY_LOG_TYPES.has(logType) || C.AMMO_BUY_LOG_TYPES.has(logType) || C.POINTS_LOG_TYPES.has(logType))) {
+        const d = log.data || {};
+        const rawTotal = Number(d.cost_total ?? d.cost ?? 0) || 0;
+        const rawQty   = Number(d.quantity ?? d.items?.[0]?.qty ?? 1) || 1;
+        unitCost = rawTotal > 0 && rawQty > 0 ? Math.round(rawTotal / rawQty) : null;
+      }
+
       state.activity.unshift({
         ts, logId: log.id, logType, title, category,
         dir: f.dir, itemId: key, name: it.name, qty: f.qty, source: f.source,
+        unitCost,
       });
     });
 

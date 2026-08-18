@@ -45,9 +45,10 @@ function createState(startTs) {
     adjustments: [],       // manual reconciliation records (separate layer, see manual_adjustments table)
 
     fifo: {
-      lots: new Map(),     // item_id → [{id, ts, logId, itemId, itemName, category, totalQty, remaining, unitCost, source}, ...] oldest-first
-      newLots: [],         // lots created this poll cycle → INSERT on next persist
-      dirtyIds: new Set(), // lot DB ids with modified remaining_qty → UPDATE on next persist
+      lots: new Map(),          // item_id → [{id, ts, logId, itemId, itemName, category, totalQty, remaining, unitCost, source}, ...] oldest-first
+      newLots: [],              // lots created this poll cycle → INSERT on next persist
+      dirtyIds: new Set(),      // lot DB ids with modified remaining_qty → UPDATE on next persist
+      lastKnownCost: new Map(), // item_id → most recent unitCost > 0 (used by reconciler to price shortfall lots)
     },
     transactions: [],      // buy/sell transaction rows → INSERT ON CONFLICT DO NOTHING on next persist
   };

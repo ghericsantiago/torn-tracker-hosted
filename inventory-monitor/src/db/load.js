@@ -149,6 +149,16 @@ async function loadState(pool, state, config, catalog) {
     });
   });
 
+  // Seed lastKnownCost: most recent paid lot per item (including depleted ones)
+  // Used by the reconciler to price shortfall lots instead of defaulting to $0.
+  const costRows = await pool.query(
+    `SELECT DISTINCT ON (item_id) item_id, unit_cost
+     FROM fifo_lots WHERE unit_cost > 0
+     ORDER BY item_id, ts DESC, id DESC`
+  );
+  state.fifo.lastKnownCost = new Map();
+  costRows.rows.forEach(r => state.fifo.lastKnownCost.set(r.item_id, Number(r.unit_cost)));
+
   console.log(`[init] DB loaded: ${Object.keys(state.items).length} items, ${Object.keys(state.bazaar.items).length} bazaar, ${Object.keys(state.display.items).length} display, ${Object.keys(state.market.items).length} market, ${state.activity.length} activity, ${state.transfers.length} transfers, ${state.trades.trades.length} trades, ${state.museum.swaps.length} museum swaps, ${state.adjustments.length} adjustments, ${state.processedIds.length} processed, ${fifoRows.rows.length} fifo lots, lastTs=${state.lastTs}`);
 }
 

@@ -46,7 +46,7 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
       .filter(a => a.itemId === itemId && (dir === 'both' || a.dir === dir)
         && (source ? a.source === source : !C.LOCATION_LEDGER_SOURCES.has(a.source)))
       .slice(0, limit)
-      .map(a => ({ ts: a.ts, source: a.source, qty: a.qty, category: a.category || '', logType: a.logType, dir: a.dir }));
+      .map(a => ({ ts: a.ts, source: a.source, qty: a.qty, category: a.category || '', logType: a.logType, dir: a.dir, unitCost: a.unitCost ?? null }));
     // Manual adjustments for this item+direction (inventory-level, so only when no source filter)
     if (!source) {
       state.adjustments

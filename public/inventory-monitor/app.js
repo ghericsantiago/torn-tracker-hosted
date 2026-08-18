@@ -540,10 +540,11 @@ function renderPop(title, rows, truncated) {
       <td>${esc(e.label)}</td>
       <td class="dim">${esc(e.cat || '')}${e.type != null ? ` <span class="dim2">#${e.type}</span>` : ''}</td>
       <td class="r">${e.sign ? e.sign : ''}${fmtQty(e.qty)}</td>
+      <td class="r gold dim">${e.unitCost > 0 ? fmt$(e.unitCost) + '/ea' : ''}</td>
     </tr>`).join('')
     : truncated
-      ? '<tr><td colspan="4" class="empty">Records outside rolling history window.</td></tr>'
-      : '<tr><td colspan="4" class="empty">Nothing to show yet.</td></tr>';
+      ? '<tr><td colspan="5" class="empty">Records outside rolling history window.</td></tr>'
+      : '<tr><td colspan="5" class="empty">Nothing to show yet.</td></tr>';
 }
 function positionPop(cell) {
   const pop = $('hover-pop');
@@ -574,7 +575,7 @@ async function showHoverPop(cell) {
   const name = (cell.closest('tr') && cell.closest('tr').querySelector('.item') || {}).textContent || itemId;
   const title = source || (dir === 'both' ? 'History' : (dir === 'in' ? 'IN' : 'OUT'));
   renderPop(`${title} · ${name} · ${events.length} event${events.length === 1 ? '' : 's'}`,
-    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : '−' })),
+    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : '−', unitCost: e.unitCost || 0 })),
     truncated);
   positionPop(cell);
 }
