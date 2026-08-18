@@ -50,6 +50,22 @@ Sell log types: **1104, 1113, 1221, 1226, 4210, 4220, 5011**.
 - `data.item` may be `[{id, qty}]` (take first), a number, or fall back to `data.items[0].id`.
 - Buy from **Bazaar** and **Point Market** are tax-exempt; Item Market sells are taxed.
 
+### 1b. Ammo market — buy (4500) / sell (4510)
+
+Ammo uses a **flat data shape** (not `data.item`) and maps to the `__ammo__` pseudo-item namespace:
+
+| Log | Direction | Source | Data shape |
+|---|---|---|---|
+| 4500 Ammo buy | `in` | `Ammo Buy` | `{ ammo: <typeId>, quantity: <rounds>, value: <$> }` |
+| 4510 Ammo sell | `out` | `Ammo Sell` | same |
+
+- Item id: pseudo `__ammo__<typeId>__0` — same namespace as ammo received from crimes/stocks
+  (which use a nested `{type:{size:qty}}` shape), but size is always `0` in the buy/sell log.
+- `data.value` is the total money paid/received — not tracked as an inventory flow.
+- **4520 Ammo priority** — preference setting only, no inventory flow.
+- ⚠️ Ammo **consumed during fights** has no Torn log type — it cannot be tracked via logs.
+  See `GAME_MECHANICS.md` §13.
+
 ---
 
 ## 2. Free items — income (no money)

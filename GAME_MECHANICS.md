@@ -287,6 +287,42 @@ Loan lifecycle:
 
 ---
 
+## 13. Ammo market
+
+You can buy and sell ammo directly from the Torn Ammo Market:
+
+- **4500 Ammo buy** — rounds enter your ammo supply: `{ ammo: <typeId>, quantity: <rounds>, value: <$> }`.
+- **4510 Ammo sell** — rounds leave your ammo supply: same shape.
+- **4520 Ammo priority** — sets which ammo type is used first in combat; **no inventory flow**.
+
+Data shape note: the `ammo` field here is a plain integer (the ammo type id, e.g. `1`), not
+the nested `{type:{size:qty}}` object used in crime / stock / company ammo logs. Both formats
+map to the same `__ammo__<typeId>__0` pseudo-item in the inventory monitor.
+
+⚠️ **Ammo consumed during fights has no Torn log type.** Rounds fired in attacks, defences,
+faction wars, etc. are not logged — the only way to observe bullet drain is to compare
+ammo totals between polls (snapshot-based). The inventory monitor therefore **cannot track
+in-combat ammo consumption**.
+
+Similarly, **temporary / booster items used mid-fight** (items consumed during a fight turn,
+not from the inventory screen) produce no log entry. Attack logs (8100–8180) record fight
+*outcomes* only (lost, stalemate, hospitalize, mug, loot…), not what was consumed during it.
+
+## 14. Piggy Bank
+
+The **Piggy Bank** (item 820) is a savings container. Two log types cover it:
+
+| Log | Title | Inventory effect |
+|---|---|---|
+| **2380** | Item use piggy bank deposit | `out` item 820 (treated as consumed — the pig stays in your inventory in-game, but the log fires as a standard "Item use" event) |
+| **2381** | Item use piggy bank withdraw | `out` item 820 (the pig is smashed — it is actually consumed) |
+
+The deposit log (2380) fires for each money deposit into the pig; the pig is **not actually
+consumed** then (it stays in inventory), but the Torn log API surfaces it as an "Item use"
+event. The inventory monitor treats both 2380 and 2381 as `out` flows (source `Consumed`)
+because that is the data Torn provides — this means deposit events create phantom `out`
+records. Only 2381 (withdraw/smash) truly removes the pig from inventory.
+
 ## 12. Racing — car enlist / unenlist
 
 Racing requires you to **enlist a car** (from your inventory) and lets you **unenlist** it

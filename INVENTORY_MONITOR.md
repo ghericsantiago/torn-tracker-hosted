@@ -172,6 +172,7 @@ of truth** as the portfolio tracker (`ITEM_EXTRACTION.md` §1/§5/§6).
 |---|---|---|---|
 | Buy | 1103, 1112, 1220, 1225, 4201, 4200, 5010 | `in` | 5010 (point market buy) with no item id → pseudo-item `__points__` (Torn Points) |
 | Sell | 4210, 4220 | `out` | **1221/1226 bazaar sells, 1104/1113 market sells and 5011 point-market sells are excluded** — the item/points already left inventory when stocked/listed (§4c/§4e/§4f) |
+| Ammo market | 4500 buy / 4510 sell | `in` / `out` | flat `{ammo: typeId, quantity: rounds}` → pseudo-item `__ammo__<typeId>__0`; source `Ammo Buy` / `Ammo Sell`; 4520 (Ammo priority) has no flow (`ITEM_TRACKING.md` §1b) |
 | Trade items | 4445 outgoing / 4446 incoming | `out` / `in` | each `{id, qty}` from `data.items`; no grouping needed for a running total |
 | Free items | 7011, 1401, 1404, 8930, 8938, 8980, 5725, 9020, 9027, 8170, 8377, 6401, 6505, 6525, 6500, 5530, 5533, 8855, 2548, 5600, 5251, 5575, 5580, 2536, 6731, 6733, 6746, 6751, 6752, 6753, 6797, 4101, 4103, 4105, 4001, 4320, 6749, 8945, 8946, **7900** | `in` | source label per type (City Find, Crime, Player Send, Faction Armory…); 8946 Christmas town coupon exchange → `in` each `data.items` entry; 7900 Missions buy reward item → `in` `data.item` × `data.quantity` (source `Missions`) |
 | Item usage | 2xxx Consumed ids + easter eggs 8981–8989, 2621, 1400/1403 Dumped, 4000 Parceled, 4100/4102/4104 Sent, 6725/6728/6732/6747/6750/6796 Faction…, 6768/6769 OC Spent, 9163/9190/9191 Crime Loss, 9300–9361 Crime Spent, 15021 Staff Removal | `out` | 6745 "Faction loan item send" excluded — item moves from faction armory (never personal inventory) |
@@ -400,8 +401,12 @@ How it's written (all in one transaction per poll):
 > + Trading tabs) opens the item's **History**: both directions merged, **chronological
 > order** (oldest first), each row signed **+ in / − out** (e.g. `+100 Buy`, `−10 Trade`).
 > Backed by `/api/item-events`; the activity feed (memory + DB) holds the newest **20000**
-> entries so the popups keep history across full backfills (an item's events are never
-> trimmed out by other items' activity).
+> entries **globally** (across all items). When an item's events fall outside this window
+> (evicted by more recent events from other items), the popup shows **"Records outside
+> rolling history window."** — the IN/OUT totals are still correct (they come from
+> `item_totals`, which is never pruned), but the per-event breakdown is unavailable.
+> The popup cache (`hoverCache`) is cleared on every state refresh so stale empty results
+> don't persist across polls.
 >
 > **Sortable columns:** every table column is sortable — click a header to sort by it
 > (click again to reverse; an arrow shows the active sort). Value columns sort by the
