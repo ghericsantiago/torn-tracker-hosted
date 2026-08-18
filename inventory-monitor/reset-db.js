@@ -41,7 +41,7 @@ const ALL_TABLES = [
   'activity', 'bazaar_totals', 'bazaar_meta', 'display_totals', 'transfers',
   'location_events',
   'market_totals', 'market_meta', 'trade_events', 'museum_swaps', 'museum_meta',
-  'manual_adjustments',
+  'manual_adjustments', 'fifo_lots', 'transactions',
 ];
 
 (async () => {
