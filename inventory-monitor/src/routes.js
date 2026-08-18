@@ -312,7 +312,7 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
   router.post('/api/fifo/reconcile', async (req, res) => {
     if (!reconcileFifo) return res.status(503).json({ ok: false, error: 'Reconciler not available.' });
     try {
-      const result = reconcileFifo(state);
+      const result = await reconcileFifo(state);
 
       // Flush new lots (INSERT) and dirty lots (UPDATE) immediately
       const client = await db.pool.connect();

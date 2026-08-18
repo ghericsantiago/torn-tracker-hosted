@@ -112,7 +112,7 @@ function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrade
       // true inventory net (log ledger + inventory manual adjustments).
       // Runs silently after every poll; also callable on demand via POST /api/fifo/reconcile.
       if (reconcileFifo) {
-        const r = reconcileFifo(state);
+        const r = await reconcileFifo(state);
         if (r.itemsAffected > 0) {
           console.log(`[poll] FIFO reconcile: ${r.itemsAffected} item(s) — +${r.unitsCreated} lot units created, -${r.unitsDepleted} depleted`);
         }

@@ -50,7 +50,7 @@ async function mount(app) {
   await loadState(pool, state, config, catalog);
 
   const logClient = createLogClient(config);
-  const ledger    = createLedger({ catalog, config });
+  const ledger    = createLedger({ catalog, config, pool });
   const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog, finalizeNewTrades: ledger.finalizeNewTrades, reconcileFifo: ledger.reconcileFifo });
   const summary   = createSummary({ state, catalog, config });
 

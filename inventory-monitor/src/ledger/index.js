@@ -10,11 +10,11 @@ const { createApplyLog } = require('./apply');
 const { createTradeFifoFinalizer } = require('./trade-fifo');
 const { createFifoReconciler } = require('./reconcile');
 
-function createLedger({ catalog, config }) {
+function createLedger({ catalog, config, pool }) {
   return {
     applyLog:          createApplyLog({ catalog, config }),
     finalizeNewTrades: createTradeFifoFinalizer({ catalog }),
-    reconcileFifo:     createFifoReconciler({ catalog }),
+    reconcileFifo:     createFifoReconciler({ catalog, pool }),
   };
 }
 
