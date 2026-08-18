@@ -54,6 +54,68 @@
   #hover-pop th { font-size: 10px; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid #2a3350; padding: 2px 4px; text-align: left; }
   #hover-pop td { padding: 2px 4px; border-bottom: 1px solid rgba(255,255,255,.04); white-space: nowrap; }
 
+  /* FIFO lot breakdown popup */
+  .fifo-cell { cursor: pointer; text-decoration: underline dotted var(--gold); color: var(--gold2); }
+  .fifo-cell:hover { background: rgba(201,148,58,.12); }
+  #fifo-pop {
+    position: fixed; z-index: 1000; min-width: 320px; max-width: 450px;
+    background: #141826; border: 1px solid #2a3350; border-radius: 8px;
+    padding: 8px 10px; box-shadow: 0 6px 24px rgba(0,0,0,.6); font-size: 12px;
+  }
+  #fifo-pop h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #fifo-pop-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fifo-pop-close { background: none; border: none; color: var(--dim); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+  #fifo-pop-close:hover { color: #fff; }
+  #fifo-pop .pop-scroll { max-height: 300px; overflow-y: auto; }
+  #fifo-pop table { width: 100%; border-collapse: collapse; }
+  #fifo-pop th { font-size: 10px; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid #2a3350; padding: 2px 4px; text-align: left; }
+  #fifo-pop td { padding: 2px 4px; border-bottom: 1px solid rgba(255,255,255,.04); white-space: nowrap; }
+  .fifo-depleted td { opacity: .4; text-decoration: line-through; }
+  .fifo-summary td { border-top: 1px solid #2a3350; background: rgba(0,0,0,.2); font-size: 11px; }
+  .col-avgcost { color: var(--gold2); }
+  .col-costbasis { color: var(--dim2); font-size: 11px; }
+
+  /* Ledger tab */
+  .ledger-filter-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+  }
+  .ledger-filter-bar input[type="text"],
+  .ledger-filter-bar select,
+  .ledger-filter-bar input[type="date"] {
+    background: #0d1120; border: 1px solid #2a3350; color: var(--text);
+    border-radius: 5px; padding: 6px 8px; font-size: 12px; outline: none;
+  }
+  .ledger-filter-bar input[type="text"] { flex: 1; min-width: 140px; }
+  .ledger-filter-bar select { min-width: 120px; }
+  .ledger-filter-bar input[type="date"] { min-width: 100px; color-scheme: dark; }
+  .ldg-date-group { display: flex; align-items: center; gap: 4px; }
+  .ldg-date-group span { color: var(--dim); }
+  .ldg-presets { display: flex; gap: 4px; }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+
+  /* channel badges */
+  .ch-badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+  .ch-bazaar       { background: rgba(201,148,58,.2);  color: #e8c37a; border: 1px solid rgba(201,148,58,.4); }
+  .ch-item_market  { background: rgba(79,140,255,.2);  color: #7ab0ff; border: 1px solid rgba(79,140,255,.4); }
+  .ch-points_market{ background: rgba(160,80,220,.2);  color: #c488f8; border: 1px solid rgba(160,80,220,.4); }
+  .ch-shop         { background: rgba(100,110,140,.2); color: #9aa0bc; border: 1px solid rgba(100,110,140,.4); }
+  .ch-trade        { background: rgba(62,200,112,.2);  color: #80e8a8; border: 1px solid rgba(62,200,112,.4); }
+
+  /* Ledger day separator rows */
+  .ledger-day td { background: rgba(30,34,56,.7); border-left: 2px solid var(--gold); padding: 5px 12px; font-size: 11px; color: var(--dim2); }
+  .ldg-day-label { color: var(--gold2); font-weight: 600; }
+
+  /* Ledger column highlights */
+  .col-bought { color: var(--red); font-weight: 600; }
+  .col-sold   { color: var(--green); font-weight: 600; }
+  .ldg-bal.green { color: var(--green); }
+  .ldg-bal.red   { color: var(--red); }
+  .ledger-table { font-size: 12px; }
+  .ledger-table .ldg-time { min-width: 50px; color: var(--dim2); }
+  .ledger-table .ldg-item { font-weight: 500; }
+  .ledger-table .ldg-unit { color: var(--dim2); }
+
   /* manual adjustment modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 900; display: flex; align-items: center; justify-content: center; }
   .modal { background: #141826; border: 1px solid #2a3350; border-radius: 10px; width: 480px; max-width: 94vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.7); }
@@ -238,4 +300,7 @@
     #io-out-table th:nth-child(2), #io-out-table td:nth-child(2),
     #io-out-table th:nth-child(5), #io-out-table td:nth-child(5) { display: none; }
     #io-in-table, #io-out-table { min-width: 0; }
+    .ledger-filter-bar { flex-wrap: wrap; gap: 6px; }
+    .ledger-filter-bar input[type="text"] { min-width: 0; flex: 1 1 100%; }
+    .ldg-date-group, .ldg-presets { flex: 1 1 100%; justify-content: flex-start; }
   }

@@ -182,6 +182,27 @@ const MARKET_SELL_LOG_TYPES   = new Set([1104, 1113]);
 const AMMO_BUY_LOG_TYPES  = new Set([4500]);
 const AMMO_SELL_LOG_TYPES = new Set([4510]);
 
+// ── Transaction ledger channel map ───────────────────────────
+// Maps log type → { channel, side } for the transaction ledger.
+// 5011 is included here (points market sell = transaction record only;
+// no inventory flow — points already left wallet at 5000 listing time).
+const TRANSACTION_CHANNEL_MAP = new Map([
+  [1103, { channel: 'item_market',   side: 'buy'  }],
+  [1112, { channel: 'item_market',   side: 'buy'  }],
+  [1104, { channel: 'item_market',   side: 'sell' }],
+  [1113, { channel: 'item_market',   side: 'sell' }],
+  [1220, { channel: 'bazaar',        side: 'buy'  }],
+  [1225, { channel: 'bazaar',        side: 'buy'  }],
+  [1221, { channel: 'bazaar',        side: 'sell' }],
+  [1226, { channel: 'bazaar',        side: 'sell' }],
+  [4200, { channel: 'shop',          side: 'buy'  }],
+  [4201, { channel: 'shop',          side: 'buy'  }],
+  [4210, { channel: 'shop',          side: 'sell' }],
+  [4220, { channel: 'shop',          side: 'sell' }],
+  [5010, { channel: 'points_market', side: 'buy'  }],
+  [5011, { channel: 'points_market', side: 'sell' }],
+]);
+
 // ── Aggregates ───────────────────────────────────────────────
 // Every log type the monitor cares about — requested from the hosted log server
 // (the server filters by these types, so all flows stay complete).
@@ -194,7 +215,8 @@ const ALL_LOG_TYPES = new Set();
  MARKET_ADD_LOG_TYPES, MARKET_REMOVE_LOG_TYPES, MARKET_SELL_LOG_TYPES]
   .forEach(s => s.forEach(t => ALL_LOG_TYPES.add(t)));
 ALL_LOG_TYPES.add(MUSEUM_LOG_TYPE).add(BLOOD_BAG_LOG_TYPE).add(VIRUS_COMPLETE_LOG_TYPE)
-  .add(RACING_ENLIST_LOG_TYPE).add(RACING_UNENLIST_LOG_TYPE);
+  .add(RACING_ENLIST_LOG_TYPE).add(RACING_UNENLIST_LOG_TYPE)
+  .add(5011);  // points market sell — transaction record; no inventory flow (see ITEM_TRACKING.md §6f)
 const LOG_TYPES_PARAM = Array.from(ALL_LOG_TYPES).join(',');
 
 // Activity sources that belong to the *location* ledgers (Bazaar/Display/Market tabs)
@@ -218,6 +240,7 @@ module.exports = {
   BAZAAR_ADD_LOG_TYPES, BAZAAR_REMOVE_LOG_TYPES, BAZAAR_SELL_LOG_TYPES,
   DISPLAY_ADD_LOG_TYPES, DISPLAY_REMOVE_LOG_TYPES,
   MARKET_ADD_LOG_TYPES, MARKET_REMOVE_LOG_TYPES, MARKET_SELL_LOG_TYPES,
+  TRANSACTION_CHANNEL_MAP,
   ALL_LOG_TYPES, LOG_TYPES_PARAM,
   LOCATION_LEDGER_SOURCES,
 };

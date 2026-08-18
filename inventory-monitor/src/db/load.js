@@ -133,7 +133,23 @@ async function loadState(pool, state, config, catalog) {
     label: r.label || 'Manual', note: r.note || '', scope: r.scope || 'inventory',
   }));
 
-  console.log(`[init] DB loaded: ${Object.keys(state.items).length} items, ${Object.keys(state.bazaar.items).length} bazaar, ${Object.keys(state.display.items).length} display, ${Object.keys(state.market.items).length} market, ${state.activity.length} activity, ${state.transfers.length} transfers, ${state.trades.trades.length} trades, ${state.museum.swaps.length} museum swaps, ${state.adjustments.length} adjustments, ${state.processedIds.length} processed, lastTs=${state.lastTs}`);
+  // FIFO cost lots — load active lots (remaining_qty > 0) oldest-first per item
+  const fifoRows = await pool.query(
+    'SELECT * FROM fifo_lots WHERE remaining_qty > 0 ORDER BY item_id, ts ASC, id ASC'
+  );
+  state.fifo.lots = new Map();
+  fifoRows.rows.forEach(r => {
+    const key = r.item_id;
+    if (!state.fifo.lots.has(key)) state.fifo.lots.set(key, []);
+    state.fifo.lots.get(key).push({
+      id: Number(r.id), ts: Number(r.ts), logId: r.log_id,
+      itemId: key, itemName: r.item_name, category: r.item_category || '',
+      totalQty: Number(r.total_qty), remaining: Number(r.remaining_qty),
+      unitCost: Number(r.unit_cost), source: r.source,
+    });
+  });
+
+  console.log(`[init] DB loaded: ${Object.keys(state.items).length} items, ${Object.keys(state.bazaar.items).length} bazaar, ${Object.keys(state.display.items).length} display, ${Object.keys(state.market.items).length} market, ${state.activity.length} activity, ${state.transfers.length} transfers, ${state.trades.trades.length} trades, ${state.museum.swaps.length} museum swaps, ${state.adjustments.length} adjustments, ${state.processedIds.length} processed, ${fifoRows.rows.length} fifo lots, lastTs=${state.lastTs}`);
 }
 
 module.exports = { loadState };

@@ -53,7 +53,7 @@ const { createRoutes } = require('./routes');
 
   const logClient = createLogClient(config);
   const ledger    = createLedger({ catalog, config });
-  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog });
+  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog, finalizeNewTrades: ledger.finalizeNewTrades });
   const summary   = createSummary({ state, catalog, config });
 
   const app = express();

@@ -165,11 +165,13 @@ function switchView(v) {
   $('view-bazaar').style.display    = v === 'bazaar' ? '' : 'none';
   $('view-display').style.display   = v === 'display' ? '' : 'none';
   $('view-market').style.display    = v === 'market' ? '' : 'none';
+  $('view-ledger').style.display    = v === 'ledger' ? '' : 'none';
   $('view-trading').style.display   = v === 'trading' ? '' : 'none';
   $('view-museum').style.display    = v === 'museum' ? '' : 'none';
   $('view-transfers').style.display = v === 'transfers' ? '' : 'none';
   render();
   if (v === 'monitor') loadActivity(true);
+  if (v === 'ledger')  loadLedger(true);
 }
 
 function render() {
@@ -216,6 +218,7 @@ function render() {
   if (view === 'bazaar') { renderBazaar(q); return; }
   if (view === 'display') { renderDisplay(q); return; }
   if (view === 'market') { renderMarket(q); return; }
+  if (view === 'ledger') return;  // managed by loadLedger, not render()
   if (view === 'trading') { renderTrades(q); return; }
   if (view === 'museum') { renderMuseum(q); return; }
   if (view === 'transfers') { renderTransfers(q); return; }
@@ -249,16 +252,28 @@ function renderInventory(q) {
   $('inv-badge').textContent = state.items.filter(it => it.net > 0).length;
 
   initTabPage('tb-inv', items,
-    '<tr><td colspan="7" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>',
-    it => `<tr>
-      <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
-      <td class="cat dim">${esc(it.category || '')}</td>
-      <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
-      <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
-      <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
-      <td class="gold">${fmt$(it.net * it.value)}</td>
-      <td class="dim r">${fmtTime(it.lastTs)}</td>
-    </tr>`
+    '<tr><td colspan="10" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>',
+    it => {
+      const avgCostCell = it.avgCost != null
+        ? `<td class="r fifo-cell col-avgcost" data-fifo-item="${it.id}" title="Click to see FIFO lots">${fmt$(it.avgCost)}</td>`
+        : `<td class="r dim col-avgcost">—</td>`;
+      const costBasisCell = it.costBasis > 0
+        ? `<td class="r col-costbasis dim">${fmt$(it.costBasis)}</td>`
+        : `<td class="r dim col-costbasis">—</td>`;
+      const lotsCell = it.fifoLots > 0
+        ? `<td class="r dim">${it.fifoLots}</td>`
+        : `<td class="r dim">—</td>`;
+      return `<tr>
+        <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+        <td class="cat dim">${esc(it.category || '')}</td>
+        <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
+        <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
+        <td class="${it.net >= 0 ? 'green' : 'red'} hv-cell" data-item="${it.id}" data-dir="both" title="History">${it.net >= 0 ? '+' : ''}${fmtQty(it.net)}</td>
+        <td class="gold">${fmt$(it.net * it.value)}</td>
+        ${avgCostCell}${costBasisCell}${lotsCell}
+        <td class="dim r">${fmtTime(it.lastTs)}</td>
+      </tr>`;
+    }
   );
   updateSortIndicators();
 }
@@ -598,7 +613,7 @@ const sortState = {};   // tbodyId → { key, dir }
 const SORTS = {
   'tb-in':   { item: r => r.name, cat: r => r.category || '', in: r => r.in, val: r => r.value * r.in, src: r => Object.keys(r.sourcesIn || {}).join(','), last: r => r.lastTs },
   'tb-out':  { item: r => r.name, cat: r => r.category || '', out: r => r.out, val: r => r.value * r.out, src: r => Object.keys(r.sourcesOut || {}).join(','), last: r => r.lastTs },
-  'tb-inv':  { item: r => r.name, cat: r => r.category || '', in: r => r.in, out: r => r.out, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
+  'tb-inv':  { item: r => r.name, cat: r => r.category || '', in: r => r.in, out: r => r.out, net: r => r.net, val: r => r.value * r.net, avgcost: r => r.avgCost ?? -1, costbasis: r => r.costBasis ?? 0, lots: r => r.fifoLots ?? 0, last: r => r.lastTs },
   'tb-bz':   { item: r => r.name, cat: r => r.category || '', added: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
   'tb-disp': { item: r => r.name, cat: r => r.category || '', added: r => r.in, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
   'tb-mkt':  { item: r => r.name, cat: r => r.category || '', listed: r => r.in, sold: r => r.sold, removed: r => r.removed, net: r => r.net, val: r => r.value * r.net, last: r => r.lastTs },
@@ -785,9 +800,228 @@ window.addEventListener('scroll', () => {
   else if (view === 'bazaar')     appendTabPage('tb-bz');
   else if (view === 'display')    appendTabPage('tb-disp');
   else if (view === 'market')     appendTabPage('tb-mkt');
+  else if (view === 'ledger')     loadLedger(false);
   else if (view === 'trading')  { appendTabPage('tb-trd'); appendTabPage('tb-trd-items'); }
   else if (view === 'museum')     appendTabPage('tb-mus');
   else if (view === 'transfers')  appendTabPage('tb-tr');
+});
+
+// ── FIFO lot breakdown popup ──────────────────────────────────
+let fifoPop = { visible: false, itemId: null };
+
+async function showFifoPop(cell) {
+  const itemId = cell.dataset.fifoItem;
+  if (!itemId) return;
+  if (fifoPop.visible && fifoPop.itemId === itemId) { hideFifoPop(); return; }
+  try {
+    const r = await fetch('/admin/inventory/api/fifo/lots/' + encodeURIComponent(itemId));
+    const d = await r.json();
+    const lots   = d.lots   || [];
+    const summary = d.summary || {};
+    const itemName = (cell.closest('tr') && cell.closest('tr').querySelector('.item') || {}).textContent || itemId;
+    $('fifo-pop-title-text').textContent = 'FIFO Lots · ' + itemName;
+    $('fifo-pop-body').innerHTML = lots.length
+      ? lots.map(l => `<tr class="${l.depleted ? 'fifo-depleted' : ''}">
+          <td class="dim">${fmtTime(l.ts)}</td>
+          <td><span class="badge">${esc(l.source)}</span></td>
+          <td class="r">${fmtQty(l.totalQty)}</td>
+          <td class="r ${l.depleted ? 'dim' : 'green'}">${fmtQty(l.remaining)}</td>
+          <td class="r gold">${fmt$(l.unitCost)}</td>
+          <td class="r">${fmt$(l.lotValue)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" class="empty">No FIFO lots yet.</td></tr>';
+    $('fifo-pop-foot').innerHTML = summary.totalRemaining > 0
+      ? `<tr class="fifo-summary">
+          <td colspan="3"><strong>Total</strong></td>
+          <td class="r green"><strong>${fmtQty(summary.totalRemaining)}</strong></td>
+          <td class="r gold"><strong>${fmt$(summary.avgCost)}</strong></td>
+          <td class="r"><strong>${fmt$(summary.costBasis)}</strong></td>
+        </tr>` : '';
+
+    const pop = $('fifo-pop');
+    pop.style.display = '';
+    fifoPop.visible = true;
+    fifoPop.itemId  = itemId;
+    const rect = cell.getBoundingClientRect();
+    const w = Math.min(440, Math.max(360, pop.offsetWidth));
+    pop.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - w - 8)) + 'px';
+    pop.style.top  = Math.max(4, rect.bottom + 6) + 'px';
+  } catch (e) { console.error('[fifo-pop]', e); }
+}
+function hideFifoPop() {
+  fifoPop.visible = false; fifoPop.itemId = null;
+  $('fifo-pop').style.display = 'none';
+}
+document.addEventListener('click', async e => {
+  const cell = e.target.closest && e.target.closest('.fifo-cell');
+  if (cell && cell.dataset.fifoItem) { e.stopPropagation(); showFifoPop(cell); return; }
+  const pop = $('fifo-pop');
+  if (pop && !pop.contains(e.target)) hideFifoPop();
+});
+$('fifo-pop-close').addEventListener('click', hideFifoPop);
+
+// ── Ledger tab ────────────────────────────────────────────────
+const CH_LABELS = {
+  bazaar:       'Bazaar',
+  item_market:  'Item Market',
+  points_market:'Points Market',
+  shop:         'Shop',
+  trade:        'Trade',
+};
+function chBadge(ch) {
+  return `<span class="ch-badge ch-${ch}">${esc(CH_LABELS[ch] || ch)}</span>`;
+}
+
+const ldgState = {
+  cursor: null, hasMore: true, loading: false,
+  balance: 0,    // running balance (client-side, reset on full reload)
+  prevDate: null,
+  filters: { q: '', category: '', channel: '', side: '', from_ts: '', to_ts: '' },
+};
+
+async function loadLedger(reset) {
+  if (ldgState.loading) return;
+  if (reset) {
+    ldgState.cursor = null; ldgState.hasMore = true;
+    ldgState.balance = 0; ldgState.prevDate = null;
+    $('tb-ledger').innerHTML = '';
+    $('ldg-end').style.display = 'none';
+  }
+  if (!ldgState.hasMore) return;
+  ldgState.loading = true;
+  $('ldg-spinner').style.display = '';
+
+  try {
+    const f = ldgState.filters;
+    const params = new URLSearchParams({ limit: 50 });
+    if (ldgState.cursor) params.set('cursor', ldgState.cursor);
+    if (f.q)        params.set('q',        f.q);
+    if (f.category) params.set('category', f.category);
+    if (f.channel)  params.set('channel',  f.channel);
+    if (f.side)     params.set('side',     f.side);
+    if (f.from_ts)  params.set('from_ts',  f.from_ts);
+    if (f.to_ts)    params.set('to_ts',    f.to_ts);
+
+    const r = await fetch('/admin/inventory/api/transactions?' + params);
+    const d = await r.json();
+    const rows = d.rows || [];
+    const summary = d.summary || {};
+
+    if (reset) {
+      $('ldg-spent').textContent   = fmt$(summary.totalSpent);
+      $('ldg-revenue').textContent  = fmt$(summary.totalRevenue);
+      const net = (summary.totalRevenue || 0) - (summary.totalSpent || 0);
+      const netEl = $('ldg-net');
+      netEl.textContent = (net >= 0 ? '+' : '') + fmt$(Math.abs(net));
+      netEl.className   = 'val ' + (net >= 0 ? 'green' : 'red');
+      $('ldg-count').textContent = (summary.txCount || 0).toLocaleString();
+    }
+
+    // Group rows by day and inject day-separator rows with daily subtotals
+    const FMT_DATE = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', month: 'short', day: '2-digit', year: '2-digit' });
+    const FMT_HHMM = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+
+    // Group by day for daily totals
+    let html = '';
+    // Collect day groups within this batch
+    const dayGroups = [];
+    let currentDay = null;
+    for (const row of rows) {
+      const rowDate = FMT_DATE.format(new Date(row.ts));
+      if (rowDate !== currentDay) {
+        currentDay = rowDate;
+        dayGroups.push({ date: rowDate, rows: [] });
+      }
+      dayGroups[dayGroups.length - 1].rows.push(row);
+    }
+
+    for (const group of dayGroups) {
+      const dayDebit  = group.rows.filter(r => r.side === 'buy').reduce((s, r) => s + (r.totalPrice || 0), 0);
+      const dayCredit = group.rows.filter(r => r.side === 'sell').reduce((s, r) => s + (r.totalPrice || 0), 0);
+      if (group.date !== ldgState.prevDate) {
+        ldgState.prevDate = group.date;
+        const debitStr  = dayDebit  > 0 ? `<span class="col-bought">${fmt$(dayDebit)}</span>` : '';
+        const creditStr = dayCredit > 0 ? `<span class="col-sold">+${fmt$(dayCredit)}</span>` : '';
+        html += `<tr class="ledger-day">
+          <td colspan="5" class="ldg-day-label">▸ ${esc(group.date)}</td>
+          <td class="r">${debitStr}</td>
+          <td class="r">${creditStr}</td>
+          <td></td>
+        </tr>`;
+      }
+      for (const row of group.rows) {
+        const isBuy = row.side === 'buy';
+        ldgState.balance += isBuy ? -(row.totalPrice || 0) : (row.totalPrice || 0);
+        const balClass = ldgState.balance >= 0 ? 'green' : 'red';
+        const boughtCell = isBuy  && row.totalPrice != null ? `<span class="col-bought">${fmt$(row.totalPrice)}</span>` : '';
+        const soldCell   = !isBuy && row.totalPrice != null ? `<span class="col-sold">+${fmt$(row.totalPrice)}</span>` : '';
+        html += `<tr>
+          <td class="dim ldg-time">${FMT_HHMM.format(new Date(row.ts))}</td>
+          <td class="item ldg-item">${esc(row.itemName)}</td>
+          <td>${chBadge(row.channel)}</td>
+          <td class="r ldg-qty">${fmtQty(row.qty)}</td>
+          <td class="r dim ldg-unit">${row.unitPrice != null ? fmt$(row.unitPrice) : '—'}</td>
+          <td class="r ldg-bought">${boughtCell}</td>
+          <td class="r ldg-sold">${soldCell}</td>
+          <td class="r ldg-bal ${balClass}">${ldgState.balance >= 0 ? '+' : ''}${fmt$(Math.abs(ldgState.balance))}</td>
+        </tr>`;
+      }
+    }
+
+    if (rows.length === 0 && reset) {
+      $('tb-ledger').innerHTML = '<tr><td colspan="8" class="empty">No transactions yet.</td></tr>';
+    } else {
+      $('tb-ledger').insertAdjacentHTML('beforeend', html);
+    }
+
+    ldgState.cursor  = d.nextCursor || null;
+    ldgState.hasMore = d.hasMore || false;
+    if (!ldgState.hasMore) $('ldg-end').style.display = '';
+  } catch (e) {
+    console.error('[ledger]', e);
+  }
+  ldgState.loading = false;
+  $('ldg-spinner').style.display = 'none';
+}
+
+function applyLedgerFilters() {
+  ldgState.filters.q        = $('ldg-q').value.trim();
+  ldgState.filters.category = $('ldg-cat').value;
+  ldgState.filters.channel  = $('ldg-channel').value;
+  ldgState.filters.side     = $('ldg-side').value;
+  const fromVal = $('ldg-from').value;
+  const toVal   = $('ldg-to').value;
+  ldgState.filters.from_ts  = fromVal ? String(new Date(fromVal).setHours(0,0,0,0)) : '';
+  ldgState.filters.to_ts    = toVal   ? String(new Date(toVal).setHours(23,59,59,999)) : '';
+  loadLedger(true);
+}
+
+let ldgDebounce;
+$('ldg-q').addEventListener('input', () => { clearTimeout(ldgDebounce); ldgDebounce = setTimeout(applyLedgerFilters, 250); });
+['ldg-cat','ldg-channel','ldg-side'].forEach(id => $( id).addEventListener('change', applyLedgerFilters));
+['ldg-from','ldg-to'].forEach(id => $(id).addEventListener('change', applyLedgerFilters));
+
+$('ldg-today').addEventListener('click', () => {
+  const d = new Date(); d.setHours(0,0,0,0);
+  const s = d.toISOString().slice(0,10);
+  $('ldg-from').value = s; $('ldg-to').value = s;
+  applyLedgerFilters();
+});
+$('ldg-7d').addEventListener('click', () => {
+  const to = new Date(); const from = new Date(to - 7 * 86400000);
+  $('ldg-from').value = from.toISOString().slice(0,10);
+  $('ldg-to').value   = to.toISOString().slice(0,10);
+  applyLedgerFilters();
+});
+$('ldg-30d').addEventListener('click', () => {
+  const to = new Date(); const from = new Date(to - 30 * 86400000);
+  $('ldg-from').value = from.toISOString().slice(0,10);
+  $('ldg-to').value   = to.toISOString().slice(0,10);
+  applyLedgerFilters();
+});
+$('ldg-all').addEventListener('click', () => {
+  $('ldg-from').value = ''; $('ldg-to').value = '';
+  applyLedgerFilters();
 });
 
 load();

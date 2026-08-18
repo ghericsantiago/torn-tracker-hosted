@@ -111,6 +111,7 @@
   <button class="tab" data-view="bazaar">Bazaar <span class="n" id="bz-badge">0</span></button>
   <button class="tab" data-view="display">Display <span class="n" id="disp-badge">0</span></button>
   <button class="tab" data-view="market">Market <span class="n" id="mkt-badge">0</span></button>
+  <button class="tab" data-view="ledger">Ledger <span class="n" id="ldg-badge"></span></button>
   <button class="tab" data-view="trading">Trading <span class="n" id="trd-badge">0</span></button>
   <button class="tab" data-view="museum">Museum <span class="n" id="mus-badge">0</span></button>
   <button class="tab" data-view="transfers">Transfers <span class="n" id="tr-badge">0</span></button>
@@ -173,8 +174,8 @@
   <div class="card">
     <h2>Current inventory <span class="n" id="inv-count">0 items</span></h2>
     <table>
-      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="last">Last moved</th></tr></thead>
-      <tbody id="tb-inv"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="avgcost">Avg Cost</th><th class="r" data-sort="costbasis">Cost Basis</th><th class="r" data-sort="lots">Lots</th><th class="r" data-sort="last">Last moved</th></tr></thead>
+      <tbody id="tb-inv"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
     </table>
     <div class="note">
       <b>Ledger:</b> current = baseline (zero at monitor start, shown in Torn time) + IN − OUT from logs. Net &gt; 0 = you hold this many now;
@@ -254,6 +255,77 @@
       listing taken down back to inventory). Baseline = zero at 02:00 AM. Listing an item moves it OUT of your person
       inventory (see the Inventory tab); a market sell does NOT return it to inventory — it's gone, converted to cash.
     </div>
+  </div>
+</div>
+
+<!-- ── FIFO lot breakdown popup (Inventory tab) ─────────────── -->
+<div id="fifo-pop" style="display:none">
+  <h4 id="fifo-pop-title"><span id="fifo-pop-title-text"></span><button id="fifo-pop-close" title="Close">×</button></h4>
+  <div class="pop-scroll">
+    <table>
+      <thead><tr><th>Acquired</th><th>Source</th><th class="r">Total</th><th class="r">Remaining</th><th class="r">Unit Cost</th><th class="r">Lot Value</th></tr></thead>
+      <tbody id="fifo-pop-body"></tbody>
+      <tfoot id="fifo-pop-foot"></tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- ── Ledger view (Transaction Ledger tab) ──────────────────── -->
+<div id="view-ledger" style="display:none">
+  <div class="tiles">
+    <div class="tile red"><div class="lbl">Total Spent</div><div class="val" id="ldg-spent">—</div></div>
+    <div class="tile green"><div class="lbl">Total Revenue</div><div class="val" id="ldg-revenue">—</div></div>
+    <div class="tile gold"><div class="lbl">Net P&amp;L</div><div class="val" id="ldg-net">—</div></div>
+    <div class="tile blue"><div class="lbl">Transactions</div><div class="val" id="ldg-count">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="ledger-filter-bar">
+      <input type="text" id="ldg-q" placeholder="🔍 Item name…" autocomplete="off">
+      <select id="ldg-cat"><option value="">All categories</option></select>
+      <select id="ldg-channel">
+        <option value="">All channels</option>
+        <option value="bazaar">Bazaar</option>
+        <option value="item_market">Item Market</option>
+        <option value="points_market">Points Market</option>
+        <option value="shop">Shop</option>
+        <option value="trade">Trade</option>
+      </select>
+      <select id="ldg-side">
+        <option value="">Buy &amp; Sell</option>
+        <option value="buy">Buy only</option>
+        <option value="sell">Sell only</option>
+      </select>
+      <div class="ldg-date-group">
+        <input type="date" id="ldg-from" title="From date">
+        <span>–</span>
+        <input type="date" id="ldg-to" title="To date">
+      </div>
+      <div class="ldg-presets">
+        <button class="btn gray sm" id="ldg-today">Today</button>
+        <button class="btn gray sm" id="ldg-7d">7D</button>
+        <button class="btn gray sm" id="ldg-30d">30D</button>
+        <button class="btn gray sm" id="ldg-all">All</button>
+      </div>
+    </div>
+
+    <table class="ledger-table">
+      <thead>
+        <tr>
+          <th class="ldg-time">Time</th>
+          <th class="ldg-item">Item</th>
+          <th class="ldg-ch">Channel</th>
+          <th class="r ldg-qty">Qty</th>
+          <th class="r ldg-unit">Unit Price</th>
+          <th class="r ldg-bought">Bought</th>
+          <th class="r ldg-sold">Sold</th>
+          <th class="r ldg-bal">Balance</th>
+        </tr>
+      </thead>
+      <tbody id="tb-ledger"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+    </table>
+    <div id="ldg-spinner" class="act-spinner" style="display:none">Loading…</div>
+    <div id="ldg-end" class="act-spinner" style="display:none">— end of records —</div>
   </div>
 </div>
 

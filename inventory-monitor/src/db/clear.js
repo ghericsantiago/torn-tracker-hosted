@@ -22,6 +22,8 @@ async function clearState(pool, state) {
     await client.query('DELETE FROM museum_swaps');
     await client.query('UPDATE museum_meta SET points_received = 0, updated_at = now() WHERE id = 1');
     await client.query('DELETE FROM manual_adjustments');
+    await client.query('DELETE FROM fifo_lots');
+    await client.query('DELETE FROM transactions');
     await client.query(
       `INSERT INTO monitor_meta (id, start_ts, last_ts, poll_last_ts, poll_ok, poll_msg, poll_processed, updated_at)
        VALUES (1, $1, NULL, $2, true, 'State reset — next poll refetches from start', 0, now())

@@ -90,10 +90,11 @@ Torn API (user log selection)  ──poll 60s──▶  flow extraction  ──�
   (see §4b) — logs are the only source of truth, no live inventory API.
 - Persists the derived state to **PostgreSQL** (schema in `schema.sql`, applied automatically
   at startup) so restarts continue where they left off.
-- Serves a dark **dashboard** with eight tabs — **Monitor** (summary tiles + IN table + OUT
+- Serves a dark **dashboard** with nine tabs — **Monitor** (summary tiles + IN table + OUT
   table + activity feed), **Inventory** (person-inventory ledger), **Bazaar**, **Display**,
   **Market** (item market listings), **Trading** (player trades), **Museum** (exchange
-  rewards) and **Transfers** (location→location moves) — plus a small **JSON API**.
+  rewards), **Transfers** (location→location moves) and **Ledger** (FIFO cost accounting) —
+  plus a small **JSON API**.
 
 ## 2. Requirements
 
@@ -214,7 +215,12 @@ current = baseline (zero at startTs) + IN − OUT   →   i.e. current = net
     "stockValue": 5928, "overdrawnItems": 2 }
   ```
   plus each `items[]` entry carries `net` for the per-item view (Item | In | Out | Net |
-  Value | Last moved).
+  Value | Last moved), and also `avgCost` (weighted average unit cost of active lots; `null`
+  when no lots exist), `costBasis` (total remaining-lot value), and `fifoLots` (lot count).
+- **FIFO cost columns (Inventory tab):** each item row also shows **Avg Cost**, **Cost
+  Basis**, and **Lots**. Clicking the Avg Cost cell opens a FIFO lot popup showing all lots
+  (active + depleted) with columns Date / Source / Total / Remaining / Unit Cost / Lot Value
+  and a summary footer.
 
 ## 4c. Bazaar inventory view (separate ledger)
 
@@ -330,6 +336,29 @@ Each swap logs `data.points_received` (museum points earned, e.g. 1000× Plushie
 - `/api/state` exposes it as `museum`: `{ pointsReceived, swapCount, unitsSpent, swaps[] }`
   (swaps capped at 1000).
 
+## 4i. Ledger tab (FIFO cost accounting)
+
+The **Ledger** tab (9th tab, after Market) records every buy and sell as a **transaction**
+and tracks item cost using a **FIFO lot** model (implemented in `src/ledger/`):
+
+- **FIFO lots** (`src/ledger/fifo.js` — `fifoIn` / `fifoOut`) are created on acquisition
+  (BUY_LOG_TYPES, FREE_LOG_TYPES, TRADE_IN, AMMO_BUY, POINTS_LOG_TYPES, VIRUS_COMPLETE,
+  RACING_UNENLIST) and depleted oldest-first on disposal (USAGE, SELL, AMMO_SELL, TRADE_OUT,
+  POINTS_MARKET_ADD, BAZAAR_SELL, MARKET_SELL). Free items receive `unit_cost = 0`; trades
+  use proportional market-value allocation applied post-batch by `createTradeFifoFinalizer`.
+  FIFO tracks **ownership** (not location) — stocking to bazaar/market does not deplete lots.
+  Points use pseudo item_id `__points__`; FIFO OUT fires at 5000 (listing), FIFO IN at 5001
+  (cancelled — points returned).
+- **Transaction records** (`src/ledger/transactions.js` — `logTransactionEvent`) are emitted
+  for buy/sell logs mapped in `TRANSACTION_CHANNEL_MAP`. Each record carries: ts, log_id,
+  log_type, channel, side (buy/sell), item_id, item_name, item_category, qty, unit_price,
+  total_price.
+- **Ledger tab UI:** 4 stat tiles (Total Spent / Total Revenue / Net P&L / Tx Count), filter
+  bar (item name search, category, channel, buy/sell side, date range, preset buttons Today /
+  7D / 30D / All), paginated table with day-separator rows showing daily debit/credit totals,
+  a running balance column, and channel-colored source badges (bazaar=amber, item_market=blue,
+  points_market=purple, shop=gray, trade=teal).
+
 ## 5. Persistence — PostgreSQL (`schema.sql`)
 
 The derived state lives in Postgres (logs remain the source of truth; the DB is the derived
@@ -353,6 +382,8 @@ view, rebuilt continuously from polls). Schema applied idempotently at startup:
 | `museum_swaps` | museum exchanges (7000): set_name, quantity, points_received | pruned to newest 1000 (§4h) |
 | `museum_meta` | single row: total `points_received` | Σ swap points |
 | `manual_adjustments` | manual reconcile records (item_id, **scope**, dir, qty, label, note) — separate layer, replayed at read time per scope, never merged into item totals. `scope` = `inventory` \| `bazaar` \| `display` \| `market` (default `inventory`) | user-added only |
+| `fifo_lots` | append-only FIFO cost lots: `item_id`, `ts`, `log_id` (nullable), `total_qty`, `remaining_qty`, `unit_cost`, `source` | Indexes: `(item_id, ts, id)` for ordered scan; partial `(item_id, remaining_qty WHERE remaining_qty > 0)` for active lot lookup |
+| `transactions` | ledger records: `ts`, `log_id` (partial unique WHERE NOT NULL), `log_type`, `channel`, `side`, `item_id`, `item_name`, `item_category`, `qty`, `unit_price`, `total_price` | Powers `/api/transactions` |
 
 How it's written (all in one transaction per poll):
 
@@ -369,13 +400,15 @@ How it's written (all in one transaction per poll):
 
 | Endpoint | Description |
 |---|---|
-| `GET /` | Dashboard — eight tabs: **Monitor** (IN/OUT + activity), **Inventory** (person ledger), **Bazaar**, **Display**, **Market**, **Trading** (player trades), **Museum** (exchange rewards), **Transfers** (location moves) |
-| `GET /api/state` | Full JSON: counts, `current` (inventory ledger), `bazaar`, `display`, `market`, `trades`, `museum`, `transfers`, items, activity, poll status |
+| `GET /` | Dashboard — nine tabs: **Monitor** (IN/OUT + activity), **Inventory** (person ledger), **Bazaar**, **Display**, **Market**, **Trading** (player trades), **Museum** (exchange rewards), **Transfers** (location moves), **Ledger** (FIFO cost accounting) |
+| `GET /api/state` | Full JSON: counts, `current` (inventory ledger), `bazaar`, `display`, `market`, `trades`, `museum`, `transfers`, items, activity, poll status. Each `items[]` entry now also includes `avgCost`, `costBasis`, `fifoLots` |
 | `GET /api/item-events?itemId=&dir=in\|out\|both&source=` | Per-item event breakdown for the **click popups** — newest 100 activity entries for that item as `{events:[{ts, source, qty, dir}]}`. `dir=both` returns the **full chronological history** (oldest first) used by the **Net** column popup. When `source` is a location source (`Bazaar Added`, `Market Sold`, …) the events come from the dedicated `location_events` history (50k/scope) instead of the capped activity feed — so the Bazaar/Display/Market popups never go empty for old items. Without `source`: inventory-ledger flows only. |
 | `POST /api/adjust` | Add a **manual adjustment** (reconciliation): `{item, scope?, dir:'in'\|'out', qty, label?, note?}` or `{item, scope?, balance, label?, note?}` (reconcile to a target balance; the server computes the in/out delta). `scope` = `inventory` (default) \| `bazaar` \| `display` \| `market` — determines which ledger the balance is compared against and which clone is adjusted in `/api/state`. `item` = name or numeric id (resolved against `torn_items.json`). Persisted in `manual_adjustments`, applied on top of the correct ledger at read time |
 | `DELETE /api/adjust/:id` | Remove a manual adjustment (reverts its effect) |
 | `POST /api/poll` | Trigger an immediate poll (returns `{ok, processed, state}`) |
 | `POST /api/reset` | Clear tracked data (incl. manual adjustments) and restart from the monitor start time |
+| `GET /api/transactions` | Paginated transaction ledger (keyset cursor `<ts>:<id>`). Filters: `item_id`, `category`, `channel`, `side`, `from_ts`, `to_ts`, `q` (item name search). Returns `{ rows[], summary: { totalSpent, totalRevenue, txCount, itemCount } }` |
+| `GET /api/fifo/lots/:itemId` | All FIFO lots for an item (active + depleted) + summary `{ totalRemaining, avgCost, costBasis }` |
 
 > **Manual adjustments (reconcile):** the **＋ Adjust** button (header) opens a modal with two
 > modes — *Add in/out record* (direction + qty + label) or *Reconcile to balance* (set the

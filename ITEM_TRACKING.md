@@ -49,6 +49,9 @@ Sell log types: **1104, 1113, 1221, 1226, 4210, 4220, 5011**.
 
 - `data.item` may be `[{id, qty}]` (take first), a number, or fall back to `data.items[0].id`.
 - Buy from **Bazaar** and **Point Market** are tax-exempt; Item Market sells are taxed.
+- **FIFO cost capture:** for buy logs, `data.cost_total` is stored as the FIFO lot `unit_cost`
+  (cost per unit = `cost_total / qty`). Free items (`FREE_LOG_TYPES`) receive `unit_cost = 0`;
+  trade items receive a proportional cost share using market-value weights (post-batch).
 
 ### 1b. Ammo market — buy (4500) / sell (4510)
 
@@ -304,6 +307,10 @@ balance behaves like any other item in the Monitor/Inventory ledger:
 - Same alignment rule as the item/bazaar/market ledgers: **selling** points (5011) is not an
   inventory flow — the points left your wallet at listing time (5000 add → `out`, 5001 remove
   → `in`).
+- **5011 now fetched:** log type 5011 (points market sell) is included in `ALL_LOG_TYPES` and
+  `NO_FLOW_TYPES` — it triggers no inventory flow but emits a **transaction record** in the
+  ledger (channel `points_market`, side `sell`), so revenue from point sales appears in the
+  Ledger tab.
 - `data.points_used` is the authoritative cost (e.g. `{"points_used": 30, "energy_increased": 150}`);
   if the refill was paid from faction points the log carries a `faction` value → no player flow.
 - Museum conversions add the earned points as `in` **and** the set items as `out` in the same

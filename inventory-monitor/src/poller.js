@@ -8,7 +8,7 @@
  * DIP: depends on injected { config, state, db, logClient, applyLog }.
  */
 
-function createPoller({ config, state, db, logClient, applyLog }) {
+function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrades }) {
   let processedSet = new Set(state.processedIds);
   let polling = false;
 
@@ -95,6 +95,18 @@ function createPoller({ config, state, db, logClient, applyLog }) {
       }
       clearProgress();
       console.log(`[poll] done — applied ${applied} new log${applied === 1 ? '' : 's'}${logTotal > 0 ? ` (${logTotal} fetched)` : ' (nothing new)'}`);
+
+      // Finalize FIFO + transaction rows for trades assembled this batch.
+      // Track the state.processedIds length before so we can capture any newly-added
+      // trade_fifo: dedup keys and include them in newProcessed → persisted to DB.
+      // Without this, trade keys wouldn't survive a restart and trades would be re-finalized.
+      if (finalizeNewTrades) {
+        const prevLen = state.processedIds.length;
+        finalizeNewTrades(state, processedSet);
+        if (state.processedIds.length > prevLen) {
+          newProcessed.push(...state.processedIds.slice(prevLen));
+        }
+      }
 
       if (state.processedIds.length > config.processedMax) {
         state.processedIds = state.processedIds.slice(-config.processedMax);

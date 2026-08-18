@@ -128,6 +128,43 @@ async function persistState(pool, state, config, newProcessed, applied) {
           );
         }
       }
+
+      // FIFO lots — append-only: INSERT new lots, UPDATE dirty (remaining_qty changed) lots
+      for (const lot of state.fifo.newLots) {
+        const r = await client.query(
+          `INSERT INTO fifo_lots (ts, log_id, item_id, item_name, item_category, total_qty, remaining_qty, unit_cost, source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT DO NOTHING RETURNING id`,
+          [lot.ts, lot.logId, lot.itemId, lot.itemName, lot.category || null,
+           lot.totalQty, lot.remaining, lot.unitCost, lot.source]
+        );
+        if (r.rows[0]) lot.id = Number(r.rows[0].id);
+      }
+      state.fifo.newLots = [];
+
+      for (const id of state.fifo.dirtyIds) {
+        // Find the current remaining value for this lot id
+        let remaining = 0;
+        outer: for (const lots of state.fifo.lots.values()) {
+          for (const lot of lots) {
+            if (lot.id === id) { remaining = lot.remaining; break outer; }
+          }
+        }
+        await client.query('UPDATE fifo_lots SET remaining_qty = $1 WHERE id = $2', [remaining, id]);
+      }
+      state.fifo.dirtyIds.clear();
+
+      // Transactions — INSERT, skip on duplicate log_id (idempotent)
+      for (const tx of state.transactions) {
+        await client.query(
+          `INSERT INTO transactions (ts, log_id, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           ON CONFLICT (log_id) WHERE log_id IS NOT NULL DO NOTHING`,
+          [tx.ts, tx.logId ?? null, tx.logType, tx.channel, tx.side,
+           tx.itemId, tx.itemName, tx.category || null, tx.qty, tx.unitPrice ?? null, tx.totalPrice ?? null]
+        );
+      }
+      state.transactions = [];
     }
 
     if (newProcessed.length) {

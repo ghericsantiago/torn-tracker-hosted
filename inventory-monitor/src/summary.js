@@ -178,7 +178,18 @@ function createSummary({ state, catalog, config }) {
       museum,
       transfers,
       items: items
-        .map(it => ({ ...it }))
+        .map(it => {
+          const lots   = state.fifo.lots.get(it.id) || [];
+          const active = lots.filter(l => l.remaining > 0);
+          const totalRemaining = active.reduce((s, l) => s + l.remaining, 0);
+          const totalCost      = active.reduce((s, l) => s + l.remaining * l.unitCost, 0);
+          return {
+            ...it,
+            avgCost:   totalRemaining > 0 ? Math.round(totalCost / totalRemaining) : null,
+            costBasis: totalCost,
+            fifoLots:  active.length,
+          };
+        })
         .sort((a, b) => (b.in + b.out) - (a.in + a.out)),
       activity: state.activity.concat(adjActivity).sort((a, b) => b.ts - a.ts).slice(0, 200),
       adjustments: state.adjustments.slice(0, 100).map(a => ({ id: a.id, ts: a.ts, itemId: a.itemId, name: catalog.itemName(a.itemId), scope: a.scope || 'inventory', dir: a.dir, qty: a.qty, label: a.label, note: a.note })),

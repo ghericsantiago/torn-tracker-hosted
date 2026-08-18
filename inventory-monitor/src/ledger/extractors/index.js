@@ -47,6 +47,7 @@ function createLogFlows({ catalog }) {
   const NO_FLOW_TYPES = new Set([
     4430, 4440, 4441, 4450, 4451,          // trade sub-logs → grouping only (ledger/trade.js)
     4520,                                  // Ammo priority — preference only, no inventory flow
+    5011,                                  // points market sell — points left wallet at 5000 listing time (ITEM_TRACKING §6f)
     ...C.BAZAAR_SELL_LOG_TYPES,            // 1221/1226 → bazaar ledger only
     ...C.MARKET_SELL_LOG_TYPES,            // 1104/1113 → market ledger only
   ]);

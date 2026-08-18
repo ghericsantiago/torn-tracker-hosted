@@ -155,6 +155,121 @@ function createRoutes({ state, catalog, summary, poller, db }) {
     res.json({ ok: !r.error, ...r, state: summary() });
   });
 
+  // Transaction ledger — paginated with keyset cursor, filtered by item/category/channel/side/date
+  router.get('/api/transactions', async (req, res) => {
+    try {
+      const limit    = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+      const cursor   = req.query.cursor || null;  // '<ts>:<id>' keyset
+      const itemId   = req.query.item_id   ? String(req.query.item_id)   : null;
+      const category = req.query.category  ? String(req.query.category)  : null;
+      const channel  = req.query.channel   ? String(req.query.channel)   : null;
+      const side     = req.query.side      ? String(req.query.side)      : null;
+      const fromTs   = req.query.from_ts   ? Number(req.query.from_ts)   : null;
+      const toTs     = req.query.to_ts     ? Number(req.query.to_ts)     : null;
+      const q        = req.query.q         ? String(req.query.q).toLowerCase() : null;
+
+      const conditions = [];
+      const params     = [];
+      let p = 1;
+
+      if (cursor) {
+        const [cTs, cId] = cursor.split(':');
+        conditions.push(`(ts < $${p} OR (ts = $${p} AND id < $${p+1}))`);
+        params.push(Number(cTs), Number(cId)); p += 2;
+      }
+      if (itemId)   { conditions.push(`item_id = $${p++}`);   params.push(itemId); }
+      if (category) { conditions.push(`item_category = $${p++}`); params.push(category); }
+      if (channel)  { conditions.push(`channel = $${p++}`);   params.push(channel); }
+      if (side)     { conditions.push(`side = $${p++}`);      params.push(side); }
+      if (fromTs)   { conditions.push(`ts >= $${p++}`);       params.push(fromTs); }
+      if (toTs)     { conditions.push(`ts <= $${p++}`);       params.push(toTs); }
+      if (q)        { conditions.push(`LOWER(item_name) LIKE $${p++}`); params.push(`%${q}%`); }
+
+      const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+      // Build a separate WHERE without the cursor for summary totals
+      const summaryConditions = conditions.filter((_, i) => {
+        // Skip the cursor condition (it's always the first if present)
+        return !(cursor && i === 0);
+      });
+      const summaryParams  = cursor ? params.slice(2) : params.slice();
+      const summaryWhere   = summaryConditions.length ? 'WHERE ' + summaryConditions.join(' AND ') : '';
+      // Re-parameterize summary conditions (params start at $1 since no cursor offset)
+      const summaryParamsAdjusted = summaryParams;
+      const summaryWhereAdj = summaryConditions.length
+        ? 'WHERE ' + summaryConditions.map((c, i) => c.replace(/\$\d+/g, `$${i + 1}`)).join(' AND ')
+        : '';
+
+      const [rowsResult, summaryResult] = await Promise.all([
+        db.pool.query(
+          `SELECT id, ts, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price
+           FROM transactions ${where} ORDER BY ts DESC, id DESC LIMIT $${p}`,
+          [...params, limit + 1]
+        ),
+        db.pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN side = 'buy'  THEN total_price ELSE 0 END), 0) AS total_spent,
+             COALESCE(SUM(CASE WHEN side = 'sell' THEN total_price ELSE 0 END), 0) AS total_revenue,
+             COUNT(*) AS tx_count,
+             COUNT(DISTINCT item_id) AS item_count
+           FROM transactions ${summaryWhereAdj}`,
+          summaryParamsAdjusted
+        ),
+      ]);
+
+      const rows = rowsResult.rows;
+      const hasMore = rows.length > limit;
+      if (hasMore) rows.pop();
+
+      const last = rows[rows.length - 1];
+      const nextCursor = hasMore && last ? `${last.ts}:${last.id}` : null;
+
+      const s = summaryResult.rows[0];
+      res.json({
+        rows: rows.map(r => ({
+          id: Number(r.id), ts: Number(r.ts), logType: r.log_type,
+          channel: r.channel, side: r.side,
+          itemId: r.item_id, itemName: r.item_name, itemCategory: r.item_category || '',
+          qty: Number(r.qty),
+          unitPrice: r.unit_price != null ? Number(r.unit_price) : null,
+          totalPrice: r.total_price != null ? Number(r.total_price) : null,
+        })),
+        summary: {
+          totalSpent:   Number(s.total_spent),
+          totalRevenue: Number(s.total_revenue),
+          txCount:      Number(s.tx_count),
+          itemCount:    Number(s.item_count),
+        },
+        nextCursor,
+        hasMore,
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // FIFO lot breakdown for a single item — used by the FIFO popup in the Inventory tab
+  router.get('/api/fifo/lots/:itemId', (req, res) => {
+    const itemId = String(req.params.itemId);
+    const lots   = state.fifo.lots.get(itemId) || [];
+    const active = lots.filter(l => l.remaining > 0);
+    const totalRemaining = active.reduce((s, l) => s + l.remaining, 0);
+    const totalCost      = active.reduce((s, l) => s + l.remaining * l.unitCost, 0);
+    res.json({
+      lots: lots.map(l => ({
+        id: l.id, ts: l.ts, source: l.source,
+        totalQty: l.totalQty, remaining: l.remaining,
+        unitCost: l.unitCost, lotValue: l.remaining * l.unitCost,
+        depleted: l.remaining === 0,
+      })),
+      summary: {
+        totalRemaining,
+        avgCost:   totalRemaining > 0 ? Math.round(totalCost / totalRemaining) : null,
+        costBasis: totalCost,
+      },
+    });
+  });
+
   router.post('/api/reset', async (_req, res) => {
     state.items = {};
     state.activity = [];
@@ -170,6 +285,8 @@ function createRoutes({ state, catalog, summary, poller, db }) {
     state.adjustments = [];
     state.transfers = [];
     state.locationEvents = { bazaar: [], display: [], market: [] };
+    state.fifo = { lots: new Map(), newLots: [], dirtyIds: new Set() };
+    state.transactions = [];
     await db.clear();
     res.json({ ok: true, state: summary() });
   });

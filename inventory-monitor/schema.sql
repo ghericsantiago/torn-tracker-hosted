@@ -202,3 +202,45 @@ CREATE TABLE IF NOT EXISTS manual_adjustments (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_manual_adj_ts ON manual_adjustments (ts DESC, id DESC);
+
+-- 16. FIFO cost lots — one row per acquisition lot, append-only (remaining_qty updated in place)
+--     Tracks the cost basis of every owned item using First In, First Out costing.
+--     Free items get unit_cost = 0. Points use item_id = '__points__'.
+CREATE TABLE IF NOT EXISTS fifo_lots (
+  id            bigserial   PRIMARY KEY,
+  ts            bigint      NOT NULL,              -- unix ms of the acquisition log
+  log_id        text,                              -- null for trade-derived lots
+  item_id       text        NOT NULL,
+  item_name     text        NOT NULL,
+  item_category text,
+  total_qty     bigint      NOT NULL,
+  remaining_qty bigint      NOT NULL DEFAULT 0,
+  unit_cost     bigint      NOT NULL DEFAULT 0,    -- 0 for free/trade items
+  source        text        NOT NULL DEFAULT 'Buy',
+  created_at    timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_fifo_lots_item_ts        ON fifo_lots (item_id, ts ASC, id ASC);
+CREATE INDEX IF NOT EXISTS idx_fifo_lots_item_remaining ON fifo_lots (item_id, remaining_qty) WHERE remaining_qty > 0;
+
+-- 17. Transaction ledger — every buy/sell across Item Market, Bazaar, Points Market, Shop, Trade.
+--     log_id is null for trade-derived rows (one row per item, not one per sub-log).
+CREATE TABLE IF NOT EXISTS transactions (
+  id            bigserial   PRIMARY KEY,
+  ts            bigint      NOT NULL,              -- unix ms
+  log_id        text,                              -- null for trade rows; unique when not null
+  log_type      integer     NOT NULL,
+  channel       text        NOT NULL,              -- 'bazaar' | 'item_market' | 'points_market' | 'shop' | 'trade'
+  side          text        NOT NULL,              -- 'buy' | 'sell'
+  item_id       text        NOT NULL,
+  item_name     text        NOT NULL,
+  item_category text,
+  qty           bigint      NOT NULL DEFAULT 1,
+  unit_price    bigint,
+  total_price   bigint,
+  created_at    timestamptz NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_log_id ON transactions (log_id) WHERE log_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_transactions_ts      ON transactions (ts DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_item_id ON transactions (item_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_channel ON transactions (channel);
+CREATE INDEX IF NOT EXISTS idx_transactions_side    ON transactions (side);

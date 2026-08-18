@@ -7,10 +7,12 @@
  */
 
 const { createApplyLog } = require('./apply');
+const { createTradeFifoFinalizer } = require('./trade-fifo');
 
 function createLedger({ catalog, config }) {
   return {
     applyLog: createApplyLog({ catalog, config }),
+    finalizeNewTrades: createTradeFifoFinalizer({ catalog }),
   };
 }
 

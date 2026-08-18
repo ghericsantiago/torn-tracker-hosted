@@ -16,6 +16,8 @@ const { createLogFlows } = require('./extractors');
 const { logBazaarFlows, logDisplayFlows, logMarketFlows } = require('./locations');
 const { createTrade } = require('./trade');
 const { logMuseumSwap } = require('./museum');
+const { fifoIn, fifoOut } = require('./fifo');
+const { logTransactionEvent } = require('./transactions');
 
 function createApplyLog({ catalog, config }) {
   const logFlows = createLogFlows({ catalog });
@@ -198,6 +200,39 @@ function createApplyLog({ catalog, config }) {
       state.museum.pointsReceived += mSwap.pointsReceived;
       state.museum.swaps.unshift({ ts, logId: log.id, set: mSwap.set, quantity: mSwap.quantity, pointsReceived: mSwap.pointsReceived });
       if (state.museum.swaps.length > config.museumSwapMax) state.museum.swaps.length = config.museumSwapMax;
+    }
+
+    // 7. FIFO cost basis — create lots (IN) and deplete lots (OUT)
+    //    IN: all acquisition events (buys, free items, trade receives, points listing cancelled)
+    //    OUT: permanent removals — sells, usage, trades gave, bazaar/market sold
+    //    Note: points FIFO OUT fires at 5000 (listing = wallet exit), NOT 5011 (ITEM_TRACKING §6f)
+    // Trade items (4445/4446) are handled exclusively by finalizeNewTrades() in trade-fifo.js,
+    // which runs after the full batch so proportional cost allocation uses the complete trade group.
+    const isFifoIn = C.BUY_LOG_TYPES.has(logType)
+      || C.FREE_LOG_TYPES.has(logType)
+      || C.AMMO_BUY_LOG_TYPES.has(logType)
+      || C.POINTS_LOG_TYPES.has(logType)
+      || C.POINTS_MARKET_REMOVE_LOG_TYPES.has(logType)
+      || logType === C.VIRUS_COMPLETE_LOG_TYPE
+      || logType === C.RACING_UNENLIST_LOG_TYPE;
+    if (isFifoIn) fifoIn(log, state, catalog);
+
+    const isFifoOut = C.USAGE_LOG_TYPES.has(logType)
+      || C.SELL_LOG_TYPES.has(logType)
+      || C.AMMO_SELL_LOG_TYPES.has(logType)
+      || C.POINTS_MARKET_ADD_LOG_TYPES.has(logType);  // 5000: points listed → FIFO OUT __points__
+    if (isFifoOut) {
+      flows.forEach(f => { if (f.dir === 'out') fifoOut(f.itemId, f.qty, state); });
+    }
+    // Bazaar/market sold events — FIFO out at the time of sale (not when listed)
+    bzFlows.forEach(f => { if (f.kind === 'Sold') fifoOut(f.itemId, f.qty, state); });
+    mktFlows.forEach(f => { if (f.kind === 'Sold') fifoOut(f.itemId, f.qty, state); });
+
+    // 8. Transaction ledger — record buy/sell money flows for the Ledger tab
+    //    Trade transactions are deferred to finalizeNewTrades() in trade-fifo.js
+    const tx = logTransactionEvent(log, catalog);
+    if (tx) {
+      state.transactions.push({ ts, logId: log.id ?? null, logType, ...tx });
     }
 
     return flows.length + bzFlows.length + dispFlows.length + mktFlows.length;
