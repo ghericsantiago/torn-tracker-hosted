@@ -832,13 +832,13 @@ async function showFifoPop(cell) {
     $('fifo-pop-body').innerHTML = lots.length
       ? lots.map(l => {
           const srcClass = l.source === 'Reconciliation' ? 'badge fifo-src-reconciliation' : 'badge';
-          return `<tr class="${l.depleted ? 'fifo-depleted' : ''}">
+          return `<tr class="${l.depleted ? 'fifo-depleted' : ''}" data-lot-id="${l.id}">
           <td class="dim">${fmtTime(l.ts)}</td>
           <td><span class="${srcClass}">${esc(l.source)}</span></td>
           <td class="r">${fmtQty(l.totalQty)}</td>
           <td class="r ${l.depleted ? 'dim' : 'green'}">${fmtQty(l.remaining)}</td>
-          <td class="r gold">${fmt$(l.unitCost)}</td>
-          <td class="r">${fmt$(l.lotValue)}</td>
+          <td class="r gold fifo-cost-cell" data-cost="${l.unitCost}">${fmt$(l.unitCost)}<button class="fifo-edit-btn" title="Edit unit cost">✎</button></td>
+          <td class="r fifo-lot-value">${fmt$(l.lotValue)}</td>
         </tr>`;
         }).join('')
       : '<tr><td colspan="6" class="empty">No FIFO lots yet.</td></tr>';
@@ -864,6 +864,65 @@ function hideFifoPop() {
   fifoPop.visible = false; fifoPop.itemId = null;
   $('fifo-pop').style.display = 'none';
 }
+
+async function refreshFifoPopFoot(itemId) {
+  try {
+    const r = await fetch('/admin/inventory/api/fifo/lots/' + encodeURIComponent(itemId));
+    const d = await r.json();
+    const summary = d.summary || {};
+    $('fifo-pop-foot').innerHTML = summary.totalRemaining > 0
+      ? `<tr class="fifo-summary">
+          <td colspan="3"><strong>Total</strong></td>
+          <td class="r green"><strong>${fmtQty(summary.totalRemaining)}</strong></td>
+          <td class="r gold"><strong>${fmt$(summary.avgCost)}</strong></td>
+          <td class="r"><strong>${fmt$(summary.costBasis)}</strong></td>
+        </tr>` : '';
+  } catch (e) { /* silent */ }
+}
+
+$('fifo-pop-body').addEventListener('click', e => {
+  const btn = e.target.closest('.fifo-edit-btn');
+  if (!btn) return;
+  e.stopPropagation();
+
+  const tr = btn.closest('tr[data-lot-id]');
+  if (!tr) return;
+  const lotId = Number(tr.dataset.lotId);
+  const costCell = tr.querySelector('.fifo-cost-cell');
+  if (!costCell || costCell.querySelector('input')) return;
+
+  const currentCost = Number(costCell.dataset.cost || 0);
+  costCell.innerHTML = `<input class="fifo-edit-input" type="number" value="${currentCost}" min="0" step="1"><button class="fifo-edit-save" title="Save">✓</button><button class="fifo-edit-cancel" title="Cancel">✕</button>`;
+  const input = costCell.querySelector('input');
+  input.focus(); input.select();
+
+  const cancelEdit = () => {
+    costCell.innerHTML = `${fmt$(currentCost)}<button class="fifo-edit-btn" title="Edit unit cost">✎</button>`;
+  };
+
+  const saveEdit = async () => {
+    const newCost = Math.max(0, Math.floor(Number(input.value) || 0));
+    if (newCost === currentCost) { cancelEdit(); return; }
+    try {
+      const r = await fetch(`/admin/inventory/api/fifo/lots/${lotId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unitCost: newCost }),
+      });
+      const d = await r.json();
+      if (!d.ok) { alert('Error: ' + (d.error || 'unknown')); cancelEdit(); return; }
+      costCell.dataset.cost = newCost;
+      costCell.innerHTML = `${fmt$(newCost)}<button class="fifo-edit-btn" title="Edit unit cost">✎</button>`;
+      const valCell = tr.querySelector('.fifo-lot-value');
+      if (valCell) valCell.textContent = fmt$(d.lot.lotValue);
+      await refreshFifoPopFoot(fifoPop.itemId);
+    } catch (err) { alert('Error: ' + err.message); cancelEdit(); }
+  };
+
+  costCell.querySelector('.fifo-edit-save').addEventListener('click', e => { e.stopPropagation(); saveEdit(); });
+  costCell.querySelector('.fifo-edit-cancel').addEventListener('click', e => { e.stopPropagation(); cancelEdit(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); });
+});
 document.addEventListener('click', async e => {
   const cell = e.target.closest && e.target.closest('.fifo-cell');
   if (cell && cell.dataset.fifoItem) { e.stopPropagation(); showFifoPop(cell); return; }

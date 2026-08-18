@@ -352,6 +352,41 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
     }
   });
 
+  // Edit a FIFO lot's unit cost — lets users correct $0 reconciliation lots or fix wrong costs.
+  // Body: { unitCost: number }. Persists immediately; no poll needed.
+  router.patch('/api/fifo/lots/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: 'Invalid lot id.' });
+
+      const unitCost = Math.floor(Number((req.body || {}).unitCost));
+      if (!Number.isFinite(unitCost) || unitCost < 0)
+        return res.status(400).json({ ok: false, error: 'unitCost must be a non-negative integer.' });
+
+      let found = null;
+      for (const lots of state.fifo.lots.values()) {
+        for (const lot of lots) { if (lot.id === id) { found = lot; break; } }
+        if (found) break;
+      }
+      if (!found) return res.status(404).json({ ok: false, error: 'Lot not found.' });
+
+      found.unitCost = unitCost;
+      await db.pool.query('UPDATE fifo_lots SET unit_cost = $1 WHERE id = $2', [unitCost, id]);
+
+      res.json({
+        ok: true,
+        lot: {
+          id: found.id, ts: found.ts, source: found.source,
+          totalQty: found.totalQty, remaining: found.remaining,
+          unitCost: found.unitCost, lotValue: found.remaining * found.unitCost,
+          depleted: found.remaining === 0,
+        },
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
   // FIFO lot breakdown for a single item — used by the FIFO popup in the Inventory tab
   router.get('/api/fifo/lots/:itemId', (req, res) => {
     const itemId = String(req.params.itemId);

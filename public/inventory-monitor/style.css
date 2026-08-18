@@ -74,6 +74,12 @@
   .fifo-summary td { border-top: 1px solid #2a3350; background: rgba(0,0,0,.2); font-size: 11px; }
   .fifo-src-reconciliation { background: rgba(255,140,0,.15); color: #ffaa44; border: 1px solid rgba(255,140,0,.35); }
   .fifo-mismatch-dot { color: #e8a040; font-size: 11px; margin-left: 4px; cursor: default; }
+  .fifo-edit-btn { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 11px; padding: 0 2px; opacity: 0; transition: opacity .15s; vertical-align: middle; }
+  .fifo-cost-cell:hover .fifo-edit-btn { opacity: 1; }
+  .fifo-edit-input { width: 80px; background: #0d1120; border: 1px solid #4a6090; color: var(--text); border-radius: 3px; padding: 1px 4px; font-size: 12px; }
+  .fifo-edit-save, .fifo-edit-cancel { background: none; border: none; cursor: pointer; font-size: 12px; padding: 0 3px; }
+  .fifo-edit-save { color: #6ec97a; }
+  .fifo-edit-cancel { color: #e87878; }
   .col-avgcost { color: var(--gold2); }
   .col-costbasis { color: var(--dim2); font-size: 11px; }
 
