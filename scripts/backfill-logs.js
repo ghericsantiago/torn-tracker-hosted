@@ -32,18 +32,28 @@ async function backfill() {
   await setState('backfill_running', '1');
 
   // Resume from checkpoint if available. Nanostamp cursors are numeric strings
-  // (19 digits); older versions stored a 10-digit timestamp, which is ignored
-  // so the run restarts cleanly from the newest logs.
+  // (19 digits); older versions stored a 10-digit timestamp, which is ignored.
   const savedNano  = await getState('backfill_to_cursor');
   const savedPages = await getState('backfill_pages');
   let nano         = savedNano && /^\d{11,}$/.test(savedNano) ? savedNano : null;
   let pages        = nano ? Number(savedPages) || 0 : 0;
   let inserted     = 0;
 
-  console.log(nano
-    ? '[backfill] Resuming from checkpoint...'
-    : '[backfill] Starting full history fetch (newest → oldest)...'
-  );
+  if (nano) {
+    console.log('[backfill] Resuming from checkpoint...');
+  } else {
+    // No checkpoint — start from the oldest log we already have so we don't
+    // re-fetch existing history. Build a synthetic nanostamp ("<seconds>" +
+    // 9 zeroes) so the API returns only entries strictly older than that.
+    const { rows: oldest } = await db.query('SELECT MIN(happened_at) AS ts FROM torn_logs');
+    if (oldest[0]?.ts) {
+      const oldestSec = Math.floor(new Date(oldest[0].ts).getTime() / 1000);
+      nano = `${oldestSec}000000000`;
+      console.log(`[backfill] DB has logs from ${oldest[0].ts.toISOString().slice(0, 10)} — starting from older`);
+    } else {
+      console.log('[backfill] Starting full history fetch (newest → oldest)...');
+    }
+  }
 
   while (true) {
     const url = buildUserLogUrl(apiKey, '0', nano);
