@@ -8,7 +8,7 @@
  * DIP: depends on injected { config, state, db, logClient, applyLog }.
  */
 
-function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrades }) {
+function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrades, reconcileFifo }) {
   let processedSet = new Set(state.processedIds);
   let polling = false;
 
@@ -105,6 +105,16 @@ function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrade
         finalizeNewTrades(state, processedSet);
         if (state.processedIds.length > prevLen) {
           newProcessed.push(...state.processedIds.slice(prevLen));
+        }
+      }
+
+      // FIFO reconciliation — auto-close any gap between FIFO remaining totals and
+      // true inventory net (log ledger + inventory manual adjustments).
+      // Runs silently after every poll; also callable on demand via POST /api/fifo/reconcile.
+      if (reconcileFifo) {
+        const r = reconcileFifo(state);
+        if (r.itemsAffected > 0) {
+          console.log(`[poll] FIFO reconcile: ${r.itemsAffected} item(s) — +${r.unitsCreated} lot units created, -${r.unitsDepleted} depleted`);
         }
       }
 

@@ -10,7 +10,7 @@ const express = require('express');
 const C = require('./constants');
 const { fifoOut } = require('./ledger/fifo');
 
-function createRoutes({ state, catalog, summary, poller, db }) {
+function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
   const router = express.Router();
 
   router.get('/api/state', (_req, res) => res.json(summary()));
@@ -301,6 +301,52 @@ function createRoutes({ state, catalog, summary, poller, db }) {
           unitPrice: null, totalPrice: null, note,
         },
       });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // On-demand FIFO reconciliation — closes any gap between FIFO remaining totals and
+  // inventory net (log ledger + manual adjustments). Same logic as the auto-run after each
+  // poll, but flushes to DB immediately so the caller sees consistent data right away.
+  router.post('/api/fifo/reconcile', async (req, res) => {
+    if (!reconcileFifo) return res.status(503).json({ ok: false, error: 'Reconciler not available.' });
+    try {
+      const result = reconcileFifo(state);
+
+      // Flush new lots (INSERT) and dirty lots (UPDATE) immediately
+      const client = await db.pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const lot of state.fifo.newLots) {
+          const r = await client.query(
+            `INSERT INTO fifo_lots (ts, log_id, item_id, item_name, item_category, total_qty, remaining_qty, unit_cost, source)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+            [lot.ts, lot.logId, lot.itemId, lot.itemName, lot.category, lot.totalQty, lot.remaining, lot.unitCost, lot.source]
+          );
+          if (r.rows[0]) lot.id = Number(r.rows[0].id);
+        }
+        state.fifo.newLots = [];
+
+        for (const id of state.fifo.dirtyIds) {
+          let remaining = 0;
+          outer: for (const lots of state.fifo.lots.values()) {
+            for (const lot of lots) {
+              if (lot.id === id) { remaining = lot.remaining; break outer; }
+            }
+          }
+          await client.query('UPDATE fifo_lots SET remaining_qty = $1 WHERE id = $2', [remaining, id]);
+        }
+        state.fifo.dirtyIds.clear();
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      res.json({ ok: true, ...result });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }

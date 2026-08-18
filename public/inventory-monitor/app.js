@@ -214,6 +214,14 @@ function render() {
   const srcKeys = it => Object.keys(it.sourcesIn || {}).concat(Object.keys(it.sourcesOut || {}));
   const matches = it => !q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q) || srcKeys(it).some(s => s.toLowerCase().includes(q));
 
+  // FIFO mismatch badge on the reconcile button
+  const mismatchCount = state.fifoMismatchCount || 0;
+  const mismatchEl = $('fifo-mismatch-count');
+  if (mismatchEl) {
+    if (mismatchCount > 0) { mismatchEl.textContent = mismatchCount; mismatchEl.style.display = ''; }
+    else mismatchEl.style.display = 'none';
+  }
+
   if (view === 'inventory') { renderInventory(q); return; }
   if (view === 'bazaar') { renderBazaar(q); return; }
   if (view === 'display') { renderDisplay(q); return; }
@@ -254,9 +262,10 @@ function renderInventory(q) {
   initTabPage('tb-inv', items,
     '<tr><td colspan="10" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>',
     it => {
+      const mismatchMark = it.fifoMismatch ? `<span class="fifo-mismatch-dot" title="FIFO total doesn't match inventory net — click Reconcile FIFO to fix">⚠</span>` : '';
       const avgCostCell = it.avgCost != null
-        ? `<td class="r fifo-cell col-avgcost" data-fifo-item="${it.id}" title="Click to see FIFO lots">${fmt$(it.avgCost)}</td>`
-        : `<td class="r dim col-avgcost">—</td>`;
+        ? `<td class="r fifo-cell col-avgcost" data-fifo-item="${it.id}" title="Click to see FIFO lots">${fmt$(it.avgCost)}${mismatchMark}</td>`
+        : `<td class="r dim col-avgcost">—${mismatchMark}</td>`;
       const costBasisCell = it.costBasis > 0
         ? `<td class="r col-costbasis dim">${fmt$(it.costBasis)}</td>`
         : `<td class="r dim col-costbasis">—</td>`;
@@ -821,14 +830,17 @@ async function showFifoPop(cell) {
     const itemName = (cell.closest('tr') && cell.closest('tr').querySelector('.item') || {}).textContent || itemId;
     $('fifo-pop-title-text').textContent = 'FIFO Lots · ' + itemName;
     $('fifo-pop-body').innerHTML = lots.length
-      ? lots.map(l => `<tr class="${l.depleted ? 'fifo-depleted' : ''}">
+      ? lots.map(l => {
+          const srcClass = l.source === 'Reconciliation' ? 'badge fifo-src-reconciliation' : 'badge';
+          return `<tr class="${l.depleted ? 'fifo-depleted' : ''}">
           <td class="dim">${fmtTime(l.ts)}</td>
-          <td><span class="badge">${esc(l.source)}</span></td>
+          <td><span class="${srcClass}">${esc(l.source)}</span></td>
           <td class="r">${fmtQty(l.totalQty)}</td>
           <td class="r ${l.depleted ? 'dim' : 'green'}">${fmtQty(l.remaining)}</td>
           <td class="r gold">${fmt$(l.unitCost)}</td>
           <td class="r">${fmt$(l.lotValue)}</td>
-        </tr>`).join('')
+        </tr>`;
+        }).join('')
       : '<tr><td colspan="6" class="empty">No FIFO lots yet.</td></tr>';
     $('fifo-pop-foot').innerHTML = summary.totalRemaining > 0
       ? `<tr class="fifo-summary">
@@ -859,6 +871,31 @@ document.addEventListener('click', async e => {
   if (pop && !pop.contains(e.target)) hideFifoPop();
 });
 $('fifo-pop-close').addEventListener('click', hideFifoPop);
+
+// ── FIFO Reconcile button ─────────────────────────────────────
+$('fifo-reconcile-btn').addEventListener('click', async () => {
+  const btn = $('fifo-reconcile-btn');
+  btn.disabled = true;
+  btn.textContent = 'Reconciling…';
+  try {
+    const r = await fetch('/admin/inventory/api/fifo/reconcile', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      const msg = d.itemsAffected > 0
+        ? `Reconciled ${d.itemsAffected} item(s): +${d.unitsCreated} created, −${d.unitsDepleted} depleted`
+        : 'FIFO already in sync — nothing to reconcile';
+      alert(msg);
+      await load();
+    } else {
+      alert('Reconcile failed: ' + (d.error || 'unknown error'));
+    }
+  } catch (e) {
+    alert('Reconcile error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Reconcile FIFO <span id="fifo-mismatch-count" class="n" style="display:none"></span>';
+  }
+});
 
 // ── Ledger tab ────────────────────────────────────────────────
 const CH_LABELS = {

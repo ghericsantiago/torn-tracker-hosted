@@ -379,6 +379,19 @@ as a **transaction** and tracks item cost using a **FIFO lot** model (implemente
   - usage=red, gift=purple, faction=green, museum=gold
   - `side: use` rows are dimmed (`.ldg-use-row`) and show a `×qty` label; manual entries
     with a `note` show a gold dot tooltip on the item name.
+- **FIFO auto-reconciliation** (`src/ledger/reconcile.js` — `createFifoReconciler`): runs
+  automatically after every poll and on demand via `POST /api/fifo/reconcile`. Compares each
+  item's FIFO lot total (`state.fifo.lots` remaining) against the true inventory net (log ledger
+  + inventory-scoped manual adjustments) and closes any gap:
+  - **Shortfall** (FIFO < net): creates a `$0 Reconciliation` lot to cover the difference
+  - **Surplus** (FIFO > net): depletes oldest lots via `fifoOut` to close the gap
+  - Reconciliation lots are shown in the FIFO popup with a distinct orange badge
+    (`.fifo-src-reconciliation`)
+  - The **Reconcile FIFO** button in the Inventory tab header shows a count badge when
+    items are out of sync (`fifoMismatchCount` from `/api/state`); individual items with a
+    mismatch show a `⚠` indicator (`.fifo-mismatch-dot`) in their Avg Cost cell.
+  - `summary.js` exposes `fifoMismatch: boolean` per item and `fifoMismatchCount: number`
+    at the top level of `/api/state`.
 
 ## 5. Persistence — PostgreSQL (`schema.sql`)
 
@@ -431,6 +444,7 @@ How it's written (all in one transaction per poll):
 | `GET /api/transactions` | Paginated transaction ledger (keyset cursor `<ts>:<id>`). Filters: `item_id`, `category`, `channel` (now includes `usage`\|`gift`\|`faction`\|`museum`), `side` (`buy`\|`sell`\|`use`), `from_ts`, `to_ts`, `q` (item name search). Rows include `note` field. Returns `{ rows[], summary: { totalSpent, totalRevenue, txCount, itemCount } }` |
 | `POST /api/transactions/manual` | Create a manual outflow transaction. Body: `{item, qty, channel: 'usage'\|'gift'\|'faction'\|'museum', note?}`. Inserts a `side:'use'` transaction row, immediately depletes FIFO lots in-memory and flushes dirty lot updates to DB. Returns `{ok, transaction}` |
 | `GET /api/fifo/lots/:itemId` | All FIFO lots for an item (active + depleted) + summary `{ totalRemaining, avgCost, costBasis }` |
+| `POST /api/fifo/reconcile` | Manually trigger FIFO auto-reconciliation: closes any gap between `state.fifo` lot totals and true inventory net (log ledger + manual adjustments). Creates `$0 Reconciliation` lots for shortfalls and depletes oldest lots for surpluses. Returns `{ ok, itemsAffected, unitsCreated, unitsDepleted }`. Also runs automatically after every poll. |
 
 > **Manual adjustments (reconcile):** the **＋ Adjust** button (header) opens a modal with two
 > modes — *Add in/out record* (direction + qty + label) or *Reconcile to balance* (set the

@@ -72,6 +72,8 @@
   #fifo-pop td { padding: 2px 4px; border-bottom: 1px solid rgba(255,255,255,.04); white-space: nowrap; }
   .fifo-depleted td { opacity: .4; text-decoration: line-through; }
   .fifo-summary td { border-top: 1px solid #2a3350; background: rgba(0,0,0,.2); font-size: 11px; }
+  .fifo-src-reconciliation { background: rgba(255,140,0,.15); color: #ffaa44; border: 1px solid rgba(255,140,0,.35); }
+  .fifo-mismatch-dot { color: #e8a040; font-size: 11px; margin-left: 4px; cursor: default; }
   .col-avgcost { color: var(--gold2); }
   .col-costbasis { color: var(--dim2); font-size: 11px; }
 

@@ -161,6 +161,27 @@ function createSummary({ state, catalog, config }) {
       swaps: state.museum.swaps.slice(0, 200),
     };
 
+    const mappedItems = items
+      .map(it => {
+        const lots           = state.fifo.lots.get(it.id) || [];
+        const active         = lots.filter(l => l.remaining > 0);
+        const totalRemaining = active.reduce((s, l) => s + l.remaining, 0);
+        const totalCost      = active.reduce((s, l) => s + l.remaining * l.unitCost, 0);
+        // fifoMismatch: FIFO remaining doesn't equal the adjusted inventory net
+        // (it.net already includes manual adjustments from itemsById above)
+        const fifoMismatch   = totalRemaining !== Math.max(0, it.net);
+        return {
+          ...it,
+          avgCost:      totalRemaining > 0 ? Math.round(totalCost / totalRemaining) : null,
+          costBasis:    totalCost,
+          fifoLots:     active.length,
+          fifoMismatch,
+        };
+      })
+      .sort((a, b) => (b.in + b.out) - (a.in + a.out));
+
+    const fifoMismatchCount = mappedItems.filter(it => it.fifoMismatch).length;
+
     return {
       startTs: state.startTs,
       startLabel: new Date(state.startTs * 1000).toISOString(),
@@ -177,20 +198,8 @@ function createSummary({ state, catalog, config }) {
       trades,
       museum,
       transfers,
-      items: items
-        .map(it => {
-          const lots   = state.fifo.lots.get(it.id) || [];
-          const active = lots.filter(l => l.remaining > 0);
-          const totalRemaining = active.reduce((s, l) => s + l.remaining, 0);
-          const totalCost      = active.reduce((s, l) => s + l.remaining * l.unitCost, 0);
-          return {
-            ...it,
-            avgCost:   totalRemaining > 0 ? Math.round(totalCost / totalRemaining) : null,
-            costBasis: totalCost,
-            fifoLots:  active.length,
-          };
-        })
-        .sort((a, b) => (b.in + b.out) - (a.in + a.out)),
+      items: mappedItems,
+      fifoMismatchCount,
       activity: state.activity.concat(adjActivity).sort((a, b) => b.ts - a.ts).slice(0, 200),
       adjustments: state.adjustments.slice(0, 100).map(a => ({ id: a.id, ts: a.ts, itemId: a.itemId, name: catalog.itemName(a.itemId), scope: a.scope || 'inventory', dir: a.dir, qty: a.qty, label: a.label, note: a.note })),
     };

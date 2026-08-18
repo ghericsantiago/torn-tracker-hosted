@@ -8,11 +8,13 @@
 
 const { createApplyLog } = require('./apply');
 const { createTradeFifoFinalizer } = require('./trade-fifo');
+const { createFifoReconciler } = require('./reconcile');
 
 function createLedger({ catalog, config }) {
   return {
-    applyLog: createApplyLog({ catalog, config }),
+    applyLog:          createApplyLog({ catalog, config }),
     finalizeNewTrades: createTradeFifoFinalizer({ catalog }),
+    reconcileFifo:     createFifoReconciler({ catalog }),
   };
 }
 

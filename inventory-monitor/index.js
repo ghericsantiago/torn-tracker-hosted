@@ -51,7 +51,7 @@ async function mount(app) {
 
   const logClient = createLogClient(config);
   const ledger    = createLedger({ catalog, config });
-  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog, finalizeNewTrades: ledger.finalizeNewTrades });
+  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog, finalizeNewTrades: ledger.finalizeNewTrades, reconcileFifo: ledger.reconcileFifo });
   const summary   = createSummary({ state, catalog, config });
 
   // Serve static frontend files at /admin/inventory (before the API router so
@@ -59,7 +59,7 @@ async function mount(app) {
   app.use('/admin/inventory', express.static(config.publicDir));
 
   // Mount API routes at /admin/inventory/api/*
-  app.use('/admin/inventory', createRoutes({ state, catalog, summary, poller, db }));
+  app.use('/admin/inventory', createRoutes({ state, catalog, summary, poller, db, reconcileFifo: ledger.reconcileFifo }));
 
   // Start background poll loop
   const r = await poller.poll();
