@@ -157,11 +157,11 @@ async function persistState(pool, state, config, newProcessed, applied) {
       // Transactions — INSERT, skip on duplicate log_id (idempotent)
       for (const tx of state.transactions) {
         await client.query(
-          `INSERT INTO transactions (ts, log_id, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          `INSERT INTO transactions (ts, log_id, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price, note)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
            ON CONFLICT (log_id) WHERE log_id IS NOT NULL DO NOTHING`,
           [tx.ts, tx.logId ?? null, tx.logType, tx.channel, tx.side,
-           tx.itemId, tx.itemName, tx.category || null, tx.qty, tx.unitPrice ?? null, tx.totalPrice ?? null]
+           tx.itemId, tx.itemName, tx.category || null, tx.qty, tx.unitPrice ?? null, tx.totalPrice ?? null, tx.note ?? null]
         );
       }
       state.transactions = [];

@@ -867,6 +867,10 @@ const CH_LABELS = {
   points_market:'Points Market',
   shop:         'Shop',
   trade:        'Trade',
+  usage:        'Consumed',
+  gift:         'Gift',
+  faction:      'Faction',
+  museum:       'Museum',
 };
 function chBadge(ch) {
   return `<span class="ch-badge ch-${ch}">${esc(CH_LABELS[ch] || ch)}</span>`;
@@ -950,18 +954,23 @@ async function loadLedger(reset) {
         </tr>`;
       }
       for (const row of group.rows) {
-        const isBuy = row.side === 'buy';
-        ldgState.balance += isBuy ? -(row.totalPrice || 0) : (row.totalPrice || 0);
-        const balClass = ldgState.balance >= 0 ? 'green' : 'red';
+        const isBuy  = row.side === 'buy';
+        const isUse  = row.side === 'use';
+        // Usage rows carry no monetary value — balance is unchanged
+        ldgState.balance += isBuy ? -(row.totalPrice || 0) : isUse ? 0 : (row.totalPrice || 0);
+        const balClass   = ldgState.balance >= 0 ? 'green' : 'red';
         const boughtCell = isBuy  && row.totalPrice != null ? `<span class="col-bought">${fmt$(row.totalPrice)}</span>` : '';
-        const soldCell   = !isBuy && row.totalPrice != null ? `<span class="col-sold">+${fmt$(row.totalPrice)}</span>` : '';
-        html += `<tr>
+        const soldCell   = !isBuy && !isUse && row.totalPrice != null ? `<span class="col-sold">+${fmt$(row.totalPrice)}</span>` : '';
+        const usedCell   = isUse ? `<span class="col-used">×${fmtQty(row.qty)}</span>` : '';
+        const noteAttr   = row.note ? ` title="${esc(row.note)}"` : '';
+        const rowClass   = isUse ? ' class="ldg-use-row"' : '';
+        html += `<tr${rowClass}${noteAttr}>
           <td class="dim ldg-time">${FMT_HHMM.format(new Date(row.ts))}</td>
-          <td class="item ldg-item">${esc(row.itemName)}</td>
+          <td class="item ldg-item">${esc(row.itemName)}${row.note ? ' <span class="ldg-note-dot" title="' + esc(row.note) + '">●</span>' : ''}</td>
           <td>${chBadge(row.channel)}</td>
           <td class="r ldg-qty">${fmtQty(row.qty)}</td>
           <td class="r dim ldg-unit">${row.unitPrice != null ? fmt$(row.unitPrice) : '—'}</td>
-          <td class="r ldg-bought">${boughtCell}</td>
+          <td class="r ldg-bought">${boughtCell}${usedCell}</td>
           <td class="r ldg-sold">${soldCell}</td>
           <td class="r ldg-bal ${balClass}">${ldgState.balance >= 0 ? '+' : ''}${fmt$(Math.abs(ldgState.balance))}</td>
         </tr>`;
@@ -1023,6 +1032,69 @@ $('ldg-all').addEventListener('click', () => {
   $('ldg-from').value = ''; $('ldg-to').value = '';
   applyLedgerFilters();
 });
+
+// ── Manual consolidation modal ─────────────────────────────────
+function openManualModal() {
+  $('ldg-manual-msg').style.display = 'none';
+  $('ldg-manual-msg').textContent = '';
+  $('ldg-manual-item').value = '';
+  $('ldg-manual-qty').value  = '1';
+  $('ldg-manual-note').value = '';
+  $('ldg-manual-channel').value = 'usage';
+  $('ldg-manual-modal').style.display = '';
+  $('ldg-manual-item').focus();
+}
+function closeManualModal() {
+  $('ldg-manual-modal').style.display = 'none';
+}
+$('ldg-manual-btn').addEventListener('click', openManualModal);
+$('ldg-manual-close').addEventListener('click', closeManualModal);
+$('ldg-manual-cancel').addEventListener('click', closeManualModal);
+$('ldg-manual-modal').addEventListener('click', e => { if (e.target === $('ldg-manual-modal')) closeManualModal(); });
+
+$('ldg-manual-submit').addEventListener('click', async () => {
+  const item    = $('ldg-manual-item').value.trim();
+  const qty     = parseInt($('ldg-manual-qty').value, 10);
+  const channel = $('ldg-manual-channel').value;
+  const note    = $('ldg-manual-note').value.trim();
+  const msgEl   = $('ldg-manual-msg');
+
+  if (!item) { msgEl.textContent = 'Please enter an item name or ID.'; msgEl.className = 'adj-row err'; msgEl.style.display = ''; return; }
+  if (!qty || qty < 1) { msgEl.textContent = 'Quantity must be at least 1.'; msgEl.className = 'adj-row err'; msgEl.style.display = ''; return; }
+
+  $('ldg-manual-submit').disabled = true;
+  try {
+    const r = await fetch('/admin/inventory/api/transactions/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item, qty, channel, note: note || undefined }),
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      msgEl.textContent = d.error || 'Error recording entry.';
+      msgEl.className = 'adj-row err';
+      msgEl.style.display = '';
+    } else {
+      closeManualModal();
+      loadLedger(true);   // refresh ledger to show the new row
+    }
+  } catch (e) {
+    msgEl.textContent = 'Network error.';
+    msgEl.className = 'adj-row err';
+    msgEl.style.display = '';
+  }
+  $('ldg-manual-submit').disabled = false;
+});
+
+// Populate datalist for item autocomplete in the manual modal
+(function populateManualItemList() {
+  const dl = $('ldg-manual-items');
+  if (!dl) return;
+  fetch('/admin/inventory/api/state').then(r => r.json()).then(d => {
+    const items = Object.values(d.items || {});
+    dl.innerHTML = items.map(it => `<option value="${esc(it.name)}">`).join('');
+  }).catch(() => {});
+})();
 
 load();
 setInterval(load, 30000);   // dashboard auto-refresh

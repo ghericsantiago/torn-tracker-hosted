@@ -186,6 +186,27 @@ const AMMO_SELL_LOG_TYPES = new Set([4510]);
 // Maps log type → { channel, side } for the transaction ledger.
 // 5011 is included here (points market sell = transaction record only;
 // no inventory flow — points already left wallet at 5000 listing time).
+
+// Maps USAGE_SOURCE_MAP source labels to Ledger channel names for usage outflows.
+// Used by logUsageTransactionEvents in ledger/transactions.js.
+const USAGE_SOURCE_TO_CHANNEL = {
+  'Consumed':            'usage',
+  'Dumped':              'usage',
+  'Relic Perish':        'usage',
+  'Crime Loss':          'usage',
+  'Crime Spent':         'usage',
+  'Staff Removal':       'usage',
+  'Sent':                'gift',
+  'Parceled':            'gift',
+  'Faction Given':       'gift',
+  'Faction Payout':      'gift',
+  'Faction Armory':      'faction',
+  'Faction Loan Return': 'faction',
+  'Faction Claimed':     'faction',
+  'OC Spent':            'faction',
+  'Museum Swap':         'museum',
+};
+
 const TRANSACTION_CHANNEL_MAP = new Map([
   [1103, { channel: 'item_market',   side: 'buy'  }],
   [1112, { channel: 'item_market',   side: 'buy'  }],
@@ -236,7 +257,7 @@ module.exports = {
   MUSEUM_LOG_TYPE, BLOOD_BAG_LOG_TYPE, VIRUS_COMPLETE_LOG_TYPE,
   RACING_ENLIST_LOG_TYPE, RACING_UNENLIST_LOG_TYPE,
   FREE_LOG_TYPES, FREE_SOURCE_MAP,
-  USAGE_LOG_TYPES, USAGE_SOURCE_MAP,
+  USAGE_LOG_TYPES, USAGE_SOURCE_MAP, USAGE_SOURCE_TO_CHANNEL,
   BAZAAR_ADD_LOG_TYPES, BAZAAR_REMOVE_LOG_TYPES, BAZAAR_SELL_LOG_TYPES,
   DISPLAY_ADD_LOG_TYPES, DISPLAY_REMOVE_LOG_TYPES,
   MARKET_ADD_LOG_TYPES, MARKET_REMOVE_LOG_TYPES, MARKET_SELL_LOG_TYPES,

@@ -100,6 +100,48 @@
   </div>
 </div>
 
+<!-- Manual consolidation modal — record a usage/gift/faction/museum outflow -->
+<datalist id="ldg-manual-items"></datalist>
+<div class="modal-backdrop" id="ldg-manual-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Manual outflow entry</h3>
+      <button class="btn gray" id="ldg-manual-close">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="dim" style="margin:0 0 12px">Record an item outflow not captured by a log (e.g. items used, sent, or given to faction). Also depletes FIFO cost lots.</p>
+      <div class="adj-row">
+        <label>Item <span class="dim">(name or id)</span></label>
+        <input type="text" id="ldg-manual-item" list="ldg-manual-items" placeholder="e.g. Xanax" autocomplete="off">
+      </div>
+      <div class="adj-row adj-cols">
+        <div>
+          <label>Quantity</label>
+          <input type="number" id="ldg-manual-qty" min="1" value="1" step="1">
+        </div>
+        <div>
+          <label>Type</label>
+          <select id="ldg-manual-channel">
+            <option value="usage">Consumed / Dumped / Lost</option>
+            <option value="gift">Sent / Given to player</option>
+            <option value="faction">Faction armory / OC</option>
+            <option value="museum">Museum swap</option>
+          </select>
+        </div>
+      </div>
+      <div class="adj-row">
+        <label>Note <span class="dim">(optional)</span></label>
+        <input type="text" id="ldg-manual-note" placeholder="e.g. Used for hospital recovery" maxlength="300">
+      </div>
+      <div class="adj-row" id="ldg-manual-msg" style="display:none"></div>
+      <div class="adj-foot">
+        <button class="btn" id="ldg-manual-submit">Record outflow</button>
+        <button class="btn gray" id="ldg-manual-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="warn" id="warn-key" style="display:none">
   ⚠️ Log source not configured. Create <b>inventory-monitor/.env</b> (copy from <b>.env.example</b>) and set
   <b>LOGS_SERVER</b> (hosted portfolio server), then restart.
@@ -290,12 +332,18 @@
         <option value="points_market">Points Market</option>
         <option value="shop">Shop</option>
         <option value="trade">Trade</option>
+        <option value="usage">Consumed</option>
+        <option value="gift">Gift / Sent</option>
+        <option value="faction">Faction</option>
+        <option value="museum">Museum</option>
       </select>
       <select id="ldg-side">
-        <option value="">Buy &amp; Sell</option>
+        <option value="">All sides</option>
         <option value="buy">Buy only</option>
         <option value="sell">Sell only</option>
+        <option value="use">Use only</option>
       </select>
+      <button class="btn gray sm" id="ldg-manual-btn" title="Record a manual outflow (used/sent/converted)">+ Manual Entry</button>
       <div class="ldg-date-group">
         <input type="date" id="ldg-from" title="From date">
         <span>–</span>

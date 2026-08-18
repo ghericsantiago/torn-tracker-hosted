@@ -222,23 +222,27 @@ CREATE TABLE IF NOT EXISTS fifo_lots (
 CREATE INDEX IF NOT EXISTS idx_fifo_lots_item_ts        ON fifo_lots (item_id, ts ASC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_fifo_lots_item_remaining ON fifo_lots (item_id, remaining_qty) WHERE remaining_qty > 0;
 
--- 17. Transaction ledger — every buy/sell across Item Market, Bazaar, Points Market, Shop, Trade.
---     log_id is null for trade-derived rows (one row per item, not one per sub-log).
+-- 17. Transaction ledger — every buy/sell/use across Item Market, Bazaar, Points Market, Shop, Trade,
+--     and usage outflows (consumed, sent, museum, faction, etc.).
+--     log_id is null for trade-derived rows and manual entries.
 CREATE TABLE IF NOT EXISTS transactions (
   id            bigserial   PRIMARY KEY,
   ts            bigint      NOT NULL,              -- unix ms
-  log_id        text,                              -- null for trade rows; unique when not null
+  log_id        text,                              -- null for trade rows / manual; unique when not null
   log_type      integer     NOT NULL,
-  channel       text        NOT NULL,              -- 'bazaar' | 'item_market' | 'points_market' | 'shop' | 'trade'
-  side          text        NOT NULL,              -- 'buy' | 'sell'
+  channel       text        NOT NULL,              -- 'bazaar'|'item_market'|'points_market'|'shop'|'trade'|'usage'|'gift'|'faction'|'museum'
+  side          text        NOT NULL,              -- 'buy' | 'sell' | 'use'
   item_id       text        NOT NULL,
   item_name     text        NOT NULL,
   item_category text,
   qty           bigint      NOT NULL DEFAULT 1,
   unit_price    bigint,
   total_price   bigint,
+  note          text,                              -- optional label for manual entries
   created_at    timestamptz NOT NULL DEFAULT NOW()
 );
+-- Migration: add note column if upgrading from earlier schema without it
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS note text;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_log_id ON transactions (log_id) WHERE log_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_transactions_ts      ON transactions (ts DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_item_id ON transactions (item_id);

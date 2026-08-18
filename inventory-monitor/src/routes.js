@@ -8,6 +8,7 @@
 
 const express = require('express');
 const C = require('./constants');
+const { fifoOut } = require('./ledger/fifo');
 
 function createRoutes({ state, catalog, summary, poller, db }) {
   const router = express.Router();
@@ -202,7 +203,7 @@ function createRoutes({ state, catalog, summary, poller, db }) {
 
       const [rowsResult, summaryResult] = await Promise.all([
         db.pool.query(
-          `SELECT id, ts, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price
+          `SELECT id, ts, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price, note
            FROM transactions ${where} ORDER BY ts DESC, id DESC LIMIT $${p}`,
           [...params, limit + 1]
         ),
@@ -233,6 +234,7 @@ function createRoutes({ state, catalog, summary, poller, db }) {
           qty: Number(r.qty),
           unitPrice: r.unit_price != null ? Number(r.unit_price) : null,
           totalPrice: r.total_price != null ? Number(r.total_price) : null,
+          note: r.note || null,
         })),
         summary: {
           totalSpent:   Number(s.total_spent),
@@ -242,6 +244,62 @@ function createRoutes({ state, catalog, summary, poller, db }) {
         },
         nextCursor,
         hasMore,
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // Manual consolidation — create an outflow transaction (use/gift/faction/museum)
+  // without a corresponding log. Also depletes FIFO lots for the item.
+  // Body: { item, qty, channel, note? }
+  const VALID_USE_CHANNELS = new Set(['usage', 'gift', 'faction', 'museum']);
+  router.post('/api/transactions/manual', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const r = catalog.resolveItemId(body.item);
+      if (r.error) return res.status(400).json({ ok: false, error: r.error });
+      const itemId = String(r.id);
+
+      const channel = VALID_USE_CHANNELS.has(body.channel) ? body.channel : 'usage';
+      const qty     = Math.floor(Number(body.qty));
+      if (!Number.isFinite(qty) || qty <= 0)
+        return res.status(400).json({ ok: false, error: 'qty must be a positive number.' });
+
+      const note = String(body.note || '').trim().slice(0, 300) || null;
+      const ts   = Date.now();
+      const itemName = catalog.itemName(itemId) || itemId;
+      const category = catalog.itemCategory(itemId) || null;
+
+      // Insert transaction row (log_id = null → manual, no conflict check needed)
+      const ins = await db.pool.query(
+        `INSERT INTO transactions (ts, log_id, log_type, channel, side, item_id, item_name, item_category, qty, unit_price, total_price, note)
+         VALUES ($1, NULL, 0, $2, 'use', $3, $4, $5, $6, NULL, NULL, $7) RETURNING id`,
+        [ts, channel, itemId, itemName, category, qty, note]
+      );
+
+      // Deplete FIFO lots — track only newly-dirtied IDs so we can flush them immediately
+      const prevDirty = new Set(state.fifo.dirtyIds);
+      fifoOut(itemId, qty, state);
+      const newlyDirty = [...state.fifo.dirtyIds].filter(id => !prevDirty.has(id));
+      for (const id of newlyDirty) {
+        let remaining = 0;
+        outer: for (const lots of state.fifo.lots.values()) {
+          for (const lot of lots) {
+            if (lot.id === id) { remaining = lot.remaining; break outer; }
+          }
+        }
+        await db.pool.query('UPDATE fifo_lots SET remaining_qty = $1 WHERE id = $2', [remaining, id]);
+        state.fifo.dirtyIds.delete(id);
+      }
+
+      res.json({
+        ok: true,
+        transaction: {
+          id: Number(ins.rows[0].id), ts, channel, side: 'use',
+          itemId, itemName, itemCategory: category || '', qty,
+          unitPrice: null, totalPrice: null, note,
+        },
       });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });

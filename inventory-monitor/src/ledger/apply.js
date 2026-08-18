@@ -17,7 +17,7 @@ const { logBazaarFlows, logDisplayFlows, logMarketFlows } = require('./locations
 const { createTrade } = require('./trade');
 const { logMuseumSwap } = require('./museum');
 const { fifoIn, fifoOut } = require('./fifo');
-const { logTransactionEvent } = require('./transactions');
+const { logTransactionEvent, logUsageTransactionEvents } = require('./transactions');
 
 function createApplyLog({ catalog, config }) {
   const logFlows = createLogFlows({ catalog });
@@ -228,11 +228,15 @@ function createApplyLog({ catalog, config }) {
     bzFlows.forEach(f => { if (f.kind === 'Sold') fifoOut(f.itemId, f.qty, state); });
     mktFlows.forEach(f => { if (f.kind === 'Sold') fifoOut(f.itemId, f.qty, state); });
 
-    // 8. Transaction ledger — record buy/sell money flows for the Ledger tab
+    // 8. Transaction ledger — record buy/sell money flows and usage outflows
     //    Trade transactions are deferred to finalizeNewTrades() in trade-fifo.js
     const tx = logTransactionEvent(log, catalog);
     if (tx) {
       state.transactions.push({ ts, logId: log.id ?? null, logType, ...tx });
+    }
+    for (const utx of logUsageTransactionEvents(log, catalog)) {
+      const { logId, ...rest } = utx;
+      state.transactions.push({ ts, logId: logId ?? null, logType, ...rest });
     }
 
     return flows.length + bzFlows.length + dispFlows.length + mktFlows.length;
