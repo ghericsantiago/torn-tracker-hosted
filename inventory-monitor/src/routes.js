@@ -306,12 +306,29 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
     }
   });
 
-  // On-demand FIFO reconciliation — closes any gap between FIFO remaining totals and
-  // inventory net (log ledger + manual adjustments). Same logic as the auto-run after each
-  // poll, but flushes to DB immediately so the caller sees consistent data right away.
+  // On-demand FIFO reconciliation. Body: { reset?: boolean }
+  //   reset=true: first removes all existing Reconciliation source lots from DB and
+  //   memory (clean slate), then runs the reconciler so it recreates them from buy history.
   router.post('/api/fifo/reconcile', async (req, res) => {
     if (!reconcileFifo) return res.status(503).json({ ok: false, error: 'Reconciler not available.' });
     try {
+      const reset = !!(req.body && req.body.reset);
+      let lotsCleared = 0;
+
+      if (reset) {
+        // Remove all in-memory Reconciliation lots and delete them from DB
+        for (const [itemId, lots] of state.fifo.lots.entries()) {
+          const keep = lots.filter(l => l.source !== 'Reconciliation');
+          if (keep.length !== lots.length) {
+            state.fifo.lots.set(itemId, keep);
+            lotsCleared += lots.length - keep.length;
+          }
+        }
+        // Also remove any pending-insert Reconciliation lots (not yet in DB)
+        state.fifo.newLots = state.fifo.newLots.filter(l => l.source !== 'Reconciliation');
+        await db.pool.query(`DELETE FROM fifo_lots WHERE source = 'Reconciliation'`);
+      }
+
       const result = await reconcileFifo(state);
 
       // Flush new lots (INSERT) and dirty lots (UPDATE) immediately
@@ -346,7 +363,7 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
         client.release();
       }
 
-      res.json({ ok: true, ...result });
+      res.json({ ok: true, lotsCleared, ...result });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }
@@ -382,6 +399,32 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
           depleted: found.remaining === 0,
         },
       });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // Delete a single FIFO lot (e.g. an old $0 Reconciliation lot the user wants to replace).
+  // Removes from in-memory state and DB immediately.
+  router.delete('/api/fifo/lots/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: 'Invalid lot id.' });
+
+      let found = false;
+      for (const [itemId, lots] of state.fifo.lots.entries()) {
+        const idx = lots.findIndex(l => l.id === id);
+        if (idx !== -1) {
+          lots.splice(idx, 1);
+          state.fifo.dirtyIds.delete(id);
+          found = true;
+          break;
+        }
+      }
+      // Also remove from newLots (lot not yet persisted — may have null id, skip)
+      state.fifo.newLots = state.fifo.newLots.filter(l => l.id !== id);
+      await db.pool.query('DELETE FROM fifo_lots WHERE id = $1', [id]);
+      res.json({ ok: true, found });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }

@@ -840,15 +840,17 @@ async function showFifoPop(cell) {
           <td class="r ${l.depleted ? 'dim' : 'green'}">${fmtQty(l.remaining)}</td>
           <td class="r gold fifo-cost-cell" data-cost="${l.unitCost}">${fmt$(l.unitCost)}<button class="fifo-edit-btn" title="Edit unit cost">✎</button></td>
           <td class="r fifo-lot-value">${fmt$(l.lotValue)}</td>
+          <td>${l.source === 'Reconciliation' ? `<button class="fifo-del-btn" data-lot-id="${l.id}" title="Delete this reconciliation lot">×</button>` : ''}</td>
         </tr>`;
         }).join('')
-      : '<tr><td colspan="6" class="empty">No FIFO lots yet.</td></tr>';
+      : '<tr><td colspan="7" class="empty">No FIFO lots yet.</td></tr>';
     $('fifo-pop-foot').innerHTML = summary.totalRemaining > 0
       ? `<tr class="fifo-summary">
           <td colspan="3"><strong>Total</strong></td>
           <td class="r green"><strong>${fmtQty(summary.totalRemaining)}</strong></td>
           <td class="r gold"><strong>${fmt$(summary.avgCost)}</strong></td>
           <td class="r"><strong>${fmt$(summary.costBasis)}</strong></td>
+          <td></td>
         </tr>` : '';
 
     const pop = $('fifo-pop');
@@ -877,11 +879,29 @@ async function refreshFifoPopFoot(itemId) {
           <td class="r green"><strong>${fmtQty(summary.totalRemaining)}</strong></td>
           <td class="r gold"><strong>${fmt$(summary.avgCost)}</strong></td>
           <td class="r"><strong>${fmt$(summary.costBasis)}</strong></td>
+          <td></td>
         </tr>` : '';
   } catch (e) { /* silent */ }
 }
 
-$('fifo-pop-body').addEventListener('click', e => {
+$('fifo-pop-body').addEventListener('click', async e => {
+  const delBtn = e.target.closest('.fifo-del-btn');
+  if (delBtn) {
+    e.stopPropagation();
+    const lotId = Number(delBtn.dataset.lotId);
+    if (!confirm('Delete this Reconciliation lot? The gap will be refilled on the next Reconcile.')) return;
+    delBtn.disabled = true;
+    try {
+      const r = await fetch(`/admin/inventory/api/fifo/lots/${lotId}`, { method: 'DELETE' });
+      const d = await r.json();
+      if (d.ok) {
+        delBtn.closest('tr').remove();
+        await refreshFifoPopFoot(fifoPop.itemId);
+      } else { alert('Delete failed: ' + (d.error || 'unknown')); delBtn.disabled = false; }
+    } catch (err) { alert('Error: ' + err.message); delBtn.disabled = false; }
+    return;
+  }
+
   const btn = e.target.closest('.fifo-edit-btn');
   if (!btn) return;
   e.stopPropagation();
@@ -938,12 +958,17 @@ $('fifo-reconcile-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Reconciling…';
   try {
-    const r = await fetch('/admin/inventory/api/fifo/reconcile', { method: 'POST' });
+    const r = await fetch('/admin/inventory/api/fifo/reconcile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset: true }),
+    });
     const d = await r.json();
     if (d.ok) {
+      const cleared = d.lotsCleared > 0 ? `, cleared ${d.lotsCleared} old lot(s)` : '';
       const msg = d.itemsAffected > 0
-        ? `Reconciled ${d.itemsAffected} item(s): +${d.unitsCreated} created, −${d.unitsDepleted} depleted`
-        : 'FIFO already in sync — nothing to reconcile';
+        ? `Reconciled ${d.itemsAffected} item(s): +${d.unitsCreated} created, −${d.unitsDepleted} depleted${cleared}`
+        : `FIFO already in sync${cleared}`;
       alert(msg);
       await load();
     } else {

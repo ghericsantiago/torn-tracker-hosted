@@ -80,6 +80,9 @@
   .fifo-edit-save, .fifo-edit-cancel { background: none; border: none; cursor: pointer; font-size: 12px; padding: 0 3px; }
   .fifo-edit-save { color: #6ec97a; }
   .fifo-edit-cancel { color: #e87878; }
+  .fifo-del-btn { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 13px; padding: 0 3px; opacity: 0; transition: opacity .15s; }
+  tr:hover .fifo-del-btn { opacity: 1; }
+  .fifo-del-btn:hover { color: #e87878; }
   .col-avgcost { color: var(--gold2); }
   .col-costbasis { color: var(--dim2); font-size: 11px; }
 
