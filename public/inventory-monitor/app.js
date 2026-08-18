@@ -264,7 +264,9 @@ function renderInventory(q) {
     it => {
       const mismatchMark = it.fifoMismatch ? `<span class="fifo-mismatch-dot" title="FIFO total doesn't match inventory net — click Reconcile FIFO to fix">⚠</span>` : '';
       const avgCostCell = it.avgCost != null
-        ? `<td class="r fifo-cell col-avgcost" data-fifo-item="${it.id}" title="Click to see FIFO lots">${fmt$(it.avgCost)}${mismatchMark}</td>`
+        ? it.avgCostEstimated
+          ? `<td class="r fifo-cell col-avgcost col-avgcost-est" data-fifo-item="${it.id}" title="Estimated from recent buy history (no active FIFO lots) — click Reconcile FIFO to create exact lots">~${fmt$(it.avgCost)}${mismatchMark}</td>`
+          : `<td class="r fifo-cell col-avgcost" data-fifo-item="${it.id}" title="Click to see FIFO lots">${fmt$(it.avgCost)}${mismatchMark}</td>`
         : `<td class="r dim col-avgcost">—${mismatchMark}</td>`;
       const costBasisCell = it.costBasis > 0
         ? `<td class="r col-costbasis dim">${fmt$(it.costBasis)}</td>`

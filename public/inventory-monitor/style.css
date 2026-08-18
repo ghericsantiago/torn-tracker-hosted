@@ -84,6 +84,7 @@
   tr:hover .fifo-del-btn { opacity: 1; }
   .fifo-del-btn:hover { color: #e87878; }
   .col-avgcost { color: var(--gold2); }
+  .col-avgcost-est { color: var(--dim2); font-style: italic; }
   .col-costbasis { color: var(--dim2); font-size: 11px; }
 
   /* Ledger tab */

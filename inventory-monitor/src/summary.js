@@ -167,12 +167,46 @@ function createSummary({ state, catalog, config }) {
         const active         = lots.filter(l => l.remaining > 0);
         const totalRemaining = active.reduce((s, l) => s + l.remaining, 0);
         const totalCost      = active.reduce((s, l) => s + l.remaining * l.unitCost, 0);
+        const trueNet        = Math.max(0, it.net);
         // fifoMismatch: FIFO remaining doesn't equal the adjusted inventory net
         // (it.net already includes manual adjustments from itemsById above)
-        const fifoMismatch   = totalRemaining !== Math.max(0, it.net);
+        const fifoMismatch   = totalRemaining !== trueNet;
+
+        // avgCost: use active lots when available; fall back to an estimate when
+        // all lots are depleted but inventory is non-zero (same logic as reconciler):
+        //   1. Walk in-session depleted lots (newest first, unit_cost > 0) for a
+        //      weighted estimate matching actual recent purchase prices.
+        //   2. Fall back to lastKnownCost if no in-session history available.
+        let avgCost = null;
+        let avgCostEstimated = false;
+        if (totalRemaining > 0) {
+          avgCost = Math.round(totalCost / totalRemaining);
+        } else if (trueNet > 0) {
+          // Try in-session depleted lots (newest first) — mirrors reconciler pricing
+          const depleted = lots.filter(l => l.remaining === 0 && l.unitCost > 0)
+                               .slice().reverse(); // lots stored oldest-first; reverse = newest-first
+          let estCost = 0, estUnits = 0, need = trueNet;
+          for (const l of depleted) {
+            if (need <= 0) break;
+            const take = Math.min(need, l.totalQty);
+            estCost  += take * l.unitCost;
+            estUnits += take;
+            need     -= take;
+          }
+          if (estUnits > 0) {
+            avgCost = Math.round(estCost / estUnits);
+            avgCostEstimated = true;
+          } else {
+            // No in-session depleted lots with price — use lastKnownCost as proxy
+            const lkc = state.fifo.lastKnownCost.get(String(it.id));
+            if (lkc > 0) { avgCost = lkc; avgCostEstimated = true; }
+          }
+        }
+
         return {
           ...it,
-          avgCost:      totalRemaining > 0 ? Math.round(totalCost / totalRemaining) : null,
+          avgCost,
+          avgCostEstimated,
           costBasis:    totalCost,
           fifoLots:     active.length,
           fifoMismatch,
