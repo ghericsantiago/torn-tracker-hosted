@@ -489,6 +489,7 @@ function renderTransfers(q) {
 }
 
 async function load() {
+  hoverCache.clear();
   try {
     const r = await fetch('/admin/inventory/api/state');
     state = await r.json();
@@ -507,7 +508,7 @@ async function load() {
 const hoverCache = new Map();
 let hoverPopVisible = false;
 let hoverPopCell = null;   // the cell the open popup belongs to
-function renderPop(title, rows) {
+function renderPop(title, rows, truncated) {
   $('hover-pop-title-text').textContent = title;
   $('hover-pop-body').innerHTML = rows.length ? rows.map(e => `
     <tr>
@@ -516,7 +517,9 @@ function renderPop(title, rows) {
       <td class="dim">${esc(e.cat || '')}${e.type != null ? ` <span class="dim2">#${e.type}</span>` : ''}</td>
       <td class="r">${e.sign ? e.sign : ''}${fmtQty(e.qty)}</td>
     </tr>`).join('')
-    : '<tr><td colspan="4" class="empty">Nothing to show yet.</td></tr>';
+    : truncated
+      ? '<tr><td colspan="4" class="empty">Records outside rolling history window.</td></tr>'
+      : '<tr><td colspan="4" class="empty">Nothing to show yet.</td></tr>';
 }
 function positionPop(cell) {
   const pop = $('hover-pop');
@@ -537,14 +540,18 @@ async function showHoverPop(cell) {
     try {
       const qs = `itemId=${encodeURIComponent(itemId)}&dir=${dir}${source ? '&source=' + encodeURIComponent(source) : ''}&limit=100`;
       const r = await fetch('/admin/inventory/api/item-events?' + qs);
-      hoverCache.set(key, (await r.json()).events || []);
-    } catch { hoverCache.set(key, []); }
+      const d = await r.json();
+      hoverCache.set(key, { events: d.events || [], truncated: !!d.truncated });
+    } catch { hoverCache.set(key, { events: [], truncated: false }); }
   }
-  const events = hoverCache.get(key);
+  const cached = hoverCache.get(key);
+  const events = cached.events;
+  const truncated = cached.truncated;
   const name = (cell.closest('tr') && cell.closest('tr').querySelector('.item') || {}).textContent || itemId;
   const title = source || (dir === 'both' ? 'History' : (dir === 'in' ? 'IN' : 'OUT'));
   renderPop(`${title} · ${name} · ${events.length} event${events.length === 1 ? '' : 's'}`,
-    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : '−' })));
+    events.map(e => ({ ts: e.ts, label: e.source, cat: e.category, type: e.logType, qty: e.qty, sign: (e.dir || dir) === 'in' ? '+' : '−' })),
+    truncated);
   positionPop(cell);
 }
 // Transfers tab: route-count tile → list of transfers for that route (client-side data)

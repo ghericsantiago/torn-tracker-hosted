@@ -16,6 +16,7 @@ const C = require('../../constants');
 
 const MODULES = [
   require('./buy-sell'),
+  require('./ammo'),
   require('./trade-items'),
   require('./museum-swap'),
   require('./blood-bag'),
@@ -45,6 +46,7 @@ function createLogFlows({ catalog }) {
   // inventory flows — trade money/anchor/property, location sells — are expected gaps).
   const NO_FLOW_TYPES = new Set([
     4430, 4440, 4441, 4450, 4451,          // trade sub-logs → grouping only (ledger/trade.js)
+    4520,                                  // Ammo priority — preference only, no inventory flow
     ...C.BAZAAR_SELL_LOG_TYPES,            // 1221/1226 → bazaar ledger only
     ...C.MARKET_SELL_LOG_TYPES,            // 1104/1113 → market ledger only
   ]);

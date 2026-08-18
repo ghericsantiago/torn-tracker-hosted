@@ -53,7 +53,14 @@ function createRoutes({ state, catalog, summary, poller, db }) {
         .forEach(a => events.push({ ts: a.ts, source: `Manual: ${a.label || 'Manual'}`, qty: a.qty, category: 'Manual', logType: null, dir: a.dir }));
       events.sort(dir === 'both' ? ((x, y) => x.ts - y.ts) : ((x, y) => y.ts - x.ts));
     }
-    res.json({ events: events.slice(0, limit) });
+    const sliced = events.slice(0, limit);
+    // Detect when totals exist but all activity records were evicted from the rolling window.
+    let truncated = false;
+    if (sliced.length === 0 && !source) {
+      const it = state.items[itemId];
+      if (it && (dir === 'both' ? (it.in > 0 || it.out > 0) : it[dir] > 0)) truncated = true;
+    }
+    res.json({ events: sliced, truncated });
   });
 
   // Paginated activity feed — merges log activity + manual adjustments, newest first.

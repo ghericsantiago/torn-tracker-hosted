@@ -177,12 +177,18 @@ const MARKET_ADD_LOG_TYPES    = new Set([1100, 1110]);
 const MARKET_REMOVE_LOG_TYPES = new Set([1101, 1111]);
 const MARKET_SELL_LOG_TYPES   = new Set([1104, 1113]);
 
+// ── Ammo market ──────────────────────────────────────────────
+// 4500 = Ammo buy (in), 4510 = Ammo sell (out). 4520 (Ammo priority) has no inventory flow.
+const AMMO_BUY_LOG_TYPES  = new Set([4500]);
+const AMMO_SELL_LOG_TYPES = new Set([4510]);
+
 // ── Aggregates ───────────────────────────────────────────────
 // Every log type the monitor cares about — requested from the hosted log server
 // (the server filters by these types, so all flows stay complete).
 const ALL_LOG_TYPES = new Set();
 [BUY_LOG_TYPES, SELL_LOG_TYPES, POINTS_LOG_TYPES, POINTS_MARKET_ADD_LOG_TYPES, POINTS_MARKET_REMOVE_LOG_TYPES,
  POINT_USAGE_LOG_TYPES, TRADE_SUB_LOG_TYPES, FREE_LOG_TYPES, USAGE_LOG_TYPES,
+ AMMO_BUY_LOG_TYPES, AMMO_SELL_LOG_TYPES,
  BAZAAR_ADD_LOG_TYPES, BAZAAR_REMOVE_LOG_TYPES, BAZAAR_SELL_LOG_TYPES,
  DISPLAY_ADD_LOG_TYPES, DISPLAY_REMOVE_LOG_TYPES,
  MARKET_ADD_LOG_TYPES, MARKET_REMOVE_LOG_TYPES, MARKET_SELL_LOG_TYPES]
@@ -201,6 +207,7 @@ const LOCATION_LEDGER_SOURCES = new Set([
 
 module.exports = {
   BUY_LOG_TYPES, SELL_LOG_TYPES, POINTS_LOG_TYPES,
+  AMMO_BUY_LOG_TYPES, AMMO_SELL_LOG_TYPES,
   POINTS_MARKET_ADD_LOG_TYPES, POINTS_MARKET_REMOVE_LOG_TYPES,
   POINT_USAGE_LOG_TYPES, POINT_USAGE_SOURCE,
   TRADE_OUT_LOG_TYPES, TRADE_IN_LOG_TYPES, TRADE_SUB_LOG_TYPES,
