@@ -51,7 +51,7 @@ async function mount(app) {
 
   const logClient = createLogClient(config);
   const ledger    = createLedger({ catalog, config });
-  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog });
+  const poller    = createPoller({ config, state, db, logClient, applyLog: ledger.applyLog, finalizeNewTrades: ledger.finalizeNewTrades });
   const summary   = createSummary({ state, catalog, config });
 
   // Serve static frontend files at /admin/inventory (before the API router so
