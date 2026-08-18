@@ -125,6 +125,16 @@ See `GAME_MECHANICS.md` §11 for the full loan lifecycle.
 Usage log groups + sources: see `ITEM_EXTRACTION.md` §6 (Consumed, Dumped, Parceled, Sent,
 Faction…, OC Spent, Crime Spent/Loss, Relic Perish, Staff Removal).
 
+**Ledger tracking:** all `USAGE_LOG_TYPES` now also emit `side: 'use'` transaction records
+in the Ledger tab (via `logUsageTransactionEvents` in `src/ledger/transactions.js`). Channel
+is derived from `USAGE_SOURCE_TO_CHANNEL` in `src/constants.js`:
+- `usage` — Consumed, Dumped, Crime Loss/Spent, Relic Perish, Staff Removal
+- `gift` — Sent (4100/4102/4104), Parceled (4000), Faction Given (6732), Faction Payout (6796)
+- `faction` — Faction Armory deposit/claim (6725/6728/6750), Loan Return (6747), OC Spent (6768/6769)
+- `museum` — Museum Swap (7000)
+
+These rows carry `total_price = null` (no monetary value) and do not affect the running balance.
+
 ### Base rule (pure consumption)
 
 - Default: **`out`** of `data.item`, qty `data.quantity || 1` (e.g. the 2xxx Consumed ids in
@@ -134,6 +144,8 @@ Faction…, OC Spent, Crime Spent/Loss, Relic Perish, Staff Removal).
 
 - **If `data.faction != 0`** on a `Consumed` log: the item came from the faction armory →
   **no inventory flow** for the player (tracked separately as armory use).
+- Same exclusion applies in `logUsageTransactionEvents` — no ledger row is emitted for
+  armory-consumed items.
 - `faction == 0` (or absent) → normal `out` flow from own inventory.
 
 ### Transformations (net effect)

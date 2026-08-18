@@ -338,8 +338,9 @@ Each swap logs `data.points_received` (museum points earned, e.g. 1000× Plushie
 
 ## 4i. Ledger tab (FIFO cost accounting)
 
-The **Ledger** tab (9th tab, after Market) records every buy and sell as a **transaction**
-and tracks item cost using a **FIFO lot** model (implemented in `src/ledger/`):
+The **Ledger** tab (9th tab, after Market) records every buy, sell, and item outflow
+as a **transaction** and tracks item cost using a **FIFO lot** model (implemented in
+`src/ledger/`):
 
 - **FIFO lots** (`src/ledger/fifo.js` — `fifoIn` / `fifoOut`) are created on acquisition
   (BUY_LOG_TYPES, FREE_LOG_TYPES, TRADE_IN, AMMO_BUY, POINTS_LOG_TYPES, VIRUS_COMPLETE,
@@ -349,15 +350,35 @@ and tracks item cost using a **FIFO lot** model (implemented in `src/ledger/`):
   FIFO tracks **ownership** (not location) — stocking to bazaar/market does not deplete lots.
   Points use pseudo item_id `__points__`; FIFO OUT fires at 5000 (listing), FIFO IN at 5001
   (cancelled — points returned).
-- **Transaction records** (`src/ledger/transactions.js` — `logTransactionEvent`) are emitted
-  for buy/sell logs mapped in `TRANSACTION_CHANNEL_MAP`. Each record carries: ts, log_id,
-  log_type, channel, side (buy/sell), item_id, item_name, item_category, qty, unit_price,
-  total_price.
+- **Buy/sell transaction records** (`src/ledger/transactions.js` — `logTransactionEvent`)
+  are emitted for buy/sell logs mapped in `TRANSACTION_CHANNEL_MAP`. Each record carries:
+  ts, log_id, log_type, channel, side (`buy`|`sell`), item_id, item_name, item_category, qty,
+  unit_price, total_price, note (null for auto-tracked rows).
+- **Usage outflow records** (`src/ledger/transactions.js` — `logUsageTransactionEvents`)
+  are emitted for all `USAGE_LOG_TYPES`. These carry `side = 'use'` and `total_price = null`
+  (no monetary value). The channel is derived from `USAGE_SOURCE_TO_CHANNEL` (in
+  `src/constants.js`):
+  - `usage` — Consumed, Dumped, Crime Loss/Spent, Relic Perish, Staff Removal
+  - `gift` — Sent to player (4100/4102/4104), Parceled, Faction Given, Faction Payout
+  - `faction` — Faction Armory deposit/claim (6725/6728/6750), Loan Return (6747), OC Spent
+  - `museum` — Museum Swap (7000)
+  - Armory-faction-use exclusion is preserved (source=Consumed && data.faction → skipped).
+  - Multi-item usage logs (where `extractFreeItems` returns >1 item) get `log_id = null`
+    to avoid unique-index conflicts; single-item logs use the real log id.
+- **Manual consolidation** (`POST /api/transactions/manual`) — create a `side: use` outflow
+  entry manually (for items used/given/converted without a captured log). Accepts `{item, qty,
+  channel, note?}`. Immediately depletes FIFO lots in-memory and flushes dirty lot updates to
+  the DB; no poll required. The "+ Manual Entry" button in the Ledger filter bar opens a modal
+  for this.
 - **Ledger tab UI:** 4 stat tiles (Total Spent / Total Revenue / Net P&L / Tx Count), filter
-  bar (item name search, category, channel, buy/sell side, date range, preset buttons Today /
-  7D / 30D / All), paginated table with day-separator rows showing daily debit/credit totals,
-  a running balance column, and channel-colored source badges (bazaar=amber, item_market=blue,
-  points_market=purple, shop=gray, trade=teal).
+  bar (item name search, category, channel [now includes usage/gift/faction/museum], side
+  [buy/sell/use], date range, preset buttons Today / 7D / 30D / All), paginated table with
+  day-separator rows showing daily debit/credit totals, a running balance column, and
+  channel-colored source badges:
+  - bazaar=amber, item_market=blue, points_market=purple, shop=gray, trade=teal
+  - usage=red, gift=purple, faction=green, museum=gold
+  - `side: use` rows are dimmed (`.ldg-use-row`) and show a `×qty` label; manual entries
+    with a `note` show a gold dot tooltip on the item name.
 
 ## 5. Persistence — PostgreSQL (`schema.sql`)
 
@@ -383,7 +404,7 @@ view, rebuilt continuously from polls). Schema applied idempotently at startup:
 | `museum_meta` | single row: total `points_received` | Σ swap points |
 | `manual_adjustments` | manual reconcile records (item_id, **scope**, dir, qty, label, note) — separate layer, replayed at read time per scope, never merged into item totals. `scope` = `inventory` \| `bazaar` \| `display` \| `market` (default `inventory`) | user-added only |
 | `fifo_lots` | append-only FIFO cost lots: `item_id`, `ts`, `log_id` (nullable), `total_qty`, `remaining_qty`, `unit_cost`, `source` | Indexes: `(item_id, ts, id)` for ordered scan; partial `(item_id, remaining_qty WHERE remaining_qty > 0)` for active lot lookup |
-| `transactions` | ledger records: `ts`, `log_id` (partial unique WHERE NOT NULL), `log_type`, `channel`, `side`, `item_id`, `item_name`, `item_category`, `qty`, `unit_price`, `total_price` | Powers `/api/transactions` |
+| `transactions` | ledger records: `ts`, `log_id` (partial unique WHERE NOT NULL), `log_type`, `channel` (`bazaar`\|`item_market`\|`points_market`\|`shop`\|`trade`\|`usage`\|`gift`\|`faction`\|`museum`), `side` (`buy`\|`sell`\|`use`), `item_id`, `item_name`, `item_category`, `qty`, `unit_price`, `total_price`, `note` (nullable, for manual entries) | Powers `/api/transactions`. `note` column added via `ALTER TABLE … ADD COLUMN IF NOT EXISTS` migration in schema.sql |
 
 How it's written (all in one transaction per poll):
 
@@ -407,7 +428,8 @@ How it's written (all in one transaction per poll):
 | `DELETE /api/adjust/:id` | Remove a manual adjustment (reverts its effect) |
 | `POST /api/poll` | Trigger an immediate poll (returns `{ok, processed, state}`) |
 | `POST /api/reset` | Clear tracked data (incl. manual adjustments) and restart from the monitor start time |
-| `GET /api/transactions` | Paginated transaction ledger (keyset cursor `<ts>:<id>`). Filters: `item_id`, `category`, `channel`, `side`, `from_ts`, `to_ts`, `q` (item name search). Returns `{ rows[], summary: { totalSpent, totalRevenue, txCount, itemCount } }` |
+| `GET /api/transactions` | Paginated transaction ledger (keyset cursor `<ts>:<id>`). Filters: `item_id`, `category`, `channel` (now includes `usage`\|`gift`\|`faction`\|`museum`), `side` (`buy`\|`sell`\|`use`), `from_ts`, `to_ts`, `q` (item name search). Rows include `note` field. Returns `{ rows[], summary: { totalSpent, totalRevenue, txCount, itemCount } }` |
+| `POST /api/transactions/manual` | Create a manual outflow transaction. Body: `{item, qty, channel: 'usage'\|'gift'\|'faction'\|'museum', note?}`. Inserts a `side:'use'` transaction row, immediately depletes FIFO lots in-memory and flushes dirty lot updates to DB. Returns `{ok, transaction}` |
 | `GET /api/fifo/lots/:itemId` | All FIFO lots for an item (active + depleted) + summary `{ totalRemaining, avgCost, costBasis }` |
 
 > **Manual adjustments (reconcile):** the **＋ Adjust** button (header) opens a modal with two
