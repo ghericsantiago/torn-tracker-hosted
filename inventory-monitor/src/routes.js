@@ -22,7 +22,7 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
   // (those live in their own tabs) — only inventory-ledger flows compose the Monitor
   // IN/OUT + Inventory numbers. With `source=` it filters to exactly that source (used by
   // the Bazaar/Display/Market tabs' Added/Sold/Removed columns).
-  router.get('/api/item-events', (req, res) => {
+  router.get('/api/item-events', async (req, res) => {
     const itemId = String(req.query.itemId || '');
     const dir    = req.query.dir === 'both' ? 'both' : (req.query.dir === 'in' ? 'in' : 'out');
     const source = req.query.source ? String(req.query.source) : null;
@@ -46,22 +46,45 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
       .filter(a => a.itemId === itemId && (dir === 'both' || a.dir === dir)
         && (source ? a.source === source : !C.LOCATION_LEDGER_SOURCES.has(a.source)))
       .slice(0, limit)
-      .map(a => ({ ts: a.ts, source: a.source, qty: a.qty, category: a.category || '', logType: a.logType, dir: a.dir, unitCost: a.unitCost ?? null }));
+      .map(a => ({ ts: a.ts, logId: a.logId ?? null, source: a.source, qty: a.qty, category: a.category || '', logType: a.logType, dir: a.dir, unitCost: a.unitCost ?? null }));
     // Manual adjustments for this item+direction (inventory-level, so only when no source filter)
     if (!source) {
       state.adjustments
         .filter(a => a.itemId === itemId && (dir === 'both' || a.dir === dir))
-        .forEach(a => events.push({ ts: a.ts, source: `Manual: ${a.label || 'Manual'}`, qty: a.qty, category: 'Manual', logType: null, dir: a.dir }));
+        .forEach(a => events.push({ ts: a.ts, logId: null, source: `Manual: ${a.label || 'Manual'}`, qty: a.qty, category: 'Manual', logType: null, dir: a.dir, unitCost: null }));
       events.sort(dir === 'both' ? ((x, y) => x.ts - y.ts) : ((x, y) => y.ts - x.ts));
     }
     const sliced = events.slice(0, limit);
+
+    // Enrich events that are missing unitCost by looking up the transactions table.
+    // Activity records loaded from DB don't carry unit_cost; transactions does.
+    const missingLogIds = sliced
+      .filter(e => e.unitCost === null && e.logId !== null && e.dir === 'in')
+      .map(e => e.logId);
+    if (missingLogIds.length > 0) {
+      try {
+        const rows = await db.pool.query(
+          `SELECT log_id, unit_price FROM transactions
+           WHERE item_id = $1 AND side = 'buy' AND log_id = ANY($2)`,
+          [itemId, missingLogIds]
+        );
+        const priceByLogId = new Map(rows.rows.map(r => [r.log_id, Number(r.unit_price)]));
+        for (const e of sliced) {
+          if (e.unitCost === null && e.logId !== null && priceByLogId.has(e.logId)) {
+            e.unitCost = priceByLogId.get(e.logId);
+          }
+        }
+      } catch { /* non-fatal — price enrichment is best-effort */ }
+    }
+
     // Detect when totals exist but all activity records were evicted from the rolling window.
     let truncated = false;
     if (sliced.length === 0 && !source) {
       const it = state.items[itemId];
       if (it && (dir === 'both' ? (it.in > 0 || it.out > 0) : it[dir] > 0)) truncated = true;
     }
-    res.json({ events: sliced, truncated });
+    // Strip internal logId before sending to client
+    res.json({ events: sliced.map(({ logId, ...rest }) => rest), truncated });
   });
 
   // Paginated activity feed — merges log activity + manual adjustments, newest first.
