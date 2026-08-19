@@ -582,8 +582,8 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   .stat-value { font-size: 1.35rem; }
   .stat-label { font-size: 0.65rem; }
 
-  /* Nav: hide "View Client" link, keep Settings + Logout */
-  .nav-right a.btn { display: none; }
+  /* Nav: hide "View Client" link on mobile, keep Inventory Monitor + Settings + Logout */
+  .nav-right a.btn.mobile-hide { display: none; }
   .nav { padding: 0 0.85rem; }
   .nav-inner { height: 50px; }
 
