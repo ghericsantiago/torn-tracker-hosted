@@ -122,6 +122,19 @@
     .cat-chevron { font-size: 0.55rem; color: var(--text-muted); transition: transform 0.16s; flex-shrink: 0; pointer-events: none; }
     .cat-section.open .cat-chevron { transform: rotate(180deg); }
 
+    .drag-handle { font-size: 1rem; color: var(--text-muted); cursor: grab; flex-shrink: 0; padding: 0 0.1rem; line-height: 1; user-select: none; }
+    .drag-handle:active { cursor: grabbing; }
+    .cat-section.dragging { opacity: 0.45; }
+    .cat-section.drag-over > .cat-row { border-top: 2px solid var(--accent); }
+
+    .sort-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+    .sort-btn {
+      background: none; border: none; cursor: pointer; padding: 0 0.2rem;
+      font-size: 0.5rem; line-height: 1.2; color: var(--text-muted);
+      transition: color 0.12s; font-family: monospace;
+    }
+    .sort-btn:hover { color: var(--accent); }
+
     /* ── Item rows ──────────────────────────────────────────────────────── */
     .cat-items { display: none; }
     .cat-section.open .cat-items { display: block; }
@@ -334,6 +347,7 @@
         <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
         <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
         <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
+        <button class="btn btn-ghost btn-sm" id="resetOrderBtn" title="Reset to alphabetical order">Reset Order</button>
         <div class="toolbar-spacer"></div>
         <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
       </div>
@@ -365,8 +379,10 @@
 let globalPct  = null;
 let catPcts    = {};
 let catalog    = [];
+let catOrder   = [];   // display order — array of type strings
 let selections = new Map();
 let filterQ    = '';
+let dragSrc    = null; // drag-and-drop source type
 
 const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
 const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
@@ -476,6 +492,17 @@ async function loadCatalog() {
       }
     }
 
+    // Load / initialise category order
+    const defaultOrder = data.categories.map(c => c.type);
+    const saved = localStorage.getItem('trade-cat-order');
+    if (saved) {
+      const parsed = JSON.parse(saved).filter(t => defaultOrder.includes(t));
+      // append any new categories not yet in saved order
+      catOrder = [...parsed, ...defaultOrder.filter(t => !parsed.includes(t))];
+    } else {
+      catOrder = [...defaultOrder];
+    }
+
     renderCatalog();
     updateStats();
     document.getElementById('saveChangesBtn').disabled = false;
@@ -499,7 +526,11 @@ function renderCatalog() {
   body.innerHTML = '';
   const q = filterQ.toLowerCase();
 
-  for (const { type, items } of catalog) {
+  const orderedCatalog = [...catOrder]
+    .map(t => catalog.find(c => c.type === t))
+    .filter(Boolean);
+
+  for (const { type, items } of orderedCatalog) {
     const filtered = q
       ? items.filter(i => i.name.toLowerCase().includes(q) || type.toLowerCase().includes(q))
       : items;
@@ -517,8 +548,10 @@ function renderCatalog() {
     sec.className = 'cat-section' + (isOpen ? ' open' : '');
     sec.dataset.type = type;
 
+    sec.setAttribute('draggable', 'true');
     sec.innerHTML = `
       <div class="cat-row">
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
         <input type="checkbox" class="cat-check" ${catChecked ? 'checked' : ''}>
         <span class="cat-label">${esc(type)}</span>
         <span class="cat-tally"><span class="n-listed">${listedCount}</span>/${filtered.length}</span>
@@ -528,6 +561,10 @@ function renderCatalog() {
             value="${catPct != null ? catPct : ''}" placeholder="${globalPct != null ? pctFmt(globalPct) : '—'}"
             min="1" max="500" step="1" title="Category default margin (overrides global)">
           <span class="cat-pct-inherit">${catPct != null ? '' : '(global)'}</span>
+        </div>
+        <div class="sort-btns" onclick="event.stopPropagation()">
+          <button class="sort-btn" data-dir="-1" title="Move up">▲</button>
+          <button class="sort-btn" data-dir="1"  title="Move down">▼</button>
         </div>
         <span class="cat-chevron">▼</span>
       </div>
@@ -543,8 +580,28 @@ function renderCatalog() {
 
     // Expand/collapse
     sec.querySelector('.cat-row').addEventListener('click', e => {
-      if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-check')) return;
+      if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-check') ||
+          e.target.closest('.sort-btns') || e.target.closest('.drag-handle')) return;
       sec.classList.toggle('open');
+    });
+
+    // ▲▼ sort buttons
+    sec.querySelectorAll('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); moveCategory(type, parseInt(btn.dataset.dir)); });
+    });
+
+    // Drag-and-drop (desktop)
+    sec.addEventListener('dragstart', e => { dragSrc = type; sec.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    sec.addEventListener('dragend',   () => { dragSrc = null; sec.classList.remove('dragging'); document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('drag-over')); });
+    sec.addEventListener('dragover',  e => { e.preventDefault(); if (dragSrc && dragSrc !== type) sec.classList.add('drag-over'); });
+    sec.addEventListener('dragleave', () => sec.classList.remove('drag-over'));
+    sec.addEventListener('drop', e => {
+      e.preventDefault(); sec.classList.remove('drag-over');
+      if (!dragSrc || dragSrc === type) return;
+      const from = catOrder.indexOf(dragSrc);
+      const to   = catOrder.indexOf(type);
+      catOrder.splice(to, 0, catOrder.splice(from, 1)[0]);
+      saveCatOrder(); renderCatalog();
     });
 
     // Category % input — live update
@@ -694,6 +751,18 @@ function wireItemRows(sec, items, type) {
   }
 }
 
+/* ── Category sort ────────────────────────────────────────────────────── */
+function moveCategory(type, dir) {
+  const i = catOrder.indexOf(type);
+  const j = i + dir;
+  if (j < 0 || j >= catOrder.length) return;
+  [catOrder[i], catOrder[j]] = [catOrder[j], catOrder[i]];
+  saveCatOrder(); renderCatalog();
+}
+function saveCatOrder() {
+  localStorage.setItem('trade-cat-order', JSON.stringify(catOrder));
+}
+
 /* ── External functions (called from inline HTML) ─────────────────────── */
 window.clearOverride = function(itemId, e) {
   e.stopPropagation();
@@ -784,6 +853,10 @@ document.getElementById('expandAllBtn').addEventListener('click', () =>
   document.querySelectorAll('.cat-section').forEach(s => s.classList.add('open')));
 document.getElementById('collapseAllBtn').addEventListener('click', () =>
   document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('open')));
+document.getElementById('resetOrderBtn').addEventListener('click', () => {
+  catOrder = catalog.map(c => c.type).sort((a, b) => a.localeCompare(b));
+  saveCatOrder(); renderCatalog();
+});
 document.getElementById('catSearch').addEventListener('input', e => {
   filterQ = e.target.value.trim(); renderCatalog();
 });
