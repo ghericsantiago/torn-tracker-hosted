@@ -492,16 +492,14 @@ async function loadCatalog() {
       }
     }
 
-    // Load / initialise category order
+    // Load / initialise category order — server wins over localStorage
     const defaultOrder = data.categories.map(c => c.type);
-    const saved = localStorage.getItem('trade-cat-order');
-    if (saved) {
-      const parsed = JSON.parse(saved).filter(t => defaultOrder.includes(t));
-      // append any new categories not yet in saved order
-      catOrder = [...parsed, ...defaultOrder.filter(t => !parsed.includes(t))];
-    } else {
-      catOrder = [...defaultOrder];
-    }
+    const serverOrder  = Array.isArray(data.category_order) ? data.category_order : [];
+    const baseOrder    = serverOrder.length > 0 ? serverOrder : (() => {
+      try { return JSON.parse(localStorage.getItem('trade-cat-order') || '[]'); } catch { return []; }
+    })();
+    const validBase = baseOrder.filter(t => defaultOrder.includes(t));
+    catOrder = [...validBase, ...defaultOrder.filter(t => !validBase.includes(t))];
 
     renderCatalog();
     updateStats();
@@ -838,7 +836,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
       method: 'POST',
       body: JSON.stringify({
         listings,
-        config: { global_pct: globalPct, categories: configCats },
+        config: { global_pct: globalPct, categories: configCats, category_order: catOrder },
       }),
     });
     toast(`Saved — ${r.count} items listed`);

@@ -54,9 +54,12 @@ router.get('/api/trade/listings', async (req, res) => {
         `WHERE tl.is_active = true AND tl.profile_id = 1
          ORDER BY tl.item_type, tl.sort_order, tl.item_name`),
       db.query(
-        'SELECT display_name, discord_handle, bio, torn_profile_url FROM trade_profiles WHERE id = 1'
+        'SELECT display_name, discord_handle, bio, torn_profile_url, category_order FROM trade_profiles WHERE id = 1'
       ),
     ]);
+
+    const profile      = profileRes.rows[0] || {};
+    const catOrderArr  = Array.isArray(profile.category_order) ? profile.category_order : [];
 
     const categories = {};
     for (const row of listingsRes.rows) {
@@ -65,9 +68,19 @@ router.get('/api/trade/listings', async (req, res) => {
       categories[cat].push(row);
     }
 
+    const sorted = Object.entries(categories)
+      .sort(([a], [b]) => {
+        const ai = catOrderArr.indexOf(a), bi = catOrderArr.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      })
+      .map(([name, items]) => ({ name, items }));
+
     res.json({
-      profile:    profileRes.rows[0] || {},
-      categories: Object.entries(categories).map(([name, items]) => ({ name, items })),
+      profile:    profile,
+      categories: sorted,
       total:      listingsRes.rows.length,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -131,6 +144,7 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
         tl.is_active,
         tcc.market_pct           AS cat_pct,
         tp.default_market_pct    AS global_pct,
+        tp.category_order        AS category_order,
         CASE
           WHEN tl.price_mode = 'fixed' THEN tl.fixed_price
           WHEN tl.price_mode = 'market_pct' AND ti.market_price IS NOT NULL
@@ -154,8 +168,9 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
       map[r.type].push(r);
     }
 
-    const globalPct = rows[0]?.global_pct ?? null;
-    const catPcts   = {};
+    const globalPct   = rows[0]?.global_pct ?? null;
+    const categoryOrder = rows[0]?.category_order ?? [];
+    const catPcts     = {};
     for (const r of rows) {
       if (r.cat_pct != null) catPcts[r.type] = r.cat_pct;
     }
@@ -164,7 +179,7 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([type, items]) => ({ type, items }));
 
-    res.json({ categories, global_pct: globalPct, cat_pcts: catPcts });
+    res.json({ categories, global_pct: globalPct, cat_pcts: catPcts, category_order: categoryOrder });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -177,11 +192,12 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Save global default
-    const gp = config.global_pct != null ? parseFloat(config.global_pct) / 100 : null;
+    // 1. Save global default + category order
+    const gp       = config.global_pct != null ? parseFloat(config.global_pct) / 100 : null;
+    const catOrd   = Array.isArray(config.category_order) ? JSON.stringify(config.category_order) : null;
     await client.query(
-      'UPDATE trade_profiles SET default_market_pct=$1, updated_at=NOW() WHERE id=1',
-      [gp]
+      'UPDATE trade_profiles SET default_market_pct=$1, category_order=$2, updated_at=NOW() WHERE id=1',
+      [gp, catOrd]
     );
 
     // 2. Replace category configs entirely
