@@ -26,20 +26,25 @@
 
   <!-- Hero -->
   <div class="hero">
-    <div class="hero-left">
-      <div class="hero-label">Wanted to Buy</div>
+    <!-- Top: label -->
+    <div class="hero-label">Wanted to Buy</div>
+
+    <!-- Name row: name left, contact right — always one row -->
+    <div class="hero-name-row">
       <div class="hero-name" id="heroName">Loading…</div>
+      <div class="hero-right" id="heroContact"></div>
     </div>
-    <div class="hero-right" id="heroContact"></div>
+
+    <!-- Meta pills -->
     <div class="hero-meta">
       <span class="meta-pill"><strong id="metaCount">—</strong> listings</span>
       <span class="meta-pill"><strong id="metaCats">—</strong> categories</span>
     </div>
-  </div>
 
-  <!-- Welcome message (bio rendered as markdown) -->
-  <div class="welcome-card" id="welcomeCard" style="display:none">
-    <div class="welcome-body" id="welcomeBody"></div>
+    <!-- Welcome message at bottom of hero -->
+    <div class="hero-welcome" id="welcomeCard" style="display:none">
+      <div class="welcome-body" id="welcomeBody"></div>
+    </div>
   </div>
 
   <!-- Category filter bar -->

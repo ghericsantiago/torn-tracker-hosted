@@ -87,13 +87,9 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   backdrop-filter: blur(20px);
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   margin-bottom: 0.75rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
-  column-gap: 1rem; row-gap: 0.4rem;
-  align-items: center;
+  display: flex; flex-direction: column; gap: 0.35rem;
   position: relative; overflow: hidden;
 }
 .hero::before {
@@ -103,25 +99,32 @@ body {
   background: radial-gradient(circle, rgba(110,231,247,0.07) 0%, transparent 70%);
   pointer-events: none;
 }
-.hero-left { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .hero-label {
   font-family: var(--mono); font-size: 0.58rem; font-weight: 600;
   letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent);
 }
+/* Name row: name on left, contact badges pinned right — always one line */
+.hero-name-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  justify-content: space-between;
+}
 .hero-name {
-  font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em;
-  color: var(--text); line-height: 1.1; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+  font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text); line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
 }
 .hero-right {
-  display: flex; flex-direction: column; gap: 0.35rem;
-  align-items: flex-end; flex-shrink: 0;
+  display: flex; flex-direction: row; gap: 0.35rem;
+  align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;
 }
 .hero-meta {
   display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
-  justify-content: flex-end;
-  grid-column: 1 / -1;
-  border-top: 1px solid var(--glass-border); padding-top: 0.5rem; margin-top: 0.1rem;
+  border-top: 1px solid var(--glass-border); padding-top: 0.45rem;
+}
+/* Welcome message at bottom of hero */
+.hero-welcome {
+  border-top: 1px solid var(--glass-border); padding-top: 0.75rem; margin-top: 0.1rem;
 }
 .meta-pill {
   font-family: var(--mono); font-size: 0.65rem; color: var(--text-muted);
@@ -138,23 +141,7 @@ body {
 }
 .contact-badge:hover { border-color: rgba(110,231,247,0.3); color: var(--accent); }
 
-/* ── Welcome message ───────────────────────────────────────────────────── */
-.welcome-card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  margin-bottom: 0.75rem;
-  position: relative; overflow: hidden;
-}
-.welcome-card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--accent), transparent);
-  opacity: 0.4;
-}
-
-/* Markdown prose inside the welcome card */
+/* ── Welcome message (markdown prose) ──────────────────────────────────── */
 .welcome-body { font-size: 0.85rem; color: var(--text-dim); line-height: 1.65; }
 .welcome-body p  { margin: 0 0 0.6rem; }
 .welcome-body p:last-child { margin-bottom: 0; }
