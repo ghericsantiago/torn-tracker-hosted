@@ -381,6 +381,8 @@ body {
   overflow: hidden;
   transition: max-height 0.28s cubic-bezier(0.4,0,0.2,1), padding 0.28s;
   padding: 0 1.25rem;
+  position: relative;
+  z-index: 2;
 }
 .add-drawer.open {
   max-height: 300px;
