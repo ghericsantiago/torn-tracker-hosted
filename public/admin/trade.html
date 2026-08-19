@@ -7,17 +7,16 @@
   <link rel="stylesheet" href="/admin/style.css">
   <style>
     /* ── Layout ─────────────────────────────────────────────────────────── */
-    .top-grid {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 1.5rem;
-      align-items: start;
-      margin-bottom: 1.5rem;
-    }
     .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
     .stat-card  { padding: 1rem 1.25rem; text-align: center; }
     .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
     .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); margin-top: 0.2rem; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1.5rem; align-items: start;
+    }
 
     /* ── Profile card ───────────────────────────────────────────────────── */
     .profile-card { padding: 1.25rem; }
@@ -25,80 +24,102 @@
 
     /* ── Catalog browser ────────────────────────────────────────────────── */
     .cat-browser { overflow: hidden; }
-    .cat-head {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 0.75rem; flex-wrap: wrap;
-      padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border);
+
+    /* Top bar */
+    .browser-head {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--glass-border);
     }
-    .cat-head-left { display: flex; align-items: center; gap: 0.75rem; }
-    .cat-head-left h2 { font-size: 0.95rem; }
-    .cat-sub { font-family: var(--mono); font-size: 0.68rem; color: var(--text-muted); }
-    .cat-toolbar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+    .browser-head h2 { font-size: 0.95rem; flex-shrink: 0; }
+    .browser-spacer { flex: 1; }
+
+    /* Global default strip */
+    .global-strip {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+      padding: 0.55rem 1.25rem; background: rgba(110,231,247,0.04);
+      border-bottom: 1px solid rgba(110,231,247,0.1);
+      font-size: 0.78rem;
+    }
+    .global-strip-label {
+      font-family: var(--mono); font-size: 0.65rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .level-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.68rem;
+      font-family: var(--mono); font-weight: 600;
+    }
+    .level-badge.l1 { background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.2); color: var(--accent); }
+    .level-badge.l2 { background: rgba(129,140,248,0.1);  border: 1px solid rgba(129,140,248,0.25); color: #818cf8; }
+    .level-badge.l3 { background: rgba(74,222,128,0.08);  border: 1px solid rgba(74,222,128,0.2); color: var(--success); }
+    .pct-input-sm {
+      width: 62px; background: rgba(255,255,255,0.06);
+      border: 1px solid var(--glass-border); border-radius: 6px;
+      padding: 0.25rem 0.45rem; color: var(--text);
+      font-size: 0.82rem; font-family: var(--mono);
+      text-align: right; outline: none;
+    }
+    .pct-input-sm:focus { border-color: rgba(110,231,247,0.4); }
+    .pct-suffix { font-family: var(--mono); font-size: 0.75rem; color: var(--text-muted); }
+    .global-strip-right { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
+
+    /* Filter bar */
+    .browser-toolbar {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--glass-border);
+      background: rgba(255,255,255,0.01);
+    }
     .cat-search {
       background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-      border-radius: 7px; padding: 0.35rem 0.7rem; color: var(--text);
+      border-radius: 7px; padding: 0.32rem 0.65rem; color: var(--text);
       font-size: 0.8rem; font-family: var(--sans); width: 180px; outline: none;
     }
     .cat-search:focus { border-color: rgba(110,231,247,0.3); }
+    .toolbar-spacer { flex: 1; }
     .btn-save {
-      background: var(--accent); color: #07080f; border: none;
-      font-weight: 700; padding: 0.4rem 1.1rem; border-radius: 7px;
-      font-size: 0.825rem; font-family: var(--sans); cursor: pointer;
-      transition: all 0.18s;
+      background: var(--accent); color: #07080f;
+      border: none; font-weight: 700; padding: 0.38rem 1.1rem;
+      border-radius: 7px; font-size: 0.825rem; font-family: var(--sans);
+      cursor: pointer; transition: all 0.16s;
     }
     .btn-save:hover { background: #93f0ff; }
-    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ── Category sections ──────────────────────────────────────────────── */
-    .cat-list { max-height: 68vh; overflow-y: auto; }
+    .cat-list { max-height: 66vh; overflow-y: auto; }
 
     .cat-section { border-bottom: 1px solid rgba(255,255,255,0.04); }
     .cat-section:last-child { border-bottom: none; }
 
     .cat-row {
-      display: flex; align-items: center; gap: 0.65rem;
-      padding: 0.6rem 1.25rem;
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.55rem 1.25rem;
       cursor: pointer; transition: background 0.14s; user-select: none;
     }
-    .cat-row:hover { background: rgba(255,255,255,0.025); }
+    .cat-row:hover { background: rgba(255,255,255,0.02); }
 
-    .cat-check {
-      width: 15px; height: 15px; flex-shrink: 0;
-      cursor: pointer; accent-color: var(--accent);
-    }
-    .cat-label { font-weight: 600; font-size: 0.855rem; flex: 1; }
-    .cat-tally {
-      font-family: var(--mono); font-size: 0.65rem;
-      color: var(--text-muted); flex-shrink: 0;
-    }
-    .cat-tally .listed { color: var(--accent); }
+    .cat-check { width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
+    .cat-label { font-weight: 600; font-size: 0.845rem; flex: 1; }
+    .cat-tally { font-family: var(--mono); font-size: 0.65rem; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
+    .cat-tally .n-listed { color: var(--accent); }
 
+    /* Category % input with cascade indicator */
     .cat-pct-wrap {
-      display: flex; align-items: center; gap: 0.35rem;
-      flex-shrink: 0; font-size: 0.75rem;
+      display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;
+      font-size: 0.75rem;
     }
-    .cat-pct-label { color: var(--text-muted); font-family: var(--mono); font-size: 0.65rem; }
+    .cat-pct-label { color: var(--text-muted); font-family: var(--mono); font-size: 0.62rem; }
     .cat-pct-input {
       width: 52px; background: rgba(255,255,255,0.05);
-      border: 1px solid var(--glass-border);
-      border-radius: 5px; padding: 0.22rem 0.4rem;
-      color: var(--text); font-size: 0.78rem; font-family: var(--mono);
-      text-align: right; outline: none;
+      border: 1px solid var(--glass-border); border-radius: 5px;
+      padding: 0.2rem 0.4rem; color: var(--text);
+      font-size: 0.78rem; font-family: var(--mono); text-align: right; outline: none;
     }
-    .cat-pct-input:focus { border-color: rgba(110,231,247,0.4); }
-    .cat-apply-btn {
-      background: transparent; border: 1px solid var(--glass-border);
-      border-radius: 5px; padding: 0.22rem 0.5rem;
-      font-size: 0.7rem; font-family: var(--sans);
-      color: var(--text-muted); cursor: pointer; transition: all 0.14s;
-    }
-    .cat-apply-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: rgba(110,231,247,0.3); }
+    .cat-pct-input:focus { border-color: rgba(129,140,248,0.5); }
+    .cat-pct-input.has-value { border-color: rgba(129,140,248,0.3); color: #818cf8; }
+    .cat-pct-inherit { font-family: var(--mono); font-size: 0.6rem; color: var(--text-muted); }
 
-    .cat-chevron {
-      font-size: 0.55rem; color: var(--text-muted);
-      transition: transform 0.18s; flex-shrink: 0; padding: 0.2rem;
-      pointer-events: none;
-    }
+    .cat-chevron { font-size: 0.55rem; color: var(--text-muted); transition: transform 0.16s; flex-shrink: 0; pointer-events: none; }
     .cat-section.open .cat-chevron { transform: rotate(180deg); }
 
     /* ── Item rows ──────────────────────────────────────────────────────── */
@@ -106,99 +127,98 @@
     .cat-section.open .cat-items { display: block; }
 
     .item-row {
-      display: flex; align-items: center; gap: 0.55rem;
-      padding: 0.38rem 1.25rem 0.38rem 2.75rem;
-      border-top: 1px solid rgba(255,255,255,0.03);
-      transition: background 0.12s;
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.35rem 1.25rem 0.35rem 2.75rem;
+      border-top: 1px solid rgba(255,255,255,0.025);
+      transition: background 0.12s; min-width: 0;
     }
-    .item-row:hover { background: rgba(255,255,255,0.02); }
-    .item-row.unchecked { opacity: 0.38; }
-    .item-row.editing { background: rgba(110,231,247,0.04); opacity: 1; }
+    .item-row:hover { background: rgba(255,255,255,0.018); }
+    .item-row.unchecked { opacity: 0.35; }
+    .item-row.editing   { background: rgba(74,222,128,0.03); opacity: 1; }
 
-    .item-check {
-      width: 14px; height: 14px; flex-shrink: 0;
-      cursor: pointer; accent-color: var(--accent);
-    }
+    .item-check { width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
     .item-icon-xs {
       width: 22px; height: 22px; flex-shrink: 0;
       border-radius: 4px; object-fit: contain; padding: 1px;
-      image-rendering: pixelated;
-      border: 1px solid rgba(255,255,255,0.06);
+      image-rendering: pixelated; border: 1px solid rgba(255,255,255,0.06);
     }
-    .item-name-col { font-size: 0.815rem; flex: 1; min-width: 0;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .item-price-col {
-      display: flex; align-items: center; gap: 0.4rem;
-      flex-shrink: 0; font-family: var(--mono); font-size: 0.75rem;
+    .item-name-col { font-size: 0.81rem; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-price-col { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+
+    /* Price tags */
+    .ptag { font-family: var(--mono); font-size: 0.73rem; }
+    .ptag.l1 { color: rgba(110,231,247,0.45); font-style: italic; }   /* global inherit */
+    .ptag.l2 { color: rgba(129,140,248,0.6);  font-style: italic; }   /* cat inherit */
+    .ptag.l3 { color: var(--success); }                                /* item override */
+    .ptag.none { color: var(--text-muted); font-style: italic; }
+    .ptag.fixed-tag { color: var(--gold); }
+    .pbadge {
+      font-family: var(--mono); font-size: 0.59rem; padding: 0.06rem 0.3rem;
+      border-radius: 3px; font-weight: 600;
     }
-    .price-tag { color: var(--accent); }
-    .price-tag.none { color: var(--text-muted); font-style: italic; }
-    .price-tag.inherited { color: var(--text-muted); }
-    .pct-tag {
-      font-size: 0.62rem; background: rgba(110,231,247,0.08);
-      border: 1px solid rgba(110,231,247,0.15); border-radius: 3px;
-      padding: 0.05rem 0.3rem; color: rgba(110,231,247,0.7);
-    }
-    .notes-tag { font-size: 0.68rem; color: var(--text-muted); max-width: 100px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pbadge.l1 { background: rgba(110,231,247,0.07); border: 1px solid rgba(110,231,247,0.12); color: rgba(110,231,247,0.5); }
+    .pbadge.l2 { background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.18); color: rgba(129,140,248,0.7); }
+    .pbadge.l3 { background: rgba(74,222,128,0.08);  border: 1px solid rgba(74,222,128,0.18); color: rgba(74,222,128,0.8); }
+    .pbadge.fx { background: rgba(251,191,36,0.08);  border: 1px solid rgba(251,191,36,0.18); color: rgba(251,191,36,0.8); }
+
+    .notes-tag { font-size: 0.66rem; color: var(--text-muted); max-width: 90px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .clear-ovr { background: none; border: none; font-size: 0.65rem; color: var(--text-muted); cursor: pointer; padding: 0.1rem 0.2rem; border-radius: 3px; transition: color 0.12s; }
+    .clear-ovr:hover { color: var(--error); }
+
     .item-edit-btn {
       background: none; border: none; cursor: pointer;
-      font-size: 0.72rem; padding: 0.2rem 0.35rem; border-radius: 4px;
-      color: var(--text-muted); transition: all 0.14s; flex-shrink: 0;
+      font-size: 0.7rem; padding: 0.18rem 0.3rem; border-radius: 4px;
+      color: var(--text-muted); transition: all 0.12s; flex-shrink: 0;
     }
     .item-edit-btn:hover { background: var(--glass-hover); color: var(--text); }
-    .item-edit-btn.active { background: var(--accent-dim); color: var(--accent); }
+    .item-edit-btn.active { background: rgba(74,222,128,0.1); color: var(--success); }
 
     /* ── Inline item editor ─────────────────────────────────────────────── */
     .item-editor {
-      display: none;
-      padding: 0.6rem 1.25rem 0.7rem 2.75rem;
-      border-top: 1px solid rgba(110,231,247,0.08);
-      background: rgba(110,231,247,0.03);
-      flex-wrap: wrap; gap: 0.5rem; align-items: center;
+      display: none; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+      padding: 0.55rem 1.25rem 0.6rem 2.75rem;
+      border-top: 1px solid rgba(74,222,128,0.1);
+      background: rgba(74,222,128,0.025);
     }
     .item-editor.open { display: flex; }
 
-    .mode-toggle-sm {
-      display: flex; border: 1px solid var(--glass-border);
-      border-radius: 6px; overflow: hidden;
-    }
-    .mode-btn-sm {
-      padding: 0.28rem 0.65rem; font-size: 0.75rem; font-weight: 500;
-      font-family: var(--sans); background: transparent; border: none;
-      border-right: 1px solid var(--glass-border);
-      color: var(--text-dim); cursor: pointer; transition: all 0.14s;
-    }
-    .mode-btn-sm:last-child { border-right: none; }
-    .mode-btn-sm.active { background: var(--accent-dim); color: var(--accent); }
+    .editor-label { font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
 
-    .editor-input {
-      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
-      border-radius: 6px; padding: 0.28rem 0.55rem; color: var(--text);
-      font-size: 0.8rem; font-family: var(--mono); outline: none; width: 110px;
+    /* Level selector — 3 pills */
+    .level-sel { display: flex; gap: 0.25rem; }
+    .lbtn {
+      padding: 0.24rem 0.6rem; border-radius: 5px;
+      font-size: 0.72rem; font-weight: 500; font-family: var(--sans);
+      border: 1px solid var(--glass-border); background: transparent;
+      color: var(--text-muted); cursor: pointer; transition: all 0.14s;
+      white-space: nowrap;
     }
-    .editor-input:focus { border-color: rgba(110,231,247,0.4); }
+    .lbtn:hover { background: var(--glass-hover); }
+    .lbtn.active-l1 { background: rgba(110,231,247,0.1); border-color: rgba(110,231,247,0.25); color: var(--accent); }
+    .lbtn.active-l2 { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.3); color: #818cf8; }
+    .lbtn.active-l3 { background: rgba(74,222,128,0.1);  border-color: rgba(74,222,128,0.25); color: var(--success); }
+
+    .editor-val-wrap { display: flex; align-items: center; gap: 0.35rem; }
+    .editor-input {
+      width: 100px; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border); border-radius: 6px;
+      padding: 0.25rem 0.5rem; color: var(--text);
+      font-size: 0.8rem; font-family: var(--mono); outline: none;
+    }
+    .editor-input:focus { border-color: rgba(74,222,128,0.4); }
     .editor-notes {
       background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
-      border-radius: 6px; padding: 0.28rem 0.55rem; color: var(--text);
-      font-size: 0.8rem; font-family: var(--sans); outline: none; width: 160px;
+      border-radius: 6px; padding: 0.25rem 0.5rem; color: var(--text);
+      font-size: 0.78rem; font-family: var(--sans); outline: none; width: 150px;
     }
-    .editor-notes:focus { border-color: rgba(110,231,247,0.4); }
-    .editor-label { font-size: 0.7rem; color: var(--text-muted); font-family: var(--mono); }
+    .editor-notes:focus { border-color: rgba(74,222,128,0.4); }
     .editor-apply {
-      background: var(--accent-dim); border: 1px solid rgba(110,231,247,0.25);
-      border-radius: 6px; padding: 0.28rem 0.65rem;
-      font-size: 0.75rem; color: var(--accent); cursor: pointer;
+      background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25);
+      border-radius: 6px; padding: 0.25rem 0.65rem;
+      font-size: 0.75rem; color: var(--success); cursor: pointer;
       font-family: var(--sans); transition: all 0.14s;
     }
-    .editor-apply:hover { background: rgba(110,231,247,0.2); }
-    .editor-clear {
-      background: transparent; border: 1px solid var(--glass-border);
-      border-radius: 6px; padding: 0.28rem 0.65rem;
-      font-size: 0.75rem; color: var(--text-muted); cursor: pointer;
-      font-family: var(--sans); transition: all 0.14s;
-    }
-    .editor-clear:hover { background: var(--glass-hover); }
+    .editor-apply:hover { background: rgba(74,222,128,0.2); }
 
     /* ── Toast ──────────────────────────────────────────────────────────── */
     #toast {
@@ -206,23 +226,17 @@
       background: #1d2540; border: 1px solid var(--glass-border);
       border-radius: 10px; padding: 0.6rem 1.1rem;
       font-size: 0.825rem; color: var(--text); z-index: 1000;
-      display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-      font-family: var(--mono); white-space: nowrap;
+      display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.5); font-family: var(--mono);
     }
-    #toast.show { display: block; animation: toastIn 0.2s; }
+    #toast.show { display: block; animation: tIn 0.2s; }
     #toast.err  { border-color: rgba(248,113,113,0.3); color: var(--error); }
-    @keyframes toastIn {
-      from { opacity:0; transform: translateX(-50%) translateY(8px); }
-      to   { opacity:1; transform: translateX(-50%) translateY(0); }
-    }
+    @keyframes tIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 
     /* ── Responsive ─────────────────────────────────────────────────────── */
-    @media (max-width: 900px) {
-      .top-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
     @media (max-width: 640px) {
       .stats-row { grid-template-columns: repeat(2,1fr); }
-      .cat-pct-wrap { display: none; } /* hide on very small; use per-item edit */
+      .cat-pct-wrap { display: none; }
     }
   </style>
 </head>
@@ -242,28 +256,26 @@
 
 <main class="dashboard">
 
-  <!-- Stats row -->
   <div class="stats-row">
     <div class="glass-card stat-card">
       <div class="stat-value" id="statTotal">—</div>
-      <div class="stat-label">Total Listed</div>
+      <div class="stat-label">Listed</div>
     </div>
     <div class="glass-card stat-card">
-      <div class="stat-value" id="statCats">—</div>
-      <div class="stat-label">Categories</div>
+      <div class="stat-value" id="statInherit" style="color:var(--accent)">—</div>
+      <div class="stat-label">Inheriting</div>
     </div>
     <div class="glass-card stat-card">
-      <div class="stat-value" id="statMktPct" style="color:var(--accent-2)">—</div>
-      <div class="stat-label">Market % Based</div>
+      <div class="stat-value" id="statOverride" style="color:var(--success)">—</div>
+      <div class="stat-label">Item Override</div>
     </div>
     <div class="glass-card stat-card">
-      <div class="stat-value" id="statFixed" style="color:var(--success)">—</div>
+      <div class="stat-value" id="statFixed" style="color:var(--gold)">—</div>
       <div class="stat-label">Fixed Price</div>
     </div>
   </div>
 
-  <!-- Top grid: profile left, catalog browser right -->
-  <div class="top-grid">
+  <div class="main-grid">
 
     <!-- Profile -->
     <div class="glass-card profile-card">
@@ -275,7 +287,7 @@
         </div>
         <div class="field">
           <label>Discord Handle</label>
-          <input type="text" id="pDiscord" placeholder="@YourName#1234">
+          <input type="text" id="pDiscord" placeholder="@Name#1234">
         </div>
         <div class="field">
           <label>Torn Profile URL</label>
@@ -283,7 +295,7 @@
         </div>
         <div class="field">
           <label>Bio</label>
-          <textarea id="pBio" rows="2" placeholder="What you're looking for, preferences, etc."
+          <textarea id="pBio" rows="2" placeholder="What you're looking for…"
             style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;padding:.55rem .85rem;color:var(--text);font-size:.875rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
         </div>
         <button type="submit" class="btn btn-primary btn-full" id="saveProfileBtn">Save Profile</button>
@@ -292,25 +304,47 @@
 
     <!-- Catalog browser -->
     <div class="glass-card cat-browser">
-      <div class="cat-head">
-        <div class="cat-head-left">
-          <h2>Item Catalog</h2>
-          <span class="cat-sub" id="catalogSub">Loading…</span>
-        </div>
-        <div class="cat-toolbar">
-          <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
-          <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
-          <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
-          <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
+
+      <!-- Header -->
+      <div class="browser-head">
+        <h2>Item Catalog</h2>
+        <span style="font-family:var(--mono);font-size:.68rem;color:var(--text-muted)" id="catalogSub">Loading…</span>
+      </div>
+
+      <!-- Global default strip (Level 1) -->
+      <div class="global-strip">
+        <span class="global-strip-label">Price Cascade</span>
+        <span class="level-badge l1">L1 Global</span>
+        <input type="number" class="pct-input-sm" id="globalPctInput"
+          placeholder="—" min="1" max="500" step="1" title="Global default margin %">
+        <span class="pct-suffix">%</span>
+        <span style="color:var(--text-muted);font-size:.7rem;font-family:var(--mono)">→</span>
+        <span class="level-badge l2">L2 Category</span>
+        <span style="color:var(--text-muted);font-size:.7rem;font-family:var(--mono)">→</span>
+        <span class="level-badge l3">L3 Item</span>
+
+        <div class="global-strip-right">
+          <span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono)">Items inherit nearest level above</span>
         </div>
       </div>
+
+      <!-- Toolbar -->
+      <div class="browser-toolbar">
+        <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
+        <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
+        <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
+        <div class="toolbar-spacer"></div>
+        <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
+      </div>
+
+      <!-- Category list -->
       <div class="cat-list" id="catalogBody">
         <div style="padding:2rem;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:.8rem">
           Loading item catalog…
         </div>
       </div>
-    </div>
 
+    </div>
   </div>
 </main>
 
@@ -319,38 +353,68 @@
 <script>
 /* ═══════════════════════════════════════════════════════════════
    State
-   selections: Map<torn_item_id, { checked, price_mode, market_pct, fixed_price, notes }>
-   catDefaults: Map<type, { market_pct }>   — category-level default %
+   ─────────────────────────────────────────────────────────────
+   globalPct  : number|null  — L1 global default (stored as %, e.g. 80)
+   catPcts    : { type → number }  — L2 category overrides (as %)
+   selections : Map<itemId, { checked, override: null | { price_mode, market_pct, fixed_price, notes } }>
+     override = null  → item inherits from category or global cascade
+     override = obj   → explicit item-level price (L3)
+   catalog    : [{ type, items }]
 ═══════════════════════════════════════════════════════════════ */
-let catalog    = [];          // [{type, items:[...]}]
-let selections = new Map();   // itemId → price state
-let catDefaults= new Map();   // type   → { market_pct }
+let globalPct  = null;
+let catPcts    = {};
+let catalog    = [];
+let selections = new Map();
 let filterQ    = '';
-let openEditor = null;        // itemId whose inline editor is open
 
-const fmt = n => n == null ? '—' : '$' + Number(n).toLocaleString();
-const pctFmt = v => v == null ? '' : (v * 100).toFixed(1).replace(/\.0$/, '') + '%';
+const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
+const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
 
-/* ── Helpers ──────────────────────────────────────────────────────────── */
+/* ── Utils ────────────────────────────────────────────────────────────── */
 function toast(msg, err = false) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className   = 'show' + (err ? ' err' : '');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.className = '', 2600);
+  el.textContent = msg; el.className = 'show' + (err ? ' err' : '');
+  clearTimeout(el._t); el._t = setTimeout(() => el.className = '', 2800);
 }
-
 async function api(url, opts = {}) {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(j.error || res.statusText);
-  }
-  return res.json();
+  const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (!r.ok) { const j = await r.json().catch(() => ({ error: r.statusText })); throw new Error(j.error || r.statusText); }
+  return r.json();
 }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ── Resolve effective price for display ──────────────────────────────── */
+function resolvePrice(item) {
+  const s = selections.get(item.id);
+  if (!s?.checked) return { level: 'none' };
+
+  // L3 explicit item override
+  if (s.override) {
+    const o = s.override;
+    if (o.price_mode === 'fixed') {
+      const eff = o.fixed_price;
+      return { level: 'l3', price_mode: 'fixed', eff, label: fmt(eff), badge: 'Fixed', notes: o.notes };
+    }
+    if (o.price_mode === 'market_pct' && o.market_pct != null) {
+      const eff = item.market_price ? Math.round(item.market_price * o.market_pct / 100) : null;
+      return { level: 'l3', price_mode: 'market_pct', eff, label: fmt(eff), badge: pctFmt(o.market_pct), notes: o.notes };
+    }
+  }
+
+  // L2 category default
+  const cp = catPcts[item.type];
+  if (cp != null) {
+    const eff = item.market_price ? Math.round(item.market_price * cp / 100) : null;
+    return { level: 'l2', price_mode: 'market_pct', eff, label: fmt(eff), badge: pctFmt(cp) + ' cat' };
+  }
+
+  // L1 global default
+  if (globalPct != null) {
+    const eff = item.market_price ? Math.round(item.market_price * globalPct / 100) : null;
+    return { level: 'l1', price_mode: 'market_pct', eff, label: fmt(eff), badge: pctFmt(globalPct) + ' global' };
+  }
+
+  return { level: 'noPrice' };
 }
 
 /* ── Profile ──────────────────────────────────────────────────────────── */
@@ -363,21 +427,17 @@ async function loadProfile() {
     document.getElementById('pBio').value         = p.bio || '';
   } catch (e) { toast('Failed to load profile: ' + e.message, true); }
 }
-
 document.getElementById('profileForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = document.getElementById('saveProfileBtn');
   btn.textContent = 'Saving…'; btn.disabled = true;
   try {
-    await api('/admin/api/trade/profile', {
-      method: 'PUT',
-      body: JSON.stringify({
-        display_name:     document.getElementById('pDisplayName').value,
-        discord_handle:   document.getElementById('pDiscord').value,
-        bio:              document.getElementById('pBio').value,
-        torn_profile_url: document.getElementById('pTornUrl').value,
-      }),
-    });
+    await api('/admin/api/trade/profile', { method: 'PUT', body: JSON.stringify({
+      display_name: document.getElementById('pDisplayName').value,
+      discord_handle: document.getElementById('pDiscord').value,
+      bio: document.getElementById('pBio').value,
+      torn_profile_url: document.getElementById('pTornUrl').value,
+    })});
     toast('Profile saved');
   } catch (e) { toast('Save failed: ' + e.message, true); }
   btn.textContent = 'Save Profile'; btn.disabled = false;
@@ -386,39 +446,32 @@ document.getElementById('profileForm').addEventListener('submit', async e => {
 /* ── Load catalog ─────────────────────────────────────────────────────── */
 async function loadCatalog() {
   try {
-    catalog = await api('/admin/api/trade/all-items');
+    const data = await api('/admin/api/trade/all-items');
+    catalog  = data.categories;
+    catPcts  = {};
+    for (const [t, v] of Object.entries(data.cat_pcts || {})) {
+      catPcts[t] = v != null ? parseFloat(v) * 100 : null;
+    }
+    globalPct = data.global_pct != null ? parseFloat(data.global_pct) * 100 : null;
+
+    // Set global input
+    document.getElementById('globalPctInput').value = globalPct != null ? globalPct : '';
 
     // Init selections from existing listings
     selections.clear();
-    catDefaults.clear();
-    for (const { type, items } of catalog) {
+    for (const { items } of catalog) {
       for (const item of items) {
-        if (item.listing_id) {
-          selections.set(item.id, {
-            checked:     item.is_active !== false,
-            price_mode:  item.price_mode || 'market_pct',
-            market_pct:  item.market_pct,
-            fixed_price: item.fixed_price,
-            notes:       item.notes || '',
-          });
+        if (!item.listing_id) continue;
+        const checked = item.is_active !== false;
+        let override = null;
+        if (item.price_mode === 'fixed' && item.fixed_price != null) {
+          override = { price_mode: 'fixed', fixed_price: item.fixed_price, market_pct: null, notes: item.notes || '' };
+        } else if (item.price_mode === 'market_pct' && item.market_pct != null) {
+          // explicit item-level override (not null = override)
+          override = { price_mode: 'market_pct', market_pct: parseFloat(item.market_pct) * 100, fixed_price: null, notes: item.notes || '' };
         }
-      }
-    }
-
-    // Derive category defaults from the most common market_pct in that category
-    for (const { type, items } of catalog) {
-      const pcts = items
-        .map(i => selections.get(i.id))
-        .filter(s => s && s.price_mode === 'market_pct' && s.market_pct)
-        .map(s => Math.round(s.market_pct * 1000) / 10);
-
-      if (pcts.length) {
-        const freq = {};
-        pcts.forEach(p => freq[p] = (freq[p] || 0) + 1);
-        const dominant = Object.entries(freq).sort((a,b) => b[1]-a[1])[0][0];
-        catDefaults.set(type, { market_pct: parseFloat(dominant) });
-      } else {
-        catDefaults.set(type, { market_pct: null });
+        // market_pct=null means inherit → no override
+        selections.set(item.id, { checked, override });
       }
     }
 
@@ -427,315 +480,254 @@ async function loadCatalog() {
     document.getElementById('saveChangesBtn').disabled = false;
   } catch (e) {
     document.getElementById('catalogBody').innerHTML =
-      `<div style="padding:2rem;text-align:center;color:var(--error)">Error: ${e.message}</div>`;
+      `<div style="padding:2rem;text-align:center;color:var(--error);font-family:var(--mono);font-size:.8rem">Error: ${e.message}</div>`;
   }
 }
+
+/* ── Global default: update on input change ──────────────────────────── */
+document.getElementById('globalPctInput').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  globalPct = (!isNaN(v) && v > 0) ? v : null;
+  renderCatalog(); updateStats();
+});
 
 /* ── Render catalog ───────────────────────────────────────────────────── */
 function renderCatalog() {
   const body = document.getElementById('catalogBody');
+  const prevOpen = new Set([...body.querySelectorAll('.cat-section.open')].map(s => s.dataset.type));
   body.innerHTML = '';
-
   const q = filterQ.toLowerCase();
 
   for (const { type, items } of catalog) {
-    const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q) || type.toLowerCase().includes(q)) : items;
+    const filtered = q
+      ? items.filter(i => i.name.toLowerCase().includes(q) || type.toLowerCase().includes(q))
+      : items;
     if (!filtered.length) continue;
 
-    const listedCount = filtered.filter(i => {
-      const s = selections.get(i.id);
-      return s && s.checked;
-    }).length;
-
-    const catDef = catDefaults.get(type) || {};
-    const pctVal = catDef.market_pct != null ? catDef.market_pct : '';
-
-    // Determine category checkbox state
-    const checkedCount = filtered.filter(i => selections.get(i.id)?.checked).length;
-    const catChecked     = checkedCount === filtered.length;
-    const catIndeterminate = checkedCount > 0 && checkedCount < filtered.length;
+    const listedCount   = filtered.filter(i => selections.get(i.id)?.checked).length;
+    const checkedCount  = listedCount;
+    const catChecked    = checkedCount === filtered.length && filtered.length > 0;
+    const catIndet      = checkedCount > 0 && checkedCount < filtered.length;
+    const catPct        = catPcts[type] ?? null;
+    const resolvedLabel = catPct != null ? `${pctFmt(catPct)}` : (globalPct != null ? `↑ ${pctFmt(globalPct)} global` : '—');
+    const isOpen        = prevOpen.has(type) || (q && filtered.some(i => i.name.toLowerCase().includes(q)));
 
     const sec = document.createElement('div');
-    sec.className = 'cat-section';
+    sec.className = 'cat-section' + (isOpen ? ' open' : '');
     sec.dataset.type = type;
 
     sec.innerHTML = `
       <div class="cat-row">
         <input type="checkbox" class="cat-check" ${catChecked ? 'checked' : ''}>
         <span class="cat-label">${esc(type)}</span>
-        <span class="cat-tally">
-          <span class="listed">${listedCount}</span> / ${filtered.length}
-        </span>
+        <span class="cat-tally"><span class="n-listed">${listedCount}</span>/${filtered.length}</span>
         <div class="cat-pct-wrap" onclick="event.stopPropagation()">
-          <span class="cat-pct-label">mkt%</span>
-          <input type="number" class="cat-pct-input" min="1" max="300" step="1"
-            value="${pctVal}" placeholder="—" title="Market % for whole category">
-          <button class="cat-apply-btn">Apply all</button>
+          <span class="cat-pct-label">L2 %</span>
+          <input type="number" class="cat-pct-input ${catPct != null ? 'has-value' : ''}"
+            value="${catPct != null ? catPct : ''}" placeholder="${globalPct != null ? pctFmt(globalPct) : '—'}"
+            min="1" max="500" step="1" title="Category default margin (overrides global)">
+          <span class="cat-pct-inherit">${catPct != null ? '' : '(global)'}</span>
         </div>
         <span class="cat-chevron">▼</span>
       </div>
       <div class="cat-items">
-        ${filtered.map(item => renderItemRow(item)).join('')}
-      </div>
-    `;
+        ${filtered.map(item => renderItemRow(item, type)).join('')}
+      </div>`;
 
-    // Category checkbox
+    // Tri-state
     const catCheck = sec.querySelector('.cat-check');
-    if (catIndeterminate) catCheck.indeterminate = true;
-    catCheck.addEventListener('change', e => {
-      e.stopPropagation();
-      toggleCategory(type, catCheck.checked, filtered);
-    });
+    if (catIndet) catCheck.indeterminate = true;
+    catCheck.addEventListener('change', e => { e.stopPropagation(); toggleCategory(type, catCheck.checked, filtered); });
     catCheck.addEventListener('click', e => e.stopPropagation());
 
-    // Expand/collapse on header click
+    // Expand/collapse
     sec.querySelector('.cat-row').addEventListener('click', e => {
       if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-check')) return;
       sec.classList.toggle('open');
     });
 
-    // Apply % to all items
-    const applyBtn  = sec.querySelector('.cat-apply-btn');
-    const pctInput  = sec.querySelector('.cat-pct-input');
-    applyBtn.addEventListener('click', e => {
-      e.stopPropagation();
+    // Category % input — live update
+    const pctInput = sec.querySelector('.cat-pct-input');
+    pctInput.addEventListener('input', () => {
       const v = parseFloat(pctInput.value);
-      if (!v || v <= 0) { toast('Enter a valid %', true); return; }
-      catDefaults.set(type, { market_pct: v });
-      applyPctToCategory(type, v, filtered);
-      renderCatalog();
-      updateStats();
+      catPcts[type] = (!isNaN(v) && v > 0) ? v : null;
+      pctInput.classList.toggle('has-value', catPcts[type] != null);
+      renderCatalog(); updateStats();
     });
 
-    // Expand if filter is active or if there are listed items
-    if (q || listedCount > 0) sec.classList.add('open');
-
-    // Wire up item rows
-    wireItemRows(sec, filtered);
-
+    // Wire item rows
+    wireItemRows(sec, filtered, type);
     body.appendChild(sec);
   }
 
-  const total = document.querySelectorAll('.cat-section').length;
+  const total = catalog.reduce((a, c) => a + c.items.length, 0);
   document.getElementById('catalogSub').textContent =
-    `${catalog.reduce((a,c) => a + c.items.length, 0)} items · ${catalog.length} categories`;
+    `${total} items · ${catalog.length} categories`;
 }
 
-function renderItemRow(item) {
+function renderItemRow(item, type) {
   const s   = selections.get(item.id);
-  const checked = s?.checked ?? false;
+  const chk = s?.checked ?? false;
+  const res = resolvePrice(item);
 
   let priceHtml = '';
-  if (s?.checked) {
-    if (s.price_mode === 'market_pct' && s.market_pct) {
-      const eff = item.market_price ? fmt(Math.round(item.market_price * s.market_pct)) : null;
-      priceHtml = `
-        <span class="price-tag">${eff || '—'}</span>
-        <span class="pct-tag">${pctFmt(s.market_pct)}</span>`;
-    } else if (s.price_mode === 'fixed' && s.fixed_price) {
-      priceHtml = `<span class="price-tag">${fmt(s.fixed_price)}</span>`;
-    } else {
-      priceHtml = `<span class="price-tag none">no price</span>`;
-    }
-    if (s.notes) {
-      priceHtml += `<span class="notes-tag" title="${esc(s.notes)}">${esc(s.notes)}</span>`;
-    }
+  if (!chk) {
+    priceHtml = `<span class="ptag none">not listed</span>`;
+  } else if (res.level === 'noPrice') {
+    priceHtml = `<span class="ptag none">no price set</span>`;
   } else {
-    priceHtml = `<span class="price-tag none">not listed</span>`;
+    priceHtml = `<span class="ptag ${res.level}">${res.label}</span>
+                 <span class="pbadge ${res.level === 'fixed' ? 'fx' : res.level}">${esc(res.badge)}</span>`;
+    if (res.notes) priceHtml += `<span class="notes-tag" title="${esc(res.notes)}">${esc(res.notes)}</span>`;
+    if (s?.override) priceHtml += `<button class="clear-ovr" title="Clear item override" onclick="clearOverride(${item.id},event)">×</button>`;
   }
 
+  const editMode = s?.override?.price_mode || 'inherit';
+  const pctVal   = s?.override?.market_pct != null ? s.override.market_pct : '';
+  const fixedVal = s?.override?.fixed_price || '';
+  const noteVal  = esc(s?.override?.notes || (s?.checked && !s?.override ? (item.notes || '') : ''));
+
   return `
-    <div class="item-row ${checked ? '' : 'unchecked'}" data-id="${item.id}">
-      <input type="checkbox" class="item-check" ${checked ? 'checked' : ''}>
-      <img class="item-icon-xs" src="https://www.torn.com/images/items/${item.id}/large.png"
-        alt="" onerror="this.style.display='none'">
+    <div class="item-row ${chk ? '' : 'unchecked'}" data-id="${item.id}">
+      <input type="checkbox" class="item-check" ${chk ? 'checked' : ''}>
+      <img class="item-icon-xs" src="https://www.torn.com/images/items/${item.id}/large.png" alt="" onerror="this.style.display='none'">
       <span class="item-name-col" title="${esc(item.name)}">${esc(item.name)}</span>
       <div class="item-price-col">
         ${priceHtml}
-        <button class="item-edit-btn ${s?.checked ? '' : 'hidden'}" title="Edit price">✏</button>
+        <button class="item-edit-btn ${s?.override ? 'active' : ''}" title="Set item override">✏</button>
       </div>
     </div>
     <div class="item-editor" data-editor="${item.id}">
-      <div class="mode-toggle-sm">
-        <button class="mode-btn-sm ${!s || s.price_mode === 'market_pct' ? 'active' : ''}" data-emode="market_pct">% Market</button>
-        <button class="mode-btn-sm ${s?.price_mode === 'fixed' ? 'active' : ''}" data-emode="fixed">Fixed $</button>
+      <span class="editor-label">L3 Override</span>
+      <div class="level-sel">
+        <button class="lbtn ${!s?.override ? 'active-l1' : ''}" data-lv="inherit">
+          ${catPcts[type] != null ? `Cat (${pctFmt(catPcts[type])})` : globalPct != null ? `Global (${pctFmt(globalPct)})` : 'Inherit'}
+        </button>
+        <button class="lbtn ${s?.override?.price_mode === 'market_pct' ? 'active-l3' : ''}" data-lv="market_pct">Custom %</button>
+        <button class="lbtn ${s?.override?.price_mode === 'fixed' ? 'active-l3' : ''}" data-lv="fixed">Fixed $</button>
       </div>
-      <div class="editor-mkt-wrap" style="display:${!s || s.price_mode !== 'fixed' ? 'flex' : 'none'};align-items:center;gap:.35rem">
+      <div class="editor-val-wrap editor-pct-wrap" style="display:${editMode === 'market_pct' ? 'flex' : 'none'}">
+        <input type="number" class="editor-input epct" min="1" max="500" step="0.5" placeholder="e.g. 100" value="${pctVal}">
         <span class="editor-label">%</span>
-        <input type="number" class="editor-input editor-pct-val" min="1" max="300" step="0.5"
-          placeholder="e.g. 85"
-          value="${s?.market_pct ? (s.market_pct * 100).toFixed(1).replace(/\.0$/,'') : ''}">
       </div>
-      <div class="editor-fixed-wrap" style="display:${s?.price_mode === 'fixed' ? 'flex' : 'none'};align-items:center;gap:.35rem">
+      <div class="editor-val-wrap editor-fixed-wrap" style="display:${editMode === 'fixed' ? 'flex' : 'none'}">
+        <input type="number" class="editor-input efixed" min="0" placeholder="e.g. 5000000" value="${fixedVal}">
         <span class="editor-label">$</span>
-        <input type="number" class="editor-input editor-fixed-val" min="0"
-          placeholder="e.g. 5000000"
-          value="${s?.fixed_price || ''}">
       </div>
-      <input type="text" class="editor-notes" placeholder="Notes (optional)"
-        value="${esc(s?.notes || '')}">
+      <input type="text" class="editor-notes" placeholder="Notes (optional)" value="${noteVal}">
       <button class="editor-apply">Apply</button>
-      <button class="editor-clear">Clear price</button>
     </div>`;
 }
 
-function wireItemRows(sec, items) {
+function wireItemRows(sec, items, type) {
   for (const item of items) {
     const row    = sec.querySelector(`.item-row[data-id="${item.id}"]`);
     const editor = sec.querySelector(`.item-editor[data-editor="${item.id}"]`);
     if (!row || !editor) continue;
 
-    // Checkbox
-    const check = row.querySelector('.item-check');
-    check.addEventListener('change', e => {
+    row.querySelector('.item-check').addEventListener('change', e => {
       e.stopPropagation();
-      setItemChecked(item, check.checked);
-      row.classList.toggle('unchecked', !check.checked);
-      const editBtn = row.querySelector('.item-edit-btn');
-      if (editBtn) editBtn.classList.toggle('hidden', !check.checked);
+      const chk = e.target.checked;
+      const s   = selections.get(item.id) || { override: null };
+      if (chk && !s.checked) {
+        // Auto-assign if no override and no inherited price: use category or global
+        selections.set(item.id, { ...s, checked: true });
+      } else {
+        selections.set(item.id, { ...s, checked: chk });
+      }
+      row.classList.toggle('unchecked', !chk);
       updateCatCheckbox(sec, items);
       updateStats();
+      renderCatalog();
     });
-    check.addEventListener('click', e => e.stopPropagation());
+    row.querySelector('.item-check').addEventListener('click', e => e.stopPropagation());
 
-    // Edit button
-    const editBtn = row.querySelector('.item-edit-btn');
-    if (editBtn) {
-      editBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        const isOpen = editor.classList.contains('open');
-        // Close any open editor
-        document.querySelectorAll('.item-editor.open').forEach(el => {
-          el.classList.remove('open');
-          el.previousElementSibling?.classList.remove('editing');
-          el.previousElementSibling?.querySelector('.item-edit-btn')?.classList.remove('active');
-        });
-        if (!isOpen) {
-          editor.classList.add('open');
-          row.classList.add('editing');
-          editBtn.classList.add('active');
-          openEditor = item.id;
-        } else {
-          openEditor = null;
-        }
+    row.querySelector('.item-edit-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const isOpen = editor.classList.contains('open');
+      document.querySelectorAll('.item-editor.open').forEach(el => {
+        el.classList.remove('open');
+        el.previousElementSibling?.classList.remove('editing');
+        el.previousElementSibling?.querySelector('.item-edit-btn')?.classList.remove('active');
       });
-    }
+      if (!isOpen) { editor.classList.add('open'); row.classList.add('editing'); }
+    });
 
-    // Mode toggle in editor
-    editor.querySelectorAll('.mode-btn-sm').forEach(btn => {
+    // Level selector
+    editor.querySelectorAll('.lbtn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const mode = btn.dataset.emode;
-        editor.querySelectorAll('.mode-btn-sm').forEach(b => b.classList.toggle('active', b === btn));
-        editor.querySelector('.editor-mkt-wrap').style.display   = mode === 'market_pct' ? 'flex' : 'none';
-        editor.querySelector('.editor-fixed-wrap').style.display = mode === 'fixed'      ? 'flex' : 'none';
+        const lv = btn.dataset.lv;
+        editor.querySelectorAll('.lbtn').forEach(b => b.className = b.className.replace(/ active-l\d/g, ''));
+        btn.classList.add(lv === 'inherit' ? 'active-l1' : 'active-l3');
+        editor.querySelector('.editor-pct-wrap').style.display   = lv === 'market_pct' ? 'flex' : 'none';
+        editor.querySelector('.editor-fixed-wrap').style.display = lv === 'fixed'      ? 'flex' : 'none';
       });
     });
 
-    // Apply button in editor
+    // Apply
     editor.querySelector('.editor-apply').addEventListener('click', () => {
-      const mode     = editor.querySelector('.mode-btn-sm.active').dataset.emode;
-      const pctRaw   = parseFloat(editor.querySelector('.editor-pct-val').value);
-      const fixedRaw = parseInt(editor.querySelector('.editor-fixed-val').value);
-      const notes    = editor.querySelector('.editor-notes').value.trim();
+      const lv   = editor.querySelector('.lbtn.active-l3, .lbtn.active-l1').dataset.lv;
+      const pctR = parseFloat(editor.querySelector('.epct').value);
+      const fixR = parseInt(editor.querySelector('.efixed').value);
+      const note = editor.querySelector('.editor-notes').value.trim();
 
-      const mp = mode === 'market_pct' ? (pctRaw > 0 ? pctRaw / 100 : null) : null;
-      const fp = mode === 'fixed'      ? (fixedRaw > 0 ? fixedRaw : null) : null;
-
-      const sel = selections.get(item.id) || { checked: true };
-      selections.set(item.id, { ...sel, checked: true, price_mode: mode, market_pct: mp, fixed_price: fp, notes });
-
-      editor.classList.remove('open');
-      row.classList.remove('editing');
-      editor.previousElementSibling?.querySelector('.item-edit-btn')?.classList.remove('active');
-      openEditor = null;
-      renderCatalog();
-      updateStats();
-    });
-
-    // Clear price
-    editor.querySelector('.editor-clear').addEventListener('click', () => {
-      const sel = selections.get(item.id) || { checked: true };
-      selections.set(item.id, { ...sel, price_mode: 'market_pct', market_pct: null, fixed_price: null, notes: '' });
-      editor.classList.remove('open');
-      row.classList.remove('editing');
-      openEditor = null;
-      renderCatalog();
-      updateStats();
-    });
-  }
-}
-
-/* ── Item / category helpers ──────────────────────────────────────────── */
-function setItemChecked(item, checked) {
-  const existing = selections.get(item.id) || {
-    price_mode: 'market_pct',
-    market_pct: catDefaults.get(item.type)?.market_pct
-      ? catDefaults.get(item.type).market_pct / 100 : null,
-    fixed_price: null, notes: '',
-  };
-  selections.set(item.id, { ...existing, checked });
-}
-
-function toggleCategory(type, checked, items) {
-  const catDef = catDefaults.get(type) || {};
-  for (const item of items) {
-    if (checked) {
-      const existing = selections.get(item.id);
-      if (existing) {
-        selections.set(item.id, { ...existing, checked: true });
+      if (lv === 'inherit') {
+        // Remove override — item falls back to cascade
+        const s = selections.get(item.id) || { checked: true };
+        selections.set(item.id, { ...s, override: note ? { ...s.override, notes: note } : null });
+      } else if (lv === 'market_pct') {
+        if (!pctR || pctR <= 0) { toast('Enter a valid %', true); return; }
+        const s = selections.get(item.id) || { checked: true };
+        selections.set(item.id, { ...s, checked: true, override: { price_mode: 'market_pct', market_pct: pctR, fixed_price: null, notes: note } });
       } else {
-        // Apply category default
-        selections.set(item.id, {
-          checked:     true,
-          price_mode:  catDef.market_pct ? 'market_pct' : 'market_pct',
-          market_pct:  catDef.market_pct ? catDef.market_pct / 100 : null,
-          fixed_price: null,
-          notes:       '',
-        });
+        if (!fixR || fixR <= 0) { toast('Enter a valid price', true); return; }
+        const s = selections.get(item.id) || { checked: true };
+        selections.set(item.id, { ...s, checked: true, override: { price_mode: 'fixed', fixed_price: fixR, market_pct: null, notes: note } });
       }
-    } else {
-      const s = selections.get(item.id);
-      if (s) selections.set(item.id, { ...s, checked: false });
-    }
+
+      editor.classList.remove('open');
+      row.classList.remove('editing');
+      renderCatalog();
+      updateStats();
+    });
   }
-  renderCatalog();
-  updateStats();
 }
 
-function applyPctToCategory(type, pct, items) {
+/* ── External functions (called from inline HTML) ─────────────────────── */
+window.clearOverride = function(itemId, e) {
+  e.stopPropagation();
+  const s = selections.get(itemId);
+  if (s) selections.set(itemId, { ...s, override: null });
+  renderCatalog(); updateStats();
+};
+
+/* ── Category helpers ─────────────────────────────────────────────────── */
+function toggleCategory(type, checked, items) {
   for (const item of items) {
-    const existing = selections.get(item.id);
-    if (existing?.checked) {
-      selections.set(item.id, { ...existing, price_mode: 'market_pct', market_pct: pct / 100 });
-    } else if (!existing) {
-      // Don't auto-check items, just store for when they get checked
-    }
-    // If item is checked, apply. If not, don't force-check.
+    const s = selections.get(item.id) || { override: null };
+    selections.set(item.id, { ...s, checked });
   }
+  renderCatalog(); updateStats();
 }
 
 function updateCatCheckbox(sec, items) {
-  const check  = sec.querySelector('.cat-check');
-  const count  = items.filter(i => selections.get(i.id)?.checked).length;
-  const allOn  = count === items.length;
-  const someOn = count > 0 && count < items.length;
-  check.checked       = allOn;
-  check.indeterminate = someOn;
+  const check = sec.querySelector('.cat-check');
+  const n = items.filter(i => selections.get(i.id)?.checked).length;
+  check.checked = n === items.length;
+  check.indeterminate = n > 0 && n < items.length;
 }
 
 /* ── Stats ────────────────────────────────────────────────────────────── */
 function updateStats() {
-  const checked  = [...selections.values()].filter(s => s.checked);
-  const mktBased = checked.filter(s => s.price_mode === 'market_pct').length;
-  const fixed    = checked.filter(s => s.price_mode === 'fixed').length;
-  const cats     = new Set(
-    catalog.flatMap(c => c.items.filter(i => selections.get(i.id)?.checked).map(() => c.type))
-  ).size;
+  const checked = [...selections.values()].filter(s => s.checked);
+  const overrides = checked.filter(s => s.override && s.override.price_mode !== 'fixed').length;
+  const fixed     = checked.filter(s => s.override?.price_mode === 'fixed').length;
+  const inherit   = checked.length - overrides - fixed;
 
-  document.getElementById('statTotal').textContent  = checked.length;
-  document.getElementById('statCats').textContent   = cats;
-  document.getElementById('statMktPct').textContent = mktBased;
-  document.getElementById('statFixed').textContent  = fixed;
+  document.getElementById('statTotal').textContent    = checked.length;
+  document.getElementById('statInherit').textContent  = inherit;
+  document.getElementById('statOverride').textContent = overrides;
+  document.getElementById('statFixed').textContent    = fixed;
 
   const btn = document.getElementById('saveChangesBtn');
   btn.textContent = `Save (${checked.length})`;
@@ -746,58 +738,58 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
   const btn = document.getElementById('saveChangesBtn');
   btn.textContent = 'Saving…'; btn.disabled = true;
 
-  // Build the payload: all checked items
   const listings = [];
-  for (const cat of catalog) {
-    for (const item of cat.items) {
+  for (const { type, items } of catalog) {
+    for (const item of items) {
       const s = selections.get(item.id);
-      if (s?.checked) {
-        listings.push({
-          torn_item_id: item.id,
-          item_name:    item.name,
-          item_type:    item.type,
-          price_mode:   s.price_mode || 'market_pct',
-          market_pct:   s.price_mode === 'market_pct' ? s.market_pct : null,
-          fixed_price:  s.price_mode === 'fixed'      ? s.fixed_price : null,
-          notes:        s.notes || null,
-        });
-      }
+      if (!s?.checked) continue;
+      const o = s.override;
+      listings.push({
+        torn_item_id: item.id,
+        item_name:    item.name,
+        item_type:    item.type,
+        price_mode:   o?.price_mode || 'market_pct',
+        // null market_pct → stored as NULL in DB → inherits from cascade
+        market_pct:   o?.price_mode === 'market_pct' && o.market_pct != null
+                        ? o.market_pct / 100 : null,
+        fixed_price:  o?.price_mode === 'fixed' ? o.fixed_price : null,
+        notes:        o?.notes || null,
+      });
     }
+  }
+
+  const configCats = {};
+  for (const [type, pct] of Object.entries(catPcts)) {
+    if (pct != null) configCats[type] = pct;
   }
 
   try {
     const r = await api('/admin/api/trade/bulk-save', {
       method: 'POST',
-      body: JSON.stringify({ listings }),
+      body: JSON.stringify({
+        listings,
+        config: { global_pct: globalPct, categories: configCats },
+      }),
     });
     toast(`Saved — ${r.count} items listed`);
-    updateStats();
-  } catch (e) {
-    toast('Save failed: ' + e.message, true);
-  }
+  } catch (e) { toast('Save failed: ' + e.message, true); }
 
-  btn.textContent = `Save (${[...selections.values()].filter(s=>s.checked).length})`;
-  btn.disabled = false;
+  const n = [...selections.values()].filter(s => s.checked).length;
+  btn.textContent = `Save (${n})`; btn.disabled = false;
 });
 
-/* ── Expand / collapse all ────────────────────────────────────────────── */
-document.getElementById('expandAllBtn').addEventListener('click', () => {
-  document.querySelectorAll('.cat-section').forEach(s => s.classList.add('open'));
-});
-document.getElementById('collapseAllBtn').addEventListener('click', () => {
-  document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('open'));
-});
-
-/* ── Category filter ──────────────────────────────────────────────────── */
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+document.getElementById('expandAllBtn').addEventListener('click', () =>
+  document.querySelectorAll('.cat-section').forEach(s => s.classList.add('open')));
+document.getElementById('collapseAllBtn').addEventListener('click', () =>
+  document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('open')));
 document.getElementById('catSearch').addEventListener('input', e => {
-  filterQ = e.target.value.trim();
-  renderCatalog();
+  filterQ = e.target.value.trim(); renderCatalog();
 });
 
 /* ── Logout ───────────────────────────────────────────────────────────── */
 document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await fetch('/admin/logout', { method: 'POST' });
-  location.href = '/admin';
+  await fetch('/admin/logout', { method: 'POST' }); location.href = '/admin';
 });
 
 /* ── Init ─────────────────────────────────────────────────────────────── */
