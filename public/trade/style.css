@@ -113,10 +113,6 @@ body {
   color: var(--text); line-height: 1.1; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-.hero-bio {
-  font-size: 0.8rem; color: var(--text-dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 .hero-right {
   display: flex; flex-direction: column; gap: 0.35rem;
   align-items: flex-end; flex-shrink: 0;
@@ -141,6 +137,52 @@ body {
   transition: all var(--tr);
 }
 .contact-badge:hover { border-color: rgba(110,231,247,0.3); color: var(--accent); }
+
+/* ── Welcome message ───────────────────────────────────────────────────── */
+.welcome-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  position: relative; overflow: hidden;
+}
+.welcome-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0.4;
+}
+
+/* Markdown prose inside the welcome card */
+.welcome-body { font-size: 0.85rem; color: var(--text-dim); line-height: 1.65; }
+.welcome-body p  { margin: 0 0 0.6rem; }
+.welcome-body p:last-child { margin-bottom: 0; }
+.welcome-body h1,.welcome-body h2,.welcome-body h3 {
+  color: var(--text); font-weight: 600; margin: 0.75rem 0 0.35rem;
+  line-height: 1.2;
+}
+.welcome-body h1 { font-size: 1.05rem; }
+.welcome-body h2 { font-size: 0.95rem; }
+.welcome-body h3 { font-size: 0.875rem; }
+.welcome-body h1:first-child,.welcome-body h2:first-child,.welcome-body h3:first-child { margin-top: 0; }
+.welcome-body ul,.welcome-body ol { padding-left: 1.4rem; margin: 0.3rem 0 0.6rem; }
+.welcome-body li { margin-bottom: 0.2rem; }
+.welcome-body strong { color: var(--text); font-weight: 600; }
+.welcome-body em    { color: var(--text-dim); font-style: italic; }
+.welcome-body code  {
+  font-family: var(--mono); font-size: 0.78rem;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
+  border-radius: 4px; padding: 0.1rem 0.35rem; color: var(--accent);
+}
+.welcome-body blockquote {
+  border-left: 2px solid rgba(110,231,247,0.3);
+  padding-left: 0.75rem; margin: 0.4rem 0 0.6rem;
+  color: var(--text-muted); font-style: italic;
+}
+.welcome-body a { color: var(--accent); text-decoration: none; }
+.welcome-body a:hover { text-decoration: underline; }
+.welcome-body hr { border: none; border-top: 1px solid var(--glass-border); margin: 0.75rem 0; }
 
 /* ── Filter bar ────────────────────────────────────────────────────────── */
 .filter-bar {

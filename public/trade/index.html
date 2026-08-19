@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wanted to Buy — Torn Tracker</title>
   <link rel="stylesheet" href="/trade/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 </head>
 <body>
 
@@ -28,13 +29,17 @@
     <div class="hero-left">
       <div class="hero-label">Wanted to Buy</div>
       <div class="hero-name" id="heroName">Loading…</div>
-      <div class="hero-bio" id="heroBio"></div>
     </div>
     <div class="hero-right" id="heroContact"></div>
     <div class="hero-meta">
       <span class="meta-pill"><strong id="metaCount">—</strong> listings</span>
       <span class="meta-pill"><strong id="metaCats">—</strong> categories</span>
     </div>
+  </div>
+
+  <!-- Welcome message (bio rendered as markdown) -->
+  <div class="welcome-card" id="welcomeCard" style="display:none">
+    <div class="welcome-body" id="welcomeBody"></div>
   </div>
 
   <!-- Category filter bar -->

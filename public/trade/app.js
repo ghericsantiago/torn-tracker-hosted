@@ -26,9 +26,14 @@
     document.getElementById('heroName').textContent = profile.display_name || 'Torn Trader';
     document.title = `${profile.display_name || 'Torn Trader'} — WTB`;
 
-    const bioEl = document.getElementById('heroBio');
-    bioEl.textContent = profile.bio || '';
-    bioEl.style.display = profile.bio ? '' : 'none';
+    const welcomeCard = document.getElementById('welcomeCard');
+    const welcomeBody = document.getElementById('welcomeBody');
+    if (profile.bio) {
+      welcomeBody.innerHTML = marked.parse(profile.bio, { breaks: true });
+      welcomeCard.style.display = '';
+    } else {
+      welcomeCard.style.display = 'none';
+    }
 
     const contactEl = document.getElementById('heroContact');
     contactEl.innerHTML = '';
