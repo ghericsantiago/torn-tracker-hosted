@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trade Listings — Torn Tracker Admin</title>
   <link rel="stylesheet" href="/admin/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
   <style>
     /* ── Layout ─────────────────────────────────────────────────────────── */
     .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
@@ -122,10 +123,11 @@
     .cat-chevron { font-size: 0.55rem; color: var(--text-muted); transition: transform 0.16s; flex-shrink: 0; pointer-events: none; }
     .cat-section.open .cat-chevron { transform: rotate(180deg); }
 
-    .drag-handle { font-size: 1rem; color: var(--text-muted); cursor: grab; flex-shrink: 0; padding: 0 0.1rem; line-height: 1; user-select: none; }
+    .drag-handle { font-size: 1.1rem; color: var(--text-muted); cursor: grab; flex-shrink: 0; padding: 0 0.15rem; line-height: 1; user-select: none; touch-action: none; }
     .drag-handle:active { cursor: grabbing; }
-    .cat-section.dragging { opacity: 0.45; }
-    .cat-section.drag-over > .cat-row { border-top: 2px solid var(--accent); }
+    .sortable-ghost  { opacity: 0.35; background: rgba(110,231,247,0.04); }
+    .sortable-chosen > .cat-row { background: rgba(110,231,247,0.04); }
+    .sortable-drag   { opacity: 1; }
 
     .sort-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
     .sort-btn {
@@ -382,7 +384,7 @@ let catalog    = [];
 let catOrder   = [];   // display order — array of type strings
 let selections = new Map();
 let filterQ    = '';
-let dragSrc    = null; // drag-and-drop source type
+let sortableInst = null;
 
 const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
 const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
@@ -547,7 +549,6 @@ function renderCatalog() {
     sec.className = 'cat-section' + (isOpen ? ' open' : '');
     sec.dataset.type = type;
 
-    sec.setAttribute('draggable', 'true');
     sec.innerHTML = `
       <div class="cat-row">
         <span class="drag-handle" title="Drag to reorder">⠿</span>
@@ -589,19 +590,6 @@ function renderCatalog() {
       btn.addEventListener('click', e => { e.stopPropagation(); moveCategory(type, parseInt(btn.dataset.dir)); });
     });
 
-    // Drag-and-drop (desktop)
-    sec.addEventListener('dragstart', e => { dragSrc = type; sec.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-    sec.addEventListener('dragend',   () => { dragSrc = null; sec.classList.remove('dragging'); document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('drag-over')); });
-    sec.addEventListener('dragover',  e => { e.preventDefault(); if (dragSrc && dragSrc !== type) sec.classList.add('drag-over'); });
-    sec.addEventListener('dragleave', () => sec.classList.remove('drag-over'));
-    sec.addEventListener('drop', e => {
-      e.preventDefault(); sec.classList.remove('drag-over');
-      if (!dragSrc || dragSrc === type) return;
-      const from = catOrder.indexOf(dragSrc);
-      const to   = catOrder.indexOf(type);
-      catOrder.splice(to, 0, catOrder.splice(from, 1)[0]);
-      saveCatOrder(); renderCatalog();
-    });
 
     // Category % input — update state while typing, re-render only on blur
     const pctInput = sec.querySelector('.cat-pct-input');
@@ -621,6 +609,8 @@ function renderCatalog() {
   const total = catalog.reduce((a, c) => a + c.items.length, 0);
   document.getElementById('catalogSub').textContent =
     `${total} items · ${catalog.length} categories`;
+
+  initSortable();
 }
 
 function renderItemRow(item, type) {
@@ -752,6 +742,22 @@ function wireItemRows(sec, items, type) {
 }
 
 /* ── Category sort ────────────────────────────────────────────────────── */
+function initSortable() {
+  if (sortableInst) sortableInst.destroy();
+  sortableInst = Sortable.create(document.getElementById('catalogBody'), {
+    handle:      '.drag-handle',
+    animation:   180,
+    ghostClass:  'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass:   'sortable-drag',
+    onEnd() {
+      catOrder = [...document.querySelectorAll('.cat-section')].map(s => s.dataset.type);
+      saveCatOrder();
+      // no renderCatalog — DOM is already in the right order
+    },
+  });
+}
+
 function moveCategory(type, dir) {
   const i = catOrder.indexOf(type);
   const j = i + dir;
