@@ -13,10 +13,10 @@
     <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
     <div class="nav-search">
       <span class="search-icon">⌕</span>
-      <input type="text" id="globalSearch" placeholder="Search items..." autocomplete="off">
+      <input type="text" id="globalSearch" placeholder="Search items…" autocomplete="off">
     </div>
     <div class="nav-right">
-      <a href="/admin/trade" class="btn btn-sm">⚙ Manage</a>
+      <a href="/admin/trade" class="btn">⚙ Manage</a>
     </div>
   </div>
 </nav>
@@ -24,36 +24,31 @@
 <div class="page">
 
   <!-- Hero -->
-  <div class="hero" id="hero">
-    <div class="hero-label">Wanted to Buy</div>
-    <div class="hero-name" id="heroName">Loading…</div>
-    <div class="hero-bio" id="heroBio"></div>
-    <div class="hero-contact" id="heroContact"></div>
-    <div class="hero-meta" id="heroMeta">
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-label">Wanted to Buy</div>
+      <div class="hero-name" id="heroName">Loading…</div>
+      <div class="hero-bio" id="heroBio"></div>
+    </div>
+    <div class="hero-right" id="heroContact"></div>
+    <div class="hero-meta">
       <span class="meta-pill"><strong id="metaCount">—</strong> listings</span>
       <span class="meta-pill"><strong id="metaCats">—</strong> categories</span>
     </div>
   </div>
 
   <!-- Category filter bar -->
-  <div class="filter-bar" id="filterBar">
-    <button class="filter-pill active" data-cat="all">
-      All <span class="count" id="allCount">0</span>
-    </button>
-  </div>
+  <div class="filter-bar" id="filterBar"></div>
 
   <!-- Loading skeleton -->
   <div class="skeleton" id="skeleton">
-    <div class="skel-block" style="height:80px"></div>
-    <div class="skel-block" style="height:200px"></div>
-    <div class="skel-block" style="height:150px"></div>
+    <div class="skel-block" style="height:60px"></div>
+    <div class="skel-block" style="height:180px"></div>
+    <div class="skel-block" style="height:140px"></div>
   </div>
 
   <!-- No results -->
-  <div class="no-results" id="noResults">
-    <div style="font-size:2rem;margin-bottom:.5rem">🔍</div>
-    No items match your search.
-  </div>
+  <div class="no-results" id="noResults">🔍 No items match your search.</div>
 
   <!-- Category sections -->
   <div class="categories" id="categories"></div>
@@ -61,7 +56,6 @@
 </div>
 
 <footer class="footer" id="footer"></footer>
-
 <script src="/trade/app.js"></script>
 </body>
 </html>
