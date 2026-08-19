@@ -502,7 +502,7 @@ th.sort-desc::after { border-top:    5px solid var(--accent); }
   .nav { padding: 0 0.85rem; position: relative; }
   .nav-inner { height: 50px; }
   .nav-status { display: none; }
-  .nav-right .btn { display: none; }
+  .nav-right .btn.mobile-hide { display: none; }
   .nav-burger { display: flex; }
   body.nav-open .nav-dropdown { display: flex; }
   body.nav-open .nav-burger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }

@@ -316,8 +316,7 @@ body {
 
 @media (max-width: 640px) {
   .nav { position: relative; }
-  .nav-right .btn { display: none; }        /* hide desktop links */
-  .nav-right button:not(.nav-burger) { display: none; } /* hide desktop buttons */
+  .nav-right .mobile-hide { display: none; }
   .nav-burger { display: flex; }
   body.nav-open .nav-dropdown { display: flex; }
   /* animated burger → X */
