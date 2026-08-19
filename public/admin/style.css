@@ -329,70 +329,82 @@ body {
 .dashboard {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
-/* Stats */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
+/* Stats bar — single compact row */
+.stats-bar {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 1.25rem;
+  gap: 0;
 }
-.stat-card {
-  padding: 1.25rem 1.5rem;
-  text-align: center;
+.sbar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.2rem 1.1rem;
+  gap: 0.05rem;
+  flex: 1;
 }
-.stat-card.clickable {
-  cursor: pointer;
-  transition: border-color var(--tr), background var(--tr);
-}
-.stat-card.clickable:hover {
-  background: var(--glass-hover);
-  border-color: rgba(255,255,255,0.14);
-}
-.stat-card.filter-active {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-}
-.stat-card.filter-active-error {
-  border-color: var(--error);
-  background: rgba(248,113,113,0.1);
-}
-.stat-value {
-  font-size: 1.75rem;
+.sbar-item.clickable { cursor: pointer; border-radius: 8px; transition: background var(--tr); }
+.sbar-item.clickable:hover { background: var(--glass-hover); }
+.sbar-item.filter-active { background: var(--accent-dim); }
+.sbar-item.filter-active-error { background: rgba(248,113,113,0.1); }
+.sbar-val {
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.02em;
-}
-.stat-label {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-top: 0.25rem;
   font-family: var(--mono);
 }
-
-/* Dashboard grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 1.5rem;
-  align-items: start;
+.sbar-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-family: var(--mono);
 }
-.add-card { padding: 1.75rem; }
-.add-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; }
-.table-card { padding: 1.5rem; overflow: hidden; }
+.sbar-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--glass-border);
+  flex-shrink: 0;
+}
+
+/* Add drawer — collapsible */
+.add-drawer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4,0,0.2,1), padding 0.28s;
+  padding: 0 1.25rem;
+}
+.add-drawer.open {
+  max-height: 300px;
+  padding: 0.9rem 1.25rem;
+}
+.add-form-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+.add-form-fields .field { margin-bottom: 0; }
+
+/* Table card */
+.table-card { padding: 0 0 0.75rem; overflow: hidden; }
 .table-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 0;
 }
-.table-header h2 { font-size: 1rem; font-weight: 600; }
+.table-header h2 { font-size: 0.92rem; font-weight: 600; }
 
 /* Table controls */
 .table-controls { display: flex; align-items: center; gap: 0.6rem; }
@@ -600,60 +612,55 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 }
 
 @media (max-width: 900px) {
-  .dashboard-grid { grid-template-columns: 1fr; }
-  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .add-form-fields { grid-template-columns: 1fr 1fr; }
+  .add-form-fields > :last-child { grid-column: 1 / -1; justify-self: start; }
   .nav { padding: 0 1rem; }
-  .table-search { width: 150px; }
+  .table-search { width: 140px; }
 }
 
 @media (max-width: 640px) {
-  .dashboard { padding: 1rem; gap: 1rem; }
-  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 0.65rem; }
+  .dashboard { padding: 0.65rem; gap: 0.55rem; }
 
-  /* Stat cards: more compact */
-  .stat-card { padding: 0.85rem 0.75rem; }
-  .stat-value { font-size: 1.35rem; }
-  .stat-label { font-size: 0.65rem; }
+  /* Stats bar: smaller values */
+  .stats-bar { padding: 0.4rem 0.5rem; }
+  .sbar-item { padding: 0.15rem 0.5rem; }
+  .sbar-val { font-size: 0.9rem; }
+  .sbar-label { font-size: 0.55rem; }
+  .sbar-sep { height: 22px; }
 
-  /* Nav: hide "View Client" link on mobile, keep Inventory Monitor + Settings + Logout */
+  /* Add drawer: single column */
+  .add-drawer.open { padding: 0.75rem 0.75rem; }
+  .add-form-fields { grid-template-columns: 1fr; }
+  .add-form-fields > :last-child { grid-column: 1; justify-self: stretch; }
+
+  /* Nav */
   .nav-right a.btn.mobile-hide { display: none; }
   .nav { padding: 0 0.85rem; }
   .nav-inner { height: 50px; }
 
-  /* Table: hide less critical columns to fit screen */
+  /* Table: hide less critical columns */
   #itemsTable thead th:nth-child(1),
-  #itemsTable tbody td:nth-child(1) { display: none; } /* Item ID */
+  #itemsTable tbody td:nth-child(1) { display: none; }
   #itemsTable thead th:nth-child(6),
-  #itemsTable tbody td:nth-child(6) { display: none; } /* Retries */
+  #itemsTable tbody td:nth-child(6) { display: none; }
   #itemsTable thead th:nth-child(7),
-  #itemsTable tbody td:nth-child(7) { display: none; } /* Records */
+  #itemsTable tbody td:nth-child(7) { display: none; }
 
-  /* Table cells: tighter padding */
-  tbody td { padding: 0.6rem 0.5rem; font-size: 0.8rem; }
-  thead th  { padding: 0 0.5rem 0.6rem; }
+  tbody td { padding: 0.55rem 0.5rem; font-size: 0.8rem; }
+  thead th  { padding: 0 0.5rem 0.55rem; }
 
-  /* Table controls: stack search under heading */
-  .table-header { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  /* Table header: stack on mobile */
+  .table-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; }
   .table-controls { width: 100%; }
   .table-search { width: 100%; flex: 1; }
 
-  /* Buttons: larger touch targets */
-  .btn { padding: 0.6rem 1rem; }
-  .btn-sm { padding: 0.5rem 0.85rem; }
-
-  /* Add card: full-width */
-  .add-card { padding: 1.25rem; }
-
-  /* Modal: full-width on small screens */
+  /* Modal: full-width */
   .modal-card { width: calc(100vw - 2rem); padding: 1.25rem; }
   .settings-modal-card { width: calc(100vw - 2rem); }
 }
 
 @media (max-width: 480px) {
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .stat-value { font-size: 1.2rem; }
+  .sbar-item { padding: 0.1rem 0.35rem; }
   .nav-brand { font-size: 0.88rem; }
-
-  /* Action buttons: icon-only to save space */
   .actions .btn-icon { padding: 0.35rem; font-size: 1.1rem; }
 }

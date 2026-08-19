@@ -38,60 +38,68 @@
 
   <main class="dashboard">
 
-    <!-- Stats row -->
-    <div class="stats-row">
-      <div class="glass-card stat-card">
-        <div class="stat-value" id="statActive">—</div>
-        <div class="stat-label">Active Items</div>
+    <!-- Stats bar -->
+    <div class="glass-card stats-bar">
+      <div class="sbar-item">
+        <span class="sbar-val" id="statActive">—</span>
+        <span class="sbar-label">Active</span>
       </div>
-      <div class="glass-card stat-card clickable" id="filterInactiveCard">
-        <div class="stat-value" id="statInactive">—</div>
-        <div class="stat-label">Inactive</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item clickable" id="filterInactiveCard">
+        <span class="sbar-val" id="statInactive">—</span>
+        <span class="sbar-label">Inactive</span>
       </div>
-      <div class="glass-card stat-card clickable" id="filterErrorCard">
-        <div class="stat-value error-color" id="statErrors">—</div>
-        <div class="stat-label">Errors</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item clickable" id="filterErrorCard">
+        <span class="sbar-val error-color" id="statErrors">—</span>
+        <span class="sbar-label">Errors</span>
       </div>
-      <div class="glass-card stat-card">
-        <div class="stat-value" id="statRecords">—</div>
-        <div class="stat-label">Total Records</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statRecords">—</span>
+        <span class="sbar-label">Records</span>
       </div>
-      <div class="glass-card stat-card">
-        <div class="stat-value mono" id="statLastSync">—</div>
-        <div class="stat-label">Last Sync</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val mono" id="statLastSync" style="font-size:.72rem">—</span>
+        <span class="sbar-label">Last Sync</span>
       </div>
     </div>
 
-    <div class="dashboard-grid">
-
-      <!-- Add item form -->
-      <div class="glass-card add-card">
-        <h2>Add Item to Monitor</h2>
+    <!-- Add item drawer -->
+    <div class="glass-card add-drawer" id="addDrawer">
+      <div class="add-drawer-inner">
         <form id="addForm">
-          <div class="field">
-            <label>Torn API Key</label>
-            <input id="addApiKey" type="text" placeholder="Your Torn API key" required />
-          </div>
-          <div class="field">
-            <label>Item Name</label>
-            <div class="ac-wrap">
-              <input id="addItemSearch" type="text" placeholder="Search by name…" autocomplete="off" />
-              <div id="addItemAc" class="ac-dropdown hidden"></div>
+          <div class="add-form-fields">
+            <div class="field">
+              <label>API Key</label>
+              <input id="addApiKey" type="text" placeholder="Your Torn API key" required />
             </div>
-            <div id="selectedChips" class="selected-chips"></div>
+            <div class="field">
+              <label>Item Name</label>
+              <div class="ac-wrap">
+                <input id="addItemSearch" type="text" placeholder="Search by name…" autocomplete="off" />
+                <div id="addItemAc" class="ac-dropdown hidden"></div>
+              </div>
+              <div id="selectedChips" class="selected-chips"></div>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:.5rem">
+              <div id="addError" class="error-msg hidden" style="flex:1"></div>
+              <button type="submit" class="btn btn-primary btn-sm">Add Item</button>
+            </div>
           </div>
-          <div id="addError" class="error-msg hidden"></div>
-          <button type="submit" class="btn btn-primary">Add Item</button>
         </form>
       </div>
+    </div>
 
-      <!-- Items table -->
-      <div class="glass-card table-card">
-        <div class="table-header">
+    <!-- Items table (full width) -->
+    <div class="glass-card table-card">
+      <div class="table-header">
           <h2>Monitored Items</h2>
           <div class="table-controls">
-            <input id="tableSearch" type="text" placeholder="Search by ID or name…" class="table-search" />
+            <input id="tableSearch" type="text" placeholder="Search…" class="table-search" />
             <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+            <button class="btn btn-ghost btn-sm" id="addToggleBtn">＋ Add</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -115,8 +123,6 @@
         </div>
         <div class="pagination" id="pagination"></div>
       </div>
-
-    </div>
 
     <!-- Setup modal (forced on first login) -->
     <div id="setupModal" class="modal hidden">
@@ -197,6 +203,8 @@
     // Mobile duplicates wire to same handlers as desktop
     document.getElementById('settingsBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('settingsBtn').click(); });
     document.getElementById('logoutBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('logoutBtn').click(); });
+    // Add drawer toggle
+    document.getElementById('addToggleBtn').addEventListener('click', () => document.getElementById('addDrawer').classList.toggle('open'));
   </script>
 </body>
 </html>
