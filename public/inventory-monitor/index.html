@@ -4,20 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Torn Inventory Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <h1>🧾 Torn Inventory Monitor <span>— what's in / what's out</span></h1>
-  <span class="status" id="st-since">…</span>
-  <span class="spacer"></span>
-  <span class="status" id="st-poll"><span class="dot idle"></span>waiting…</span>
-  <button class="btn blue" id="btn-poll">↻ Refresh now</button>
-  <button class="btn green" id="btn-adjust">＋ Adjust</button>
-  <button class="btn gray" id="btn-reset">Reset</button>
-  <a href="/admin/dashboard" class="btn gray" style="text-decoration:none">← Admin</a>
-</header>
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-brand"><span class="mono accent">&gt;_</span> Inventory Monitor</span>
+    <div class="nav-status">
+      <span class="status" id="st-since">…</span>
+      <span class="status" id="st-poll"><span class="dot idle"></span>waiting…</span>
+    </div>
+    <div class="nav-right">
+      <button class="btn btn-ghost btn-sm" id="btn-poll">↻ Refresh</button>
+      <button class="btn btn-ghost btn-sm" id="btn-adjust">＋ Adjust</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">Reset</button>
+      <a href="/admin/dashboard" class="btn btn-ghost btn-sm">← Admin</a>
+    </div>
+  </div>
+</nav>
+
+<main class="inv-main">
 <div class="poll-progress" id="poll-progress" style="display:none">
   <div class="poll-progress-track"><div class="poll-progress-fill" id="poll-progress-fill"></div></div>
   <div class="poll-progress-label" id="poll-progress-label"></div>
@@ -459,6 +469,7 @@
 </div>
 
 <div id="toast"></div>
+</main>
 <script src="app.js"></script>
 </body>
 </html>
