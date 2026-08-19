@@ -514,8 +514,9 @@ async function loadCatalog() {
 document.getElementById('globalPctInput').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
   globalPct = (!isNaN(v) && v > 0) ? v : null;
-  renderCatalog(); updateStats();
+  updateStats();
 });
+document.getElementById('globalPctInput').addEventListener('change', () => { renderCatalog(); });
 
 /* ── Render catalog ───────────────────────────────────────────────────── */
 function renderCatalog() {
@@ -602,14 +603,15 @@ function renderCatalog() {
       saveCatOrder(); renderCatalog();
     });
 
-    // Category % input — live update
+    // Category % input — update state while typing, re-render only on blur
     const pctInput = sec.querySelector('.cat-pct-input');
     pctInput.addEventListener('input', () => {
       const v = parseFloat(pctInput.value);
       catPcts[type] = (!isNaN(v) && v > 0) ? v : null;
       pctInput.classList.toggle('has-value', catPcts[type] != null);
-      renderCatalog(); updateStats();
+      updateStats();
     });
+    pctInput.addEventListener('change', () => { renderCatalog(); });
 
     // Wire item rows
     wireItemRows(sec, filtered, type);
