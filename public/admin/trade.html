@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trade Listings — Torn Tracker Admin</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <style>
+    /* ── Trade-specific additions ───────────────────────────────────────── */
+    .trade-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* Profile card */
+    .profile-card { padding: 1.5rem; }
+    .profile-card h2 { margin-bottom: 1.25rem; font-size: 1rem; }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex; border: 1px solid var(--glass-border);
+      border-radius: 8px; overflow: hidden; margin-bottom: 1rem;
+    }
+    .mode-btn {
+      flex: 1; padding: 0.55rem 0.5rem; font-size: 0.82rem; font-weight: 500;
+      font-family: var(--sans); background: transparent; border: none;
+      color: var(--text-dim); cursor: pointer; transition: all var(--tr);
+      border-right: 1px solid var(--glass-border);
+    }
+    .mode-btn:last-child { border-right: none; }
+    .mode-btn.active {
+      background: var(--accent-dim); color: var(--accent);
+    }
+
+    /* Autocomplete */
+    .ac-wrap { position: relative; }
+    .ac-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #0d0f1a; border: 1px solid var(--glass-border);
+      border-radius: 10px; max-height: 220px; overflow-y: auto;
+      z-index: 100; display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .ac-dropdown.open { display: block; }
+    .ac-item {
+      padding: 0.6rem 0.85rem; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.875rem; transition: background var(--tr);
+    }
+    .ac-item:hover { background: var(--glass-hover); }
+    .ac-item-type {
+      font-family: var(--mono); font-size: 0.65rem;
+      color: var(--text-muted); background: var(--glass-bg);
+      padding: 0.1rem 0.45rem; border-radius: 4px;
+      border: 1px solid var(--glass-border);
+    }
+
+    /* Listings table card */
+    .listings-card { padding: 0; }
+    .listings-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+      flex-wrap: wrap;
+    }
+    .listings-head h2 { font-size: 1rem; }
+    .listings-controls { display: flex; gap: 0.5rem; align-items: center; }
+    .table-search {
+      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+      border-radius: 7px; padding: 0.4rem 0.75rem; color: var(--text);
+      font-size: 0.825rem; font-family: var(--sans); width: 180px; outline: none;
+    }
+    .table-search:focus { border-color: rgba(110,231,247,0.3); }
+    .cat-filter {
+      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+      border-radius: 7px; padding: 0.4rem 0.75rem; color: var(--text);
+      font-size: 0.825rem; font-family: var(--sans); outline: none; cursor: pointer;
+    }
+    .table-wrap { overflow-x: auto; }
+    .listings-table { width: 100%; border-collapse: collapse; }
+    .listings-table th {
+      font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-muted); padding: 0.65rem 1rem;
+      text-align: left; border-bottom: 1px solid var(--glass-border);
+      white-space: nowrap;
+    }
+    .listings-table td {
+      padding: 0.65rem 1rem; font-size: 0.85rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: middle;
+    }
+    .listings-table tr:last-child td { border-bottom: none; }
+    .listings-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .listings-table tr.inactive td { opacity: 0.45; }
+    .price-mono { font-family: var(--mono); color: var(--accent); font-size: 0.85rem; }
+    .pct-badge-sm {
+      font-family: var(--mono); font-size: 0.62rem;
+      background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.15);
+      color: rgba(110,231,247,0.7); padding: 0.1rem 0.35rem; border-radius: 4px;
+    }
+    .type-badge {
+      font-family: var(--mono); font-size: 0.62rem;
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      color: var(--text-muted); padding: 0.1rem 0.45rem; border-radius: 4px;
+    }
+    .notes-cell-text { color: var(--text-dim); max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notes-cell-empty { color: var(--text-muted); font-style: italic; font-size: 0.78rem; }
+    .actions { display: flex; gap: 0.25rem; align-items: center; }
+
+    /* Edit modal */
+    .modal-card { padding: 1.75rem; }
+    .modal-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+      background: #1d2540; border: 1px solid var(--glass-border);
+      border-radius: 10px; padding: 0.65rem 1.25rem;
+      font-size: 0.85rem; color: var(--text); z-index: 1000;
+      display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      font-family: var(--mono); white-space: nowrap;
+    }
+    #toast.show { display: block; animation: fadeIn 0.2s; }
+    #toast.error { border-color: rgba(248,113,113,0.3); color: var(--error); }
+    @keyframes fadeIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { padding: 1rem 1.25rem; text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
+    .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); margin-top: 0.25rem; }
+
+    /* Responsive */
+    @media (max-width: 960px) {
+      .trade-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .stats-row { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
+    <div class="nav-right">
+      <a href="/trade" target="_blank" class="btn btn-ghost btn-sm mobile-hide">View Listing</a>
+      <a href="/admin/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+      <a href="/admin/inventory" class="btn btn-ghost btn-sm mobile-hide">Inventory</a>
+      <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<main class="dashboard">
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="glass-card stat-card">
+      <div class="stat-value" id="statTotal">—</div>
+      <div class="stat-label">Total Listings</div>
+    </div>
+    <div class="glass-card stat-card">
+      <div class="stat-value" id="statActive" style="color:var(--success)">—</div>
+      <div class="stat-label">Active</div>
+    </div>
+    <div class="glass-card stat-card">
+      <div class="stat-value" id="statCats">—</div>
+      <div class="stat-label">Categories</div>
+    </div>
+    <div class="glass-card stat-card">
+      <div class="stat-value" id="statMktPct" style="color:var(--accent-2)">—</div>
+      <div class="stat-label">Market % Based</div>
+    </div>
+  </div>
+
+  <div class="trade-grid">
+
+    <!-- Left column: Profile + Add listing -->
+    <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+      <!-- Profile card -->
+      <div class="glass-card profile-card">
+        <h2>Trader Profile</h2>
+        <form id="profileForm">
+          <div class="field">
+            <label>Display Name</label>
+            <input type="text" id="pDisplayName" placeholder="Your in-game name" required>
+          </div>
+          <div class="field">
+            <label>Discord Handle</label>
+            <input type="text" id="pDiscord" placeholder="@YourName#1234">
+          </div>
+          <div class="field">
+            <label>Torn Profile URL</label>
+            <input type="url" id="pTornUrl" placeholder="https://www.torn.com/profiles.php?XID=...">
+          </div>
+          <div class="field">
+            <label>Bio / Description</label>
+            <textarea id="pBio" rows="3" placeholder="What you're looking for, preferences, etc."
+              style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;padding:.6rem .85rem;color:var(--text);font-size:.875rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="saveProfileBtn">Save Profile</button>
+        </form>
+      </div>
+
+      <!-- Add listing card -->
+      <div class="glass-card profile-card">
+        <h2>Add Listing</h2>
+        <form id="addForm">
+          <div class="field">
+            <label>Item</label>
+            <div class="ac-wrap">
+              <input type="text" id="itemSearch" placeholder="Search item name…" autocomplete="off">
+              <div class="ac-dropdown" id="acDropdown"></div>
+            </div>
+            <input type="hidden" id="selectedItemId">
+            <input type="hidden" id="selectedItemType">
+            <div id="selectedItemName" style="margin-top:.4rem;font-size:.8rem;color:var(--accent);font-family:var(--mono);min-height:1.1rem"></div>
+          </div>
+
+          <div class="field">
+            <label>Price Mode</label>
+            <div class="mode-toggle">
+              <button type="button" class="mode-btn active" data-mode="fixed">Fixed $</button>
+              <button type="button" class="mode-btn" data-mode="market_pct">% of Market</button>
+            </div>
+          </div>
+
+          <div class="field" id="fixedPriceField">
+            <label>Buy Price ($)</label>
+            <input type="number" id="fixedPrice" placeholder="e.g. 5000000" min="0">
+          </div>
+
+          <div class="field" id="marketPctField" style="display:none">
+            <label>Market % (e.g. 85 for 85%)</label>
+            <input type="number" id="marketPct" placeholder="e.g. 85" min="1" max="200" step="0.1">
+          </div>
+
+          <div class="field">
+            <label>Notes <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+            <input type="text" id="addNotes" placeholder="Any condition, min qty, etc.">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="addBtn">Add Listing</button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Right column: Listings table -->
+    <div class="glass-card listings-card">
+      <div class="listings-head">
+        <h2>Listings</h2>
+        <div class="listings-controls">
+          <select class="cat-filter" id="catFilter">
+            <option value="">All categories</option>
+          </select>
+          <input type="text" class="table-search" id="tableSearch" placeholder="Search…">
+          <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="listings-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Type</th>
+              <th>Offer Price</th>
+              <th>Notes</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listingsBody">
+            <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Edit modal -->
+<div class="modal hidden" id="editModal">
+  <div class="modal-overlay" id="editOverlay"></div>
+  <div class="glass-card modal-card" style="width:480px;max-width:95vw">
+    <div class="modal-title" id="editModalTitle">Edit Listing</div>
+    <input type="hidden" id="editId">
+
+    <div class="field">
+      <label>Item</label>
+      <div style="font-size:.9rem;color:var(--accent);font-family:var(--mono)" id="editItemName"></div>
+    </div>
+
+    <div class="field">
+      <label>Price Mode</label>
+      <div class="mode-toggle">
+        <button type="button" class="mode-btn active" data-emode="fixed">Fixed $</button>
+        <button type="button" class="mode-btn" data-emode="market_pct">% of Market</button>
+      </div>
+    </div>
+
+    <div class="field" id="editFixedField">
+      <label>Buy Price ($)</label>
+      <input type="number" id="editFixedPrice" min="0">
+    </div>
+
+    <div class="field" id="editMktField" style="display:none">
+      <label>Market % (e.g. 85)</label>
+      <input type="number" id="editMarketPct" min="1" max="200" step="0.1">
+    </div>
+
+    <div class="field">
+      <label>Notes</label>
+      <input type="text" id="editNotes" placeholder="optional">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="editCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="editSaveBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ── State & helpers ──────────────────────────────────────────────────── */
+const fmt = n => n == null ? '—' : '$' + Number(n).toLocaleString();
+const pct = v => v == null ? '' : (v * 100).toFixed(1).replace(/\.0$/, '') + '%';
+
+let listings = [];
+let addMode  = 'fixed';
+let editMode = 'fixed';
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'show' + (isError ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 2500);
+}
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(j.error || res.statusText);
+  }
+  return res.json();
+}
+
+/* ── Profile ──────────────────────────────────────────────────────────── */
+async function loadProfile() {
+  try {
+    const p = await api('/admin/api/trade/profile');
+    document.getElementById('pDisplayName').value = p.display_name || '';
+    document.getElementById('pDiscord').value     = p.discord_handle || '';
+    document.getElementById('pTornUrl').value     = p.torn_profile_url || '';
+    document.getElementById('pBio').value         = p.bio || '';
+  } catch (e) { toast('Failed to load profile: ' + e.message, true); }
+}
+
+document.getElementById('profileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('saveProfileBtn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    await api('/admin/api/trade/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        display_name:    document.getElementById('pDisplayName').value,
+        discord_handle:  document.getElementById('pDiscord').value,
+        bio:             document.getElementById('pBio').value,
+        torn_profile_url: document.getElementById('pTornUrl').value,
+      }),
+    });
+    toast('Profile saved');
+  } catch (e) { toast('Save failed: ' + e.message, true); }
+  btn.textContent = 'Save Profile'; btn.disabled = false;
+});
+
+/* ── Item autocomplete ────────────────────────────────────────────────── */
+let acTimeout;
+let acSelected = null;
+
+const itemSearchEl = document.getElementById('itemSearch');
+const acDropdown   = document.getElementById('acDropdown');
+const selectedId   = document.getElementById('selectedItemId');
+const selectedType = document.getElementById('selectedItemType');
+const selectedName = document.getElementById('selectedItemName');
+
+itemSearchEl.addEventListener('input', () => {
+  acSelected = null;
+  selectedId.value   = '';
+  selectedType.value = '';
+  selectedName.textContent = '';
+  clearTimeout(acTimeout);
+  const q = itemSearchEl.value.trim();
+  if (!q) { acDropdown.classList.remove('open'); return; }
+  acTimeout = setTimeout(() => fetchAcItems(q), 200);
+});
+
+async function fetchAcItems(q) {
+  try {
+    const items = await api(`/admin/api/trade/search-items?q=${encodeURIComponent(q)}`);
+    acDropdown.innerHTML = '';
+    if (!items.length) {
+      acDropdown.innerHTML = '<div class="ac-item" style="color:var(--text-muted)">No items found</div>';
+    } else {
+      for (const item of items) {
+        const div = document.createElement('div');
+        div.className = 'ac-item';
+        div.innerHTML = `<span>${item.name}</span><span class="ac-item-type">${item.type || ''}</span>`;
+        div.addEventListener('mousedown', e => {
+          e.preventDefault();
+          selectItem(item);
+        });
+        acDropdown.appendChild(div);
+      }
+    }
+    acDropdown.classList.add('open');
+  } catch (e) { /* ignore */ }
+}
+
+function selectItem(item) {
+  acSelected = item;
+  itemSearchEl.value   = item.name;
+  selectedId.value     = item.id;
+  selectedType.value   = item.type || 'Other';
+  selectedName.textContent = `✓ ${item.name} · ${item.type || 'Other'}`;
+  acDropdown.classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ac-wrap')) acDropdown.classList.remove('open');
+});
+
+/* ── Price mode toggle (Add form) ─────────────────────────────────────── */
+document.querySelectorAll('.mode-btn[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    addMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('fixedPriceField').style.display  = addMode === 'fixed'      ? '' : 'none';
+    document.getElementById('marketPctField').style.display   = addMode === 'market_pct' ? '' : 'none';
+  });
+});
+
+/* ── Price mode toggle (Edit modal) ───────────────────────────────────── */
+document.querySelectorAll('.mode-btn[data-emode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    editMode = btn.dataset.emode;
+    document.querySelectorAll('.mode-btn[data-emode]').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('editFixedField').style.display = editMode === 'fixed'      ? '' : 'none';
+    document.getElementById('editMktField').style.display   = editMode === 'market_pct' ? '' : 'none';
+  });
+});
+
+/* ── Add listing ──────────────────────────────────────────────────────── */
+document.getElementById('addForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!selectedId.value) { toast('Please select an item', true); return; }
+
+  const btn = document.getElementById('addBtn');
+  btn.textContent = 'Adding…'; btn.disabled = true;
+
+  try {
+    await api('/admin/api/trade/listings', {
+      method: 'POST',
+      body: JSON.stringify({
+        torn_item_id: parseInt(selectedId.value),
+        item_name:    itemSearchEl.value.trim(),
+        item_type:    selectedType.value || 'Other',
+        price_mode:   addMode,
+        fixed_price:  addMode === 'fixed'      ? parseInt(document.getElementById('fixedPrice').value) || null : null,
+        market_pct:   addMode === 'market_pct' ? parseFloat(document.getElementById('marketPct').value) / 100 || null : null,
+        notes:        document.getElementById('addNotes').value.trim() || null,
+      }),
+    });
+    toast('Listing added');
+    resetAddForm();
+    loadListings();
+  } catch (e) { toast('Error: ' + e.message, true); }
+
+  btn.textContent = 'Add Listing'; btn.disabled = false;
+});
+
+function resetAddForm() {
+  itemSearchEl.value = '';
+  selectedId.value = '';
+  selectedType.value = '';
+  selectedName.textContent = '';
+  document.getElementById('fixedPrice').value  = '';
+  document.getElementById('marketPct').value   = '';
+  document.getElementById('addNotes').value    = '';
+  acSelected = null;
+}
+
+/* ── Load & render listings ───────────────────────────────────────────── */
+async function loadListings() {
+  try {
+    listings = await api('/admin/api/trade/listings');
+    renderListings();
+    updateStats();
+    updateCatFilter();
+  } catch (e) {
+    document.getElementById('listingsBody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--error)">${e.message}</td></tr>`;
+  }
+}
+
+function updateStats() {
+  const active = listings.filter(l => l.is_active).length;
+  const cats   = new Set(listings.map(l => l.item_type)).size;
+  const mktPct = listings.filter(l => l.price_mode === 'market_pct').length;
+  document.getElementById('statTotal').textContent  = listings.length;
+  document.getElementById('statActive').textContent = active;
+  document.getElementById('statCats').textContent   = cats;
+  document.getElementById('statMktPct').textContent = mktPct;
+}
+
+function updateCatFilter() {
+  const cats = [...new Set(listings.map(l => l.item_type))].sort();
+  const sel  = document.getElementById('catFilter');
+  const cur  = sel.value;
+  sel.innerHTML = '<option value="">All categories</option>';
+  for (const c of cats) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    if (c === cur) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+function renderListings() {
+  const catF   = document.getElementById('catFilter').value;
+  const searchQ = document.getElementById('tableSearch').value.trim().toLowerCase();
+
+  let filtered = listings;
+  if (catF)    filtered = filtered.filter(l => l.item_type === catF);
+  if (searchQ) filtered = filtered.filter(l => l.item_name.toLowerCase().includes(searchQ));
+
+  const tbody = document.getElementById('listingsBody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">No listings found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(l => {
+    const priceHtml = l.price_mode === 'market_pct'
+      ? `<div class="price-mono">${l.effective_price ? fmt(l.effective_price) : '—'}</div>
+         <div style="margin-top:.15rem"><span class="pct-badge-sm">${pct(l.market_pct)} market</span></div>`
+      : `<div class="price-mono">${fmt(l.fixed_price)}</div>`;
+
+    const notesHtml = l.notes
+      ? `<span class="notes-cell-text" title="${esc(l.notes)}">${esc(l.notes)}</span>`
+      : `<span class="notes-cell-empty">—</span>`;
+
+    return `<tr class="${l.is_active ? '' : 'inactive'}" data-id="${l.id}">
+      <td style="font-weight:600">${esc(l.item_name)}</td>
+      <td><span class="type-badge">${esc(l.item_type)}</span></td>
+      <td>${priceHtml}</td>
+      <td>${notesHtml}</td>
+      <td>
+        <span class="badge ${l.is_active ? 'badge-active' : 'badge-inactive'}">
+          ${l.is_active ? 'Active' : 'Hidden'}
+        </span>
+      </td>
+      <td>
+        <div class="actions">
+          <button class="btn-icon" title="Edit" onclick="openEdit(${l.id})">✏</button>
+          <button class="btn-icon" title="${l.is_active ? 'Hide' : 'Show'}" onclick="toggleListing(${l.id})">
+            ${l.is_active ? '👁' : '👁‍🗨'}
+          </button>
+          <button class="btn-icon danger" title="Delete" onclick="deleteListing(${l.id}, '${esc(l.item_name)}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('catFilter').addEventListener('change', renderListings);
+document.getElementById('tableSearch').addEventListener('input', renderListings);
+document.getElementById('refreshBtn').addEventListener('click', loadListings);
+
+/* ── Toggle active ────────────────────────────────────────────────────── */
+async function toggleListing(id) {
+  try {
+    const r = await api(`/admin/api/trade/listings/${id}/toggle`, { method: 'PATCH', body: '{}' });
+    const item = listings.find(l => l.id === id);
+    if (item) item.is_active = r.is_active;
+    renderListings();
+    updateStats();
+    toast(r.is_active ? 'Listing shown' : 'Listing hidden');
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+
+/* ── Delete ───────────────────────────────────────────────────────────── */
+async function deleteListing(id, name) {
+  if (!confirm(`Delete listing for "${name}"?`)) return;
+  try {
+    await api(`/admin/api/trade/listings/${id}`, { method: 'DELETE' });
+    listings = listings.filter(l => l.id !== id);
+    renderListings();
+    updateStats();
+    updateCatFilter();
+    toast('Listing deleted');
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+
+/* ── Edit modal ───────────────────────────────────────────────────────── */
+function openEdit(id) {
+  const l = listings.find(l => l.id === id);
+  if (!l) return;
+
+  document.getElementById('editId').value         = l.id;
+  document.getElementById('editModalTitle').textContent = `Edit: ${l.item_name}`;
+  document.getElementById('editItemName').textContent   = `${l.item_name} · ${l.item_type}`;
+
+  editMode = l.price_mode;
+  document.querySelectorAll('.mode-btn[data-emode]').forEach(b =>
+    b.classList.toggle('active', b.dataset.emode === editMode)
+  );
+  document.getElementById('editFixedField').style.display = editMode === 'fixed'      ? '' : 'none';
+  document.getElementById('editMktField').style.display   = editMode === 'market_pct' ? '' : 'none';
+
+  document.getElementById('editFixedPrice').value = l.fixed_price || '';
+  document.getElementById('editMarketPct').value  = l.market_pct ? (l.market_pct * 100).toFixed(1).replace(/\.0$/,'') : '';
+  document.getElementById('editNotes').value      = l.notes || '';
+
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEdit() {
+  document.getElementById('editModal').classList.add('hidden');
+}
+
+document.getElementById('editCancelBtn').addEventListener('click', closeEdit);
+document.getElementById('editOverlay').addEventListener('click', closeEdit);
+
+document.getElementById('editSaveBtn').addEventListener('click', async () => {
+  const id  = parseInt(document.getElementById('editId').value);
+  const btn = document.getElementById('editSaveBtn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+
+  try {
+    const updated = await api(`/admin/api/trade/listings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        price_mode:  editMode,
+        fixed_price: editMode === 'fixed'      ? parseInt(document.getElementById('editFixedPrice').value) || null : null,
+        market_pct:  editMode === 'market_pct' ? parseFloat(document.getElementById('editMarketPct').value) / 100 || null : null,
+        notes:       document.getElementById('editNotes').value.trim() || null,
+        is_active:   listings.find(l => l.id === id)?.is_active ?? true,
+      }),
+    });
+    const idx = listings.findIndex(l => l.id === id);
+    if (idx !== -1) listings[idx] = { ...listings[idx], ...updated };
+    closeEdit();
+    renderListings();
+    updateStats();
+    toast('Listing updated');
+  } catch (e) { toast('Error: ' + e.message, true); }
+
+  btn.textContent = 'Save Changes'; btn.disabled = false;
+});
+
+/* ── Logout ───────────────────────────────────────────────────────────── */
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/admin/logout', { method: 'POST' });
+  location.href = '/admin';
+});
+
+/* ── Utils ────────────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Init ─────────────────────────────────────────────────────────────── */
+loadProfile();
+loadListings();
+</script>
+</body>
+</html>

@@ -22,9 +22,11 @@ app.use(session({
 
 // Static files
 app.use('/admin',  express.static(path.join(__dirname, 'public/admin')));
+app.use('/trade',  express.static(path.join(__dirname, 'public/trade')));
 app.use('/',       express.static(path.join(__dirname, 'public/client')));
 
 // Routes
+app.use('/',       require('./routes/trade'));
 app.use('/admin',  require('./routes/admin'));
 app.use('/api',             require('./routes/api'));
 app.use('/api/portfolio',   require('./routes/portfolio'));
