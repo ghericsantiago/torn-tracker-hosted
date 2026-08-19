@@ -34,6 +34,15 @@
       background: var(--accent-dim); color: var(--accent);
     }
 
+    /* Item icon */
+    .item-icon-sm {
+      width: 28px; height: 28px; border-radius: 5px; object-fit: contain;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+      padding: 2px; image-rendering: pixelated; flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .item-cell-admin { display: flex; align-items: center; gap: 0.6rem; }
+
     /* Autocomplete */
     .ac-wrap { position: relative; }
     .ac-dropdown {
@@ -420,7 +429,14 @@ async function fetchAcItems(q) {
       for (const item of items) {
         const div = document.createElement('div');
         div.className = 'ac-item';
-        div.innerHTML = `<span>${item.name}</span><span class="ac-item-type">${item.type || ''}</span>`;
+        div.innerHTML = `
+          <span style="display:flex;align-items:center;gap:.5rem">
+            <img src="https://www.torn.com/images/items/${item.id}/large.png"
+              style="width:22px;height:22px;object-fit:contain;border-radius:3px;image-rendering:pixelated"
+              onerror="this.style.display='none'">
+            ${item.name}
+          </span>
+          <span class="ac-item-type">${item.type || ''}</span>`;
         div.addEventListener('mousedown', e => {
           e.preventDefault();
           selectItem(item);
@@ -566,7 +582,13 @@ function renderListings() {
       : `<span class="notes-cell-empty">—</span>`;
 
     return `<tr class="${l.is_active ? '' : 'inactive'}" data-id="${l.id}">
-      <td style="font-weight:600">${esc(l.item_name)}</td>
+      <td>
+        <div class="item-cell-admin">
+          <img class="item-icon-sm" src="https://www.torn.com/images/items/${l.torn_item_id}/large.png"
+            alt="" onerror="this.style.display='none'">
+          <span style="font-weight:600">${esc(l.item_name)}</span>
+        </div>
+      </td>
       <td><span class="type-badge">${esc(l.item_type)}</span></td>
       <td>${priceHtml}</td>
       <td>${notesHtml}</td>

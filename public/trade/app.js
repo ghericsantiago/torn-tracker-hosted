@@ -152,6 +152,13 @@
     noRes.classList.toggle('visible', totalVisible === 0 && searchQ !== '');
   }
 
+  function itemIcon(itemId) {
+    const src = `https://www.torn.com/images/items/${itemId}/large.png`;
+    return `<img class="item-icon" src="${src}" alt=""
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="item-icon-placeholder" style="display:none">?</span>`;
+  }
+
   function itemRow(item) {
     const price     = item.effective_price;
     const priceHtml = price != null
@@ -167,7 +174,12 @@
 
     return `<tr>
       <td>
-        <div class="item-name">${esc(item.item_name)}</div>
+        <div class="item-cell">
+          ${itemIcon(item.torn_item_id)}
+          <div class="item-text">
+            <div class="item-name">${esc(item.item_name)}</div>
+          </div>
+        </div>
       </td>
       <td class="price-cell">${priceHtml}</td>
       <td class="notes-cell">${notesHtml}</td>

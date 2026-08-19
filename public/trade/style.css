@@ -236,6 +236,23 @@ body {
 .items-table tbody tr:hover td { background: rgba(255,255,255,0.025); }
 .items-table tbody td { padding: 0.85rem 1rem; vertical-align: middle; }
 
+.item-cell { display: flex; align-items: center; gap: 0.75rem; }
+.item-icon {
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  object-fit: contain; padding: 3px;
+  image-rendering: pixelated;
+}
+.item-icon-placeholder {
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 6px; border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.04);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: var(--text-muted);
+}
+.item-text { display: flex; flex-direction: column; }
 .item-name {
   font-weight: 600; font-size: 0.925rem; color: var(--text);
 }
@@ -337,6 +354,8 @@ body {
   .items-table tbody td.notes-cell {
     font-size: 0.75rem; color: var(--text-muted);
   }
+  .item-icon { width: 30px; height: 30px; }
+  .item-icon-placeholder { width: 30px; height: 30px; }
   .price-amount { font-size: 1.1rem; }
   .hero-meta { gap: 1rem; }
 }

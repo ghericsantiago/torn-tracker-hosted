@@ -196,15 +196,17 @@ router.post('/api/sync-items', requireAuth, async (req, res) => {
     const apiKey = sRows[0].value;
     const items  = await fetchAllTornItems(apiKey);
 
-    // Bulk upsert in batches of 200 (keeps SQLite under 999-param limit)
+    // Bulk upsert in batches of 200 (keeps param count manageable)
     const BATCH = 200;
     for (let i = 0; i < items.length; i += BATCH) {
       const batch  = items.slice(i, i + BATCH);
-      const vals   = batch.map((_, j) => `($${j * 3 + 1}, $${j * 3 + 2}, $${j * 3 + 3})`).join(', ');
-      const params = batch.flatMap(item => [item.id, item.name, item.type]);
+      const vals   = batch.map((_, j) => `($${j * 4 + 1}, $${j * 4 + 2}, $${j * 4 + 3}, $${j * 4 + 4})`).join(', ');
+      const params = batch.flatMap(item => [item.id, item.name, item.type, item.market_price ?? null]);
       await db.query(
-        `INSERT INTO torn_items (id, name, type) VALUES ${vals}
-         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type`,
+        `INSERT INTO torn_items (id, name, type, market_price) VALUES ${vals}
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name, type = EXCLUDED.type,
+           market_price = EXCLUDED.market_price, updated_at = NOW()`,
         params
       );
     }
