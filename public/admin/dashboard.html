@@ -203,8 +203,22 @@
     // Mobile duplicates wire to same handlers as desktop
     document.getElementById('settingsBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('settingsBtn').click(); });
     document.getElementById('logoutBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('logoutBtn').click(); });
-    // Add drawer toggle
-    document.getElementById('addToggleBtn').addEventListener('click', () => document.getElementById('addDrawer').classList.toggle('open'));
+    // Add drawer toggle — restore overflow:visible after open so ac-dropdown isn't clipped
+    (function() {
+      const drawer = document.getElementById('addDrawer');
+      document.getElementById('addToggleBtn').addEventListener('click', () => {
+        if (drawer.classList.contains('open')) {
+          drawer.style.overflow = 'hidden';
+          drawer.classList.remove('open');
+        } else {
+          drawer.classList.add('open');
+          drawer.addEventListener('transitionend', function handler() {
+            drawer.removeEventListener('transitionend', handler);
+            if (drawer.classList.contains('open')) drawer.style.overflow = 'visible';
+          });
+        }
+      });
+    })();
   </script>
 </body>
 </html>
