@@ -8,93 +8,97 @@
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
   <style>
     /* ── Layout ─────────────────────────────────────────────────────────── */
-    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
-    .stat-card  { padding: 1rem 1.25rem; text-align: center; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
-    .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); margin-top: 0.2rem; }
+    .dashboard { padding-top: 0.75rem; }
 
-    .main-grid {
-      display: grid;
-      grid-template-columns: 300px 1fr;
-      gap: 1.5rem; align-items: start;
+    /* Profile drawer */
+    .profile-drawer {
+      overflow: hidden; max-height: 0; transition: max-height 0.25s ease;
+      margin-bottom: 0;
     }
-
-    /* ── Profile card ───────────────────────────────────────────────────── */
-    .profile-card { padding: 1.25rem; }
-    .profile-card h2 { margin-bottom: 1rem; font-size: 0.95rem; }
+    .profile-drawer.open { max-height: 400px; margin-bottom: 0.75rem; }
+    .profile-inner { padding: 0.9rem 1.1rem; }
+    .profile-inner h2 { font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .profile-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.75rem; }
+    .profile-fields .field { margin: 0; }
+    .profile-fields .field label { font-size: 0.68rem; }
+    .profile-fields .field input { padding: 0.28rem 0.55rem; font-size: 0.8rem; }
+    .profile-fields .field-wide { grid-column: 1/-1; }
 
     /* ── Catalog browser ────────────────────────────────────────────────── */
     .cat-browser { overflow: hidden; }
 
+    /* Stats bar — inline pills inside header */
+    .stat-pills { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .stat-pill {
+      font-family: var(--mono); font-size: 0.65rem; padding: 0.18rem 0.5rem;
+      border-radius: 99px; border: 1px solid var(--glass-border);
+      background: rgba(255,255,255,0.03); white-space: nowrap;
+    }
+    .stat-pill span { font-weight: 700; }
+    .stat-pill.sl { border-color: rgba(110,231,247,0.18); }
+    .stat-pill.sl span { color: var(--accent); }
+    .stat-pill.si span { color: var(--accent); }
+    .stat-pill.so span { color: var(--success); }
+    .stat-pill.sf span { color: var(--gold, #fbbf24); }
+
     /* Top bar */
     .browser-head {
-      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-      padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--glass-border);
-    }
-    .browser-head h2 { font-size: 0.95rem; flex-shrink: 0; }
-    .browser-spacer { flex: 1; }
-
-    /* Global default strip */
-    .global-strip {
       display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-      padding: 0.55rem 1.25rem; background: rgba(110,231,247,0.04);
-      border-bottom: 1px solid rgba(110,231,247,0.1);
-      font-size: 0.78rem;
+      padding: 0.6rem 1rem; border-bottom: 1px solid var(--glass-border);
+    }
+    .browser-head h2 { font-size: 0.88rem; flex-shrink: 0; margin: 0; }
+
+    /* Global default strip — single compact line */
+    .global-strip {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0.38rem 1rem; background: rgba(110,231,247,0.03);
+      border-bottom: 1px solid rgba(110,231,247,0.08);
     }
     .global-strip-label {
-      font-family: var(--mono); font-size: 0.65rem; color: var(--text-muted);
-      text-transform: uppercase; letter-spacing: 0.08em;
+      font-family: var(--mono); font-size: 0.6rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
     }
-    .level-badge {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.68rem;
-      font-family: var(--mono); font-weight: 600;
-    }
-    .level-badge.l1 { background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.2); color: var(--accent); }
-    .level-badge.l2 { background: rgba(129,140,248,0.1);  border: 1px solid rgba(129,140,248,0.25); color: #818cf8; }
-    .level-badge.l3 { background: rgba(74,222,128,0.08);  border: 1px solid rgba(74,222,128,0.2); color: var(--success); }
     .pct-input-sm {
-      width: 62px; background: rgba(255,255,255,0.06);
-      border: 1px solid var(--glass-border); border-radius: 6px;
-      padding: 0.25rem 0.45rem; color: var(--text);
-      font-size: 0.82rem; font-family: var(--mono);
+      width: 56px; background: rgba(255,255,255,0.06);
+      border: 1px solid var(--glass-border); border-radius: 5px;
+      padding: 0.2rem 0.4rem; color: var(--text);
+      font-size: 0.78rem; font-family: var(--mono);
       text-align: right; outline: none;
     }
     .pct-input-sm:focus { border-color: rgba(110,231,247,0.4); }
-    .pct-suffix { font-family: var(--mono); font-size: 0.75rem; color: var(--text-muted); }
-    .global-strip-right { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
+    .pct-suffix { font-family: var(--mono); font-size: 0.72rem; color: var(--text-muted); }
+    .cascade-hint { font-family: var(--mono); font-size: 0.6rem; color: rgba(255,255,255,0.2); margin-left: auto; }
 
-    /* Filter bar */
+    /* Toolbar */
     .browser-toolbar {
-      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-      padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--glass-border);
-      background: rgba(255,255,255,0.01);
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+      padding: 0.4rem 1rem; border-bottom: 1px solid var(--glass-border);
     }
     .cat-search {
       background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-      border-radius: 7px; padding: 0.32rem 0.65rem; color: var(--text);
-      font-size: 0.8rem; font-family: var(--sans); width: 180px; outline: none;
+      border-radius: 6px; padding: 0.26rem 0.55rem; color: var(--text);
+      font-size: 0.78rem; font-family: var(--sans); width: 150px; outline: none;
     }
     .cat-search:focus { border-color: rgba(110,231,247,0.3); }
     .toolbar-spacer { flex: 1; }
     .btn-save {
       background: var(--accent); color: #07080f;
-      border: none; font-weight: 700; padding: 0.38rem 1.1rem;
-      border-radius: 7px; font-size: 0.825rem; font-family: var(--sans);
+      border: none; font-weight: 700; padding: 0.32rem 0.9rem;
+      border-radius: 6px; font-size: 0.8rem; font-family: var(--sans);
       cursor: pointer; transition: all 0.16s;
     }
     .btn-save:hover { background: #93f0ff; }
     .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* ── Category sections ──────────────────────────────────────────────── */
-    .cat-list { max-height: 66vh; overflow-y: auto; }
+    .cat-list { max-height: calc(100vh - 220px); overflow-y: auto; }
 
     .cat-section { border-bottom: 1px solid rgba(255,255,255,0.04); }
     .cat-section:last-child { border-bottom: none; }
 
     .cat-row {
-      display: flex; align-items: center; gap: 0.6rem;
-      padding: 0.55rem 1.25rem;
+      display: flex; align-items: center; gap: 0.45rem;
+      padding: 0.32rem 1rem;
       cursor: pointer; transition: background 0.14s; user-select: none;
     }
     .cat-row:hover { background: rgba(255,255,255,0.02); }
@@ -142,8 +146,8 @@
     .cat-section.open .cat-items { display: block; }
 
     .item-row {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.35rem 1.25rem 0.35rem 2.75rem;
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.22rem 1rem 0.22rem 2.4rem;
       border-top: 1px solid rgba(255,255,255,0.025);
       transition: background 0.12s; min-width: 0;
     }
@@ -190,8 +194,8 @@
 
     /* ── Inline item editor ─────────────────────────────────────────────── */
     .item-editor {
-      display: none; flex-wrap: wrap; gap: 0.5rem; align-items: center;
-      padding: 0.55rem 1.25rem 0.6rem 2.75rem;
+      display: none; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+      padding: 0.4rem 1rem 0.45rem 2.4rem;
       border-top: 1px solid rgba(74,222,128,0.1);
       background: rgba(74,222,128,0.025);
     }
@@ -248,11 +252,11 @@
     @keyframes tIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 
     /* ── Responsive ─────────────────────────────────────────────────────── */
-    @media (max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
     @media (max-width: 640px) {
-      .stats-row { grid-template-columns: repeat(2,1fr); }
       .cat-pct-input { width: 44px; font-size: .72rem; }
       .cat-pct-label { display: none; }
+      .cat-list { max-height: calc(100vh - 200px); }
+      .profile-fields { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -272,97 +276,83 @@
 
 <main class="dashboard">
 
-  <div class="stats-row">
-    <div class="glass-card stat-card">
-      <div class="stat-value" id="statTotal">—</div>
-      <div class="stat-label">Listed</div>
-    </div>
-    <div class="glass-card stat-card">
-      <div class="stat-value" id="statInherit" style="color:var(--accent)">—</div>
-      <div class="stat-label">Inheriting</div>
-    </div>
-    <div class="glass-card stat-card">
-      <div class="stat-value" id="statOverride" style="color:var(--success)">—</div>
-      <div class="stat-label">Item Override</div>
-    </div>
-    <div class="glass-card stat-card">
-      <div class="stat-value" id="statFixed" style="color:var(--gold)">—</div>
-      <div class="stat-label">Fixed Price</div>
-    </div>
-  </div>
-
-  <div class="main-grid">
-
-    <!-- Profile -->
-    <div class="glass-card profile-card">
+  <!-- Profile drawer (collapsed by default) -->
+  <div class="glass-card profile-drawer" id="profileDrawer">
+    <div class="profile-inner">
       <h2>Trader Profile</h2>
       <form id="profileForm">
-        <div class="field">
-          <label>Display Name</label>
-          <input type="text" id="pDisplayName" placeholder="Your in-game name" required>
+        <div class="profile-fields">
+          <div class="field">
+            <label>Display Name</label>
+            <input type="text" id="pDisplayName" placeholder="Your in-game name" required>
+          </div>
+          <div class="field">
+            <label>Discord Handle</label>
+            <input type="text" id="pDiscord" placeholder="@Name#1234">
+          </div>
+          <div class="field">
+            <label>Torn Profile URL</label>
+            <input type="url" id="pTornUrl" placeholder="torn.com/profiles.php?XID=...">
+          </div>
+          <div class="field">
+            <label>Bio</label>
+            <textarea id="pBio" rows="2" placeholder="What you're looking for…"
+              style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:7px;padding:.35rem .6rem;color:var(--text);font-size:.8rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
+          </div>
+          <div class="field-wide" style="display:flex;justify-content:flex-end;margin-top:.25rem">
+            <button type="submit" class="btn btn-primary btn-sm" id="saveProfileBtn">Save Profile</button>
+          </div>
         </div>
-        <div class="field">
-          <label>Discord Handle</label>
-          <input type="text" id="pDiscord" placeholder="@Name#1234">
-        </div>
-        <div class="field">
-          <label>Torn Profile URL</label>
-          <input type="url" id="pTornUrl" placeholder="https://www.torn.com/profiles.php?XID=...">
-        </div>
-        <div class="field">
-          <label>Bio</label>
-          <textarea id="pBio" rows="2" placeholder="What you're looking for…"
-            style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;padding:.55rem .85rem;color:var(--text);font-size:.875rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary btn-full" id="saveProfileBtn">Save Profile</button>
       </form>
     </div>
-
-    <!-- Catalog browser -->
-    <div class="glass-card cat-browser">
-
-      <!-- Header -->
-      <div class="browser-head">
-        <h2>Item Catalog</h2>
-        <span style="font-family:var(--mono);font-size:.68rem;color:var(--text-muted)" id="catalogSub">Loading…</span>
-      </div>
-
-      <!-- Global default strip (Level 1) -->
-      <div class="global-strip">
-        <span class="global-strip-label">Price Cascade</span>
-        <span class="level-badge l1">L1 Global</span>
-        <input type="number" class="pct-input-sm" id="globalPctInput"
-          placeholder="—" min="1" max="500" step="1" title="Global default margin %">
-        <span class="pct-suffix">%</span>
-        <span style="color:var(--text-muted);font-size:.7rem;font-family:var(--mono)">→</span>
-        <span class="level-badge l2">L2 Category</span>
-        <span style="color:var(--text-muted);font-size:.7rem;font-family:var(--mono)">→</span>
-        <span class="level-badge l3">L3 Item</span>
-
-        <div class="global-strip-right">
-          <span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono)">Items inherit nearest level above</span>
-        </div>
-      </div>
-
-      <!-- Toolbar -->
-      <div class="browser-toolbar">
-        <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
-        <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
-        <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
-        <button class="btn btn-ghost btn-sm" id="resetOrderBtn" title="Reset to alphabetical order">Reset Order</button>
-        <div class="toolbar-spacer"></div>
-        <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
-      </div>
-
-      <!-- Category list -->
-      <div class="cat-list" id="catalogBody">
-        <div style="padding:2rem;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:.8rem">
-          Loading item catalog…
-        </div>
-      </div>
-
-    </div>
   </div>
+
+  <!-- Catalog browser — full width -->
+  <div class="glass-card cat-browser">
+
+    <!-- Header: title + stats pills + profile toggle -->
+    <div class="browser-head">
+      <h2>Item Catalog</h2>
+      <span style="font-family:var(--mono);font-size:.62rem;color:var(--text-muted)" id="catalogSub">Loading…</span>
+      <div class="stat-pills" id="statPills">
+        <span class="stat-pill sl"><span id="statTotal">—</span> listed</span>
+        <span class="stat-pill si"><span id="statInherit">—</span> inherit</span>
+        <span class="stat-pill so"><span id="statOverride">—</span> override</span>
+        <span class="stat-pill sf"><span id="statFixed">—</span> fixed</span>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center">
+        <button class="btn btn-ghost btn-sm" id="profileToggleBtn">Profile ▾</button>
+      </div>
+    </div>
+
+    <!-- Global default strip (Level 1) — compact -->
+    <div class="global-strip">
+      <span class="global-strip-label">L1 Global %</span>
+      <input type="number" class="pct-input-sm" id="globalPctInput"
+        placeholder="—" min="1" max="500" step="1" title="Global default margin %">
+      <span class="pct-suffix">%</span>
+      <span class="cascade-hint">→ L2 category % → L3 item override</span>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="browser-toolbar">
+      <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
+      <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
+      <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
+      <button class="btn btn-ghost btn-sm" id="resetOrderBtn">Reset Order</button>
+      <div class="toolbar-spacer"></div>
+      <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
+    </div>
+
+    <!-- Category list -->
+    <div class="cat-list" id="catalogBody">
+      <div style="padding:2rem;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:.8rem">
+        Loading item catalog…
+      </div>
+    </div>
+
+  </div>
+
 </main>
 
 <div id="toast"></div>
@@ -867,6 +857,14 @@ document.getElementById('resetOrderBtn').addEventListener('click', () => {
 });
 document.getElementById('catSearch').addEventListener('input', e => {
   filterQ = e.target.value.trim(); renderCatalog();
+});
+
+/* ── Profile drawer toggle ────────────────────────────────────────────── */
+document.getElementById('profileToggleBtn').addEventListener('click', () => {
+  const drawer = document.getElementById('profileDrawer');
+  const btn    = document.getElementById('profileToggleBtn');
+  const open   = drawer.classList.toggle('open');
+  btn.textContent = open ? 'Profile ▴' : 'Profile ▾';
 });
 
 /* ── Logout ───────────────────────────────────────────────────────────── */
