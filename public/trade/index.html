@@ -17,8 +17,14 @@
       <input type="text" id="globalSearch" placeholder="Search items…" autocomplete="off">
     </div>
     <div class="nav-right">
-      <a href="/admin/trade" class="btn">⚙ Manage</a>
+      <a href="/admin/trade" class="btn mobile-hide">⚙ Manage</a>
+      <button class="nav-burger" id="navBurger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
+  </div>
+  <div class="nav-dropdown" id="navDropdown">
+    <a href="/admin/trade" class="btn">⚙ Manage</a>
   </div>
 </nav>
 
@@ -67,5 +73,9 @@
 
 <footer class="footer" id="footer"></footer>
 <script src="/trade/app.js"></script>
+<script>
+  document.getElementById('navBurger').addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  document.addEventListener('click', e => { if (!e.target.closest('.nav')) document.body.classList.remove('nav-open'); });
+</script>
 </body>
 </html>

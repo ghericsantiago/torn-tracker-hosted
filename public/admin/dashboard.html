@@ -20,7 +20,17 @@
         <a href="/admin/inventory" class="btn btn-ghost btn-sm">Inventory Monitor</a>
         <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Settings</button>
         <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
+        <button class="nav-burger" id="navBurger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
+    </div>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm">View Client</a>
+      <a href="/admin/trade" class="btn btn-ghost btn-sm">Trade Listings</a>
+      <a href="/admin/inventory" class="btn btn-ghost btn-sm">Inventory Monitor</a>
+      <button id="settingsBtnMobile" class="btn btn-ghost btn-sm">⚙ Settings</button>
+      <button id="logoutBtnMobile" class="btn btn-ghost btn-sm">Logout</button>
     </div>
   </nav>
 
@@ -178,5 +188,13 @@
   </main>
 
   <script src="app.js"></script>
+  <script>
+    // Burger menu
+    document.getElementById('navBurger').addEventListener('click', () => document.body.classList.toggle('nav-open'));
+    document.addEventListener('click', e => { if (!e.target.closest('.nav')) document.body.classList.remove('nav-open'); });
+    // Mobile duplicates wire to same handlers as desktop
+    document.getElementById('settingsBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('settingsBtn').click(); });
+    document.getElementById('logoutBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('logoutBtn').click(); });
+  </script>
 </body>
 </html>
