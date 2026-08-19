@@ -6,148 +6,223 @@
   <title>Trade Listings — Torn Tracker Admin</title>
   <link rel="stylesheet" href="/admin/style.css">
   <style>
-    /* ── Trade-specific additions ───────────────────────────────────────── */
-    .trade-grid {
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .top-grid {
       display: grid;
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 340px 1fr;
       gap: 1.5rem;
       align-items: start;
+      margin-bottom: 1.5rem;
     }
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card  { padding: 1rem 1.25rem; text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
+    .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); margin-top: 0.2rem; }
 
-    /* Profile card */
-    .profile-card { padding: 1.5rem; }
-    .profile-card h2 { margin-bottom: 1.25rem; font-size: 1rem; }
+    /* ── Profile card ───────────────────────────────────────────────────── */
+    .profile-card { padding: 1.25rem; }
+    .profile-card h2 { margin-bottom: 1rem; font-size: 0.95rem; }
 
-    /* Mode toggle */
-    .mode-toggle {
-      display: flex; border: 1px solid var(--glass-border);
-      border-radius: 8px; overflow: hidden; margin-bottom: 1rem;
-    }
-    .mode-btn {
-      flex: 1; padding: 0.55rem 0.5rem; font-size: 0.82rem; font-weight: 500;
-      font-family: var(--sans); background: transparent; border: none;
-      color: var(--text-dim); cursor: pointer; transition: all var(--tr);
-      border-right: 1px solid var(--glass-border);
-    }
-    .mode-btn:last-child { border-right: none; }
-    .mode-btn.active {
-      background: var(--accent-dim); color: var(--accent);
-    }
-
-    /* Item icon */
-    .item-icon-sm {
-      width: 28px; height: 28px; border-radius: 5px; object-fit: contain;
-      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-      padding: 2px; image-rendering: pixelated; flex-shrink: 0;
-      vertical-align: middle;
-    }
-    .item-cell-admin { display: flex; align-items: center; gap: 0.6rem; }
-
-    /* Autocomplete */
-    .ac-wrap { position: relative; }
-    .ac-dropdown {
-      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-      background: #0d0f1a; border: 1px solid var(--glass-border);
-      border-radius: 10px; max-height: 220px; overflow-y: auto;
-      z-index: 100; display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    }
-    .ac-dropdown.open { display: block; }
-    .ac-item {
-      padding: 0.6rem 0.85rem; cursor: pointer;
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.875rem; transition: background var(--tr);
-    }
-    .ac-item:hover { background: var(--glass-hover); }
-    .ac-item-type {
-      font-family: var(--mono); font-size: 0.65rem;
-      color: var(--text-muted); background: var(--glass-bg);
-      padding: 0.1rem 0.45rem; border-radius: 4px;
-      border: 1px solid var(--glass-border);
-    }
-
-    /* Listings table card */
-    .listings-card { padding: 0; }
-    .listings-head {
+    /* ── Catalog browser ────────────────────────────────────────────────── */
+    .cat-browser { overflow: hidden; }
+    .cat-head {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 1rem; padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--glass-border);
-      flex-wrap: wrap;
+      gap: 0.75rem; flex-wrap: wrap;
+      padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border);
     }
-    .listings-head h2 { font-size: 1rem; }
-    .listings-controls { display: flex; gap: 0.5rem; align-items: center; }
-    .table-search {
+    .cat-head-left { display: flex; align-items: center; gap: 0.75rem; }
+    .cat-head-left h2 { font-size: 0.95rem; }
+    .cat-sub { font-family: var(--mono); font-size: 0.68rem; color: var(--text-muted); }
+    .cat-toolbar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+    .cat-search {
       background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-      border-radius: 7px; padding: 0.4rem 0.75rem; color: var(--text);
-      font-size: 0.825rem; font-family: var(--sans); width: 180px; outline: none;
+      border-radius: 7px; padding: 0.35rem 0.7rem; color: var(--text);
+      font-size: 0.8rem; font-family: var(--sans); width: 180px; outline: none;
     }
-    .table-search:focus { border-color: rgba(110,231,247,0.3); }
-    .cat-filter {
-      background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-      border-radius: 7px; padding: 0.4rem 0.75rem; color: var(--text);
-      font-size: 0.825rem; font-family: var(--sans); outline: none; cursor: pointer;
+    .cat-search:focus { border-color: rgba(110,231,247,0.3); }
+    .btn-save {
+      background: var(--accent); color: #07080f; border: none;
+      font-weight: 700; padding: 0.4rem 1.1rem; border-radius: 7px;
+      font-size: 0.825rem; font-family: var(--sans); cursor: pointer;
+      transition: all 0.18s;
     }
-    .table-wrap { overflow-x: auto; }
-    .listings-table { width: 100%; border-collapse: collapse; }
-    .listings-table th {
-      font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.1em;
-      color: var(--text-muted); padding: 0.65rem 1rem;
-      text-align: left; border-bottom: 1px solid var(--glass-border);
-      white-space: nowrap;
-    }
-    .listings-table td {
-      padding: 0.65rem 1rem; font-size: 0.85rem;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      vertical-align: middle;
-    }
-    .listings-table tr:last-child td { border-bottom: none; }
-    .listings-table tr:hover td { background: rgba(255,255,255,0.02); }
-    .listings-table tr.inactive td { opacity: 0.45; }
-    .price-mono { font-family: var(--mono); color: var(--accent); font-size: 0.85rem; }
-    .pct-badge-sm {
-      font-family: var(--mono); font-size: 0.62rem;
-      background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.15);
-      color: rgba(110,231,247,0.7); padding: 0.1rem 0.35rem; border-radius: 4px;
-    }
-    .type-badge {
-      font-family: var(--mono); font-size: 0.62rem;
-      background: var(--glass-bg); border: 1px solid var(--glass-border);
-      color: var(--text-muted); padding: 0.1rem 0.45rem; border-radius: 4px;
-    }
-    .notes-cell-text { color: var(--text-dim); max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .notes-cell-empty { color: var(--text-muted); font-style: italic; font-size: 0.78rem; }
-    .actions { display: flex; gap: 0.25rem; align-items: center; }
+    .btn-save:hover { background: #93f0ff; }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Edit modal */
-    .modal-card { padding: 1.75rem; }
-    .modal-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 1.5rem; }
-    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+    /* ── Category sections ──────────────────────────────────────────────── */
+    .cat-list { max-height: 68vh; overflow-y: auto; }
 
-    /* Toast */
+    .cat-section { border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .cat-section:last-child { border-bottom: none; }
+
+    .cat-row {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.6rem 1.25rem;
+      cursor: pointer; transition: background 0.14s; user-select: none;
+    }
+    .cat-row:hover { background: rgba(255,255,255,0.025); }
+
+    .cat-check {
+      width: 15px; height: 15px; flex-shrink: 0;
+      cursor: pointer; accent-color: var(--accent);
+    }
+    .cat-label { font-weight: 600; font-size: 0.855rem; flex: 1; }
+    .cat-tally {
+      font-family: var(--mono); font-size: 0.65rem;
+      color: var(--text-muted); flex-shrink: 0;
+    }
+    .cat-tally .listed { color: var(--accent); }
+
+    .cat-pct-wrap {
+      display: flex; align-items: center; gap: 0.35rem;
+      flex-shrink: 0; font-size: 0.75rem;
+    }
+    .cat-pct-label { color: var(--text-muted); font-family: var(--mono); font-size: 0.65rem; }
+    .cat-pct-input {
+      width: 52px; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--glass-border);
+      border-radius: 5px; padding: 0.22rem 0.4rem;
+      color: var(--text); font-size: 0.78rem; font-family: var(--mono);
+      text-align: right; outline: none;
+    }
+    .cat-pct-input:focus { border-color: rgba(110,231,247,0.4); }
+    .cat-apply-btn {
+      background: transparent; border: 1px solid var(--glass-border);
+      border-radius: 5px; padding: 0.22rem 0.5rem;
+      font-size: 0.7rem; font-family: var(--sans);
+      color: var(--text-muted); cursor: pointer; transition: all 0.14s;
+    }
+    .cat-apply-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: rgba(110,231,247,0.3); }
+
+    .cat-chevron {
+      font-size: 0.55rem; color: var(--text-muted);
+      transition: transform 0.18s; flex-shrink: 0; padding: 0.2rem;
+      pointer-events: none;
+    }
+    .cat-section.open .cat-chevron { transform: rotate(180deg); }
+
+    /* ── Item rows ──────────────────────────────────────────────────────── */
+    .cat-items { display: none; }
+    .cat-section.open .cat-items { display: block; }
+
+    .item-row {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.38rem 1.25rem 0.38rem 2.75rem;
+      border-top: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.12s;
+    }
+    .item-row:hover { background: rgba(255,255,255,0.02); }
+    .item-row.unchecked { opacity: 0.38; }
+    .item-row.editing { background: rgba(110,231,247,0.04); opacity: 1; }
+
+    .item-check {
+      width: 14px; height: 14px; flex-shrink: 0;
+      cursor: pointer; accent-color: var(--accent);
+    }
+    .item-icon-xs {
+      width: 22px; height: 22px; flex-shrink: 0;
+      border-radius: 4px; object-fit: contain; padding: 1px;
+      image-rendering: pixelated;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .item-name-col { font-size: 0.815rem; flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-price-col {
+      display: flex; align-items: center; gap: 0.4rem;
+      flex-shrink: 0; font-family: var(--mono); font-size: 0.75rem;
+    }
+    .price-tag { color: var(--accent); }
+    .price-tag.none { color: var(--text-muted); font-style: italic; }
+    .price-tag.inherited { color: var(--text-muted); }
+    .pct-tag {
+      font-size: 0.62rem; background: rgba(110,231,247,0.08);
+      border: 1px solid rgba(110,231,247,0.15); border-radius: 3px;
+      padding: 0.05rem 0.3rem; color: rgba(110,231,247,0.7);
+    }
+    .notes-tag { font-size: 0.68rem; color: var(--text-muted); max-width: 100px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-edit-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.72rem; padding: 0.2rem 0.35rem; border-radius: 4px;
+      color: var(--text-muted); transition: all 0.14s; flex-shrink: 0;
+    }
+    .item-edit-btn:hover { background: var(--glass-hover); color: var(--text); }
+    .item-edit-btn.active { background: var(--accent-dim); color: var(--accent); }
+
+    /* ── Inline item editor ─────────────────────────────────────────────── */
+    .item-editor {
+      display: none;
+      padding: 0.6rem 1.25rem 0.7rem 2.75rem;
+      border-top: 1px solid rgba(110,231,247,0.08);
+      background: rgba(110,231,247,0.03);
+      flex-wrap: wrap; gap: 0.5rem; align-items: center;
+    }
+    .item-editor.open { display: flex; }
+
+    .mode-toggle-sm {
+      display: flex; border: 1px solid var(--glass-border);
+      border-radius: 6px; overflow: hidden;
+    }
+    .mode-btn-sm {
+      padding: 0.28rem 0.65rem; font-size: 0.75rem; font-weight: 500;
+      font-family: var(--sans); background: transparent; border: none;
+      border-right: 1px solid var(--glass-border);
+      color: var(--text-dim); cursor: pointer; transition: all 0.14s;
+    }
+    .mode-btn-sm:last-child { border-right: none; }
+    .mode-btn-sm.active { background: var(--accent-dim); color: var(--accent); }
+
+    .editor-input {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      border-radius: 6px; padding: 0.28rem 0.55rem; color: var(--text);
+      font-size: 0.8rem; font-family: var(--mono); outline: none; width: 110px;
+    }
+    .editor-input:focus { border-color: rgba(110,231,247,0.4); }
+    .editor-notes {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+      border-radius: 6px; padding: 0.28rem 0.55rem; color: var(--text);
+      font-size: 0.8rem; font-family: var(--sans); outline: none; width: 160px;
+    }
+    .editor-notes:focus { border-color: rgba(110,231,247,0.4); }
+    .editor-label { font-size: 0.7rem; color: var(--text-muted); font-family: var(--mono); }
+    .editor-apply {
+      background: var(--accent-dim); border: 1px solid rgba(110,231,247,0.25);
+      border-radius: 6px; padding: 0.28rem 0.65rem;
+      font-size: 0.75rem; color: var(--accent); cursor: pointer;
+      font-family: var(--sans); transition: all 0.14s;
+    }
+    .editor-apply:hover { background: rgba(110,231,247,0.2); }
+    .editor-clear {
+      background: transparent; border: 1px solid var(--glass-border);
+      border-radius: 6px; padding: 0.28rem 0.65rem;
+      font-size: 0.75rem; color: var(--text-muted); cursor: pointer;
+      font-family: var(--sans); transition: all 0.14s;
+    }
+    .editor-clear:hover { background: var(--glass-hover); }
+
+    /* ── Toast ──────────────────────────────────────────────────────────── */
     #toast {
       position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
       background: #1d2540; border: 1px solid var(--glass-border);
-      border-radius: 10px; padding: 0.65rem 1.25rem;
-      font-size: 0.85rem; color: var(--text); z-index: 1000;
-      display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      border-radius: 10px; padding: 0.6rem 1.1rem;
+      font-size: 0.825rem; color: var(--text); z-index: 1000;
+      display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.5);
       font-family: var(--mono); white-space: nowrap;
     }
-    #toast.show { display: block; animation: fadeIn 0.2s; }
-    #toast.error { border-color: rgba(248,113,113,0.3); color: var(--error); }
-    @keyframes fadeIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    #toast.show { display: block; animation: toastIn 0.2s; }
+    #toast.err  { border-color: rgba(248,113,113,0.3); color: var(--error); }
+    @keyframes toastIn {
+      from { opacity:0; transform: translateX(-50%) translateY(8px); }
+      to   { opacity:1; transform: translateX(-50%) translateY(0); }
+    }
 
-    /* Stats row */
-    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
-    .stat-card { padding: 1rem 1.25rem; text-align: center; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
-    .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--mono); margin-top: 0.25rem; }
-
-    /* Responsive */
-    @media (max-width: 960px) {
-      .trade-grid { grid-template-columns: 1fr; }
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .top-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 640px) {
       .stats-row { grid-template-columns: repeat(2,1fr); }
+      .cat-pct-wrap { display: none; } /* hide on very small; use per-item edit */
     }
   </style>
 </head>
@@ -171,11 +246,7 @@
   <div class="stats-row">
     <div class="glass-card stat-card">
       <div class="stat-value" id="statTotal">—</div>
-      <div class="stat-label">Total Listings</div>
-    </div>
-    <div class="glass-card stat-card">
-      <div class="stat-value" id="statActive" style="color:var(--success)">—</div>
-      <div class="stat-label">Active</div>
+      <div class="stat-label">Total Listed</div>
     </div>
     <div class="glass-card stat-card">
       <div class="stat-value" id="statCats">—</div>
@@ -185,187 +256,101 @@
       <div class="stat-value" id="statMktPct" style="color:var(--accent-2)">—</div>
       <div class="stat-label">Market % Based</div>
     </div>
+    <div class="glass-card stat-card">
+      <div class="stat-value" id="statFixed" style="color:var(--success)">—</div>
+      <div class="stat-label">Fixed Price</div>
+    </div>
   </div>
 
-  <div class="trade-grid">
+  <!-- Top grid: profile left, catalog browser right -->
+  <div class="top-grid">
 
-    <!-- Left column: Profile + Add listing -->
-    <div style="display:flex;flex-direction:column;gap:1.5rem">
-
-      <!-- Profile card -->
-      <div class="glass-card profile-card">
-        <h2>Trader Profile</h2>
-        <form id="profileForm">
-          <div class="field">
-            <label>Display Name</label>
-            <input type="text" id="pDisplayName" placeholder="Your in-game name" required>
-          </div>
-          <div class="field">
-            <label>Discord Handle</label>
-            <input type="text" id="pDiscord" placeholder="@YourName#1234">
-          </div>
-          <div class="field">
-            <label>Torn Profile URL</label>
-            <input type="url" id="pTornUrl" placeholder="https://www.torn.com/profiles.php?XID=...">
-          </div>
-          <div class="field">
-            <label>Bio / Description</label>
-            <textarea id="pBio" rows="3" placeholder="What you're looking for, preferences, etc."
-              style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;padding:.6rem .85rem;color:var(--text);font-size:.875rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary btn-full" id="saveProfileBtn">Save Profile</button>
-        </form>
-      </div>
-
-      <!-- Add listing card -->
-      <div class="glass-card profile-card">
-        <h2>Add Listing</h2>
-        <form id="addForm">
-          <div class="field">
-            <label>Item</label>
-            <div class="ac-wrap">
-              <input type="text" id="itemSearch" placeholder="Search item name…" autocomplete="off">
-              <div class="ac-dropdown" id="acDropdown"></div>
-            </div>
-            <input type="hidden" id="selectedItemId">
-            <input type="hidden" id="selectedItemType">
-            <div id="selectedItemName" style="margin-top:.4rem;font-size:.8rem;color:var(--accent);font-family:var(--mono);min-height:1.1rem"></div>
-          </div>
-
-          <div class="field">
-            <label>Price Mode</label>
-            <div class="mode-toggle">
-              <button type="button" class="mode-btn active" data-mode="fixed">Fixed $</button>
-              <button type="button" class="mode-btn" data-mode="market_pct">% of Market</button>
-            </div>
-          </div>
-
-          <div class="field" id="fixedPriceField">
-            <label>Buy Price ($)</label>
-            <input type="number" id="fixedPrice" placeholder="e.g. 5000000" min="0">
-          </div>
-
-          <div class="field" id="marketPctField" style="display:none">
-            <label>Market % (e.g. 85 for 85%)</label>
-            <input type="number" id="marketPct" placeholder="e.g. 85" min="1" max="200" step="0.1">
-          </div>
-
-          <div class="field">
-            <label>Notes <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
-            <input type="text" id="addNotes" placeholder="Any condition, min qty, etc.">
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-full" id="addBtn">Add Listing</button>
-        </form>
-      </div>
-
+    <!-- Profile -->
+    <div class="glass-card profile-card">
+      <h2>Trader Profile</h2>
+      <form id="profileForm">
+        <div class="field">
+          <label>Display Name</label>
+          <input type="text" id="pDisplayName" placeholder="Your in-game name" required>
+        </div>
+        <div class="field">
+          <label>Discord Handle</label>
+          <input type="text" id="pDiscord" placeholder="@YourName#1234">
+        </div>
+        <div class="field">
+          <label>Torn Profile URL</label>
+          <input type="url" id="pTornUrl" placeholder="https://www.torn.com/profiles.php?XID=...">
+        </div>
+        <div class="field">
+          <label>Bio</label>
+          <textarea id="pBio" rows="2" placeholder="What you're looking for, preferences, etc."
+            style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;padding:.55rem .85rem;color:var(--text);font-size:.875rem;font-family:var(--sans);resize:vertical;outline:none;width:100%"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="saveProfileBtn">Save Profile</button>
+      </form>
     </div>
 
-    <!-- Right column: Listings table -->
-    <div class="glass-card listings-card">
-      <div class="listings-head">
-        <h2>Listings</h2>
-        <div class="listings-controls">
-          <select class="cat-filter" id="catFilter">
-            <option value="">All categories</option>
-          </select>
-          <input type="text" class="table-search" id="tableSearch" placeholder="Search…">
-          <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+    <!-- Catalog browser -->
+    <div class="glass-card cat-browser">
+      <div class="cat-head">
+        <div class="cat-head-left">
+          <h2>Item Catalog</h2>
+          <span class="cat-sub" id="catalogSub">Loading…</span>
+        </div>
+        <div class="cat-toolbar">
+          <input class="cat-search" id="catSearch" placeholder="Filter items…" autocomplete="off">
+          <button class="btn btn-ghost btn-sm" id="expandAllBtn">Expand All</button>
+          <button class="btn btn-ghost btn-sm" id="collapseAllBtn">Collapse</button>
+          <button class="btn-save" id="saveChangesBtn" disabled>Save</button>
         </div>
       </div>
-      <div class="table-wrap">
-        <table class="listings-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Type</th>
-              <th>Offer Price</th>
-              <th>Notes</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="listingsBody">
-            <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading…</td></tr>
-          </tbody>
-        </table>
+      <div class="cat-list" id="catalogBody">
+        <div style="padding:2rem;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:.8rem">
+          Loading item catalog…
+        </div>
       </div>
     </div>
 
   </div>
 </main>
 
-<!-- Edit modal -->
-<div class="modal hidden" id="editModal">
-  <div class="modal-overlay" id="editOverlay"></div>
-  <div class="glass-card modal-card" style="width:480px;max-width:95vw">
-    <div class="modal-title" id="editModalTitle">Edit Listing</div>
-    <input type="hidden" id="editId">
-
-    <div class="field">
-      <label>Item</label>
-      <div style="font-size:.9rem;color:var(--accent);font-family:var(--mono)" id="editItemName"></div>
-    </div>
-
-    <div class="field">
-      <label>Price Mode</label>
-      <div class="mode-toggle">
-        <button type="button" class="mode-btn active" data-emode="fixed">Fixed $</button>
-        <button type="button" class="mode-btn" data-emode="market_pct">% of Market</button>
-      </div>
-    </div>
-
-    <div class="field" id="editFixedField">
-      <label>Buy Price ($)</label>
-      <input type="number" id="editFixedPrice" min="0">
-    </div>
-
-    <div class="field" id="editMktField" style="display:none">
-      <label>Market % (e.g. 85)</label>
-      <input type="number" id="editMarketPct" min="1" max="200" step="0.1">
-    </div>
-
-    <div class="field">
-      <label>Notes</label>
-      <input type="text" id="editNotes" placeholder="optional">
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="editCancelBtn">Cancel</button>
-      <button class="btn btn-primary" id="editSaveBtn">Save Changes</button>
-    </div>
-  </div>
-</div>
-
 <div id="toast"></div>
 
 <script>
-/* ── State & helpers ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   State
+   selections: Map<torn_item_id, { checked, price_mode, market_pct, fixed_price, notes }>
+   catDefaults: Map<type, { market_pct }>   — category-level default %
+═══════════════════════════════════════════════════════════════ */
+let catalog    = [];          // [{type, items:[...]}]
+let selections = new Map();   // itemId → price state
+let catDefaults= new Map();   // type   → { market_pct }
+let filterQ    = '';
+let openEditor = null;        // itemId whose inline editor is open
+
 const fmt = n => n == null ? '—' : '$' + Number(n).toLocaleString();
-const pct = v => v == null ? '' : (v * 100).toFixed(1).replace(/\.0$/, '') + '%';
+const pctFmt = v => v == null ? '' : (v * 100).toFixed(1).replace(/\.0$/, '') + '%';
 
-let listings = [];
-let addMode  = 'fixed';
-let editMode = 'fixed';
-
-function toast(msg, isError = false) {
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+function toast(msg, err = false) {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.className   = 'show' + (isError ? ' error' : '');
+  el.className   = 'show' + (err ? ' err' : '');
   clearTimeout(el._t);
-  el._t = setTimeout(() => { el.className = ''; }, 2500);
+  el._t = setTimeout(() => el.className = '', 2600);
 }
 
 async function api(url, opts = {}) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (!res.ok) {
     const j = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(j.error || res.statusText);
   }
   return res.json();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 /* ── Profile ──────────────────────────────────────────────────────────── */
@@ -387,9 +372,9 @@ document.getElementById('profileForm').addEventListener('submit', async e => {
     await api('/admin/api/trade/profile', {
       method: 'PUT',
       body: JSON.stringify({
-        display_name:    document.getElementById('pDisplayName').value,
-        discord_handle:  document.getElementById('pDiscord').value,
-        bio:             document.getElementById('pBio').value,
+        display_name:     document.getElementById('pDisplayName').value,
+        discord_handle:   document.getElementById('pDiscord').value,
+        bio:              document.getElementById('pBio').value,
         torn_profile_url: document.getElementById('pTornUrl').value,
       }),
     });
@@ -398,302 +383,415 @@ document.getElementById('profileForm').addEventListener('submit', async e => {
   btn.textContent = 'Save Profile'; btn.disabled = false;
 });
 
-/* ── Item autocomplete ────────────────────────────────────────────────── */
-let acTimeout;
-let acSelected = null;
-
-const itemSearchEl = document.getElementById('itemSearch');
-const acDropdown   = document.getElementById('acDropdown');
-const selectedId   = document.getElementById('selectedItemId');
-const selectedType = document.getElementById('selectedItemType');
-const selectedName = document.getElementById('selectedItemName');
-
-itemSearchEl.addEventListener('input', () => {
-  acSelected = null;
-  selectedId.value   = '';
-  selectedType.value = '';
-  selectedName.textContent = '';
-  clearTimeout(acTimeout);
-  const q = itemSearchEl.value.trim();
-  if (!q) { acDropdown.classList.remove('open'); return; }
-  acTimeout = setTimeout(() => fetchAcItems(q), 200);
-});
-
-async function fetchAcItems(q) {
+/* ── Load catalog ─────────────────────────────────────────────────────── */
+async function loadCatalog() {
   try {
-    const items = await api(`/admin/api/trade/search-items?q=${encodeURIComponent(q)}`);
-    acDropdown.innerHTML = '';
-    if (!items.length) {
-      acDropdown.innerHTML = '<div class="ac-item" style="color:var(--text-muted)">No items found</div>';
-    } else {
+    catalog = await api('/admin/api/trade/all-items');
+
+    // Init selections from existing listings
+    selections.clear();
+    catDefaults.clear();
+    for (const { type, items } of catalog) {
       for (const item of items) {
-        const div = document.createElement('div');
-        div.className = 'ac-item';
-        div.innerHTML = `
-          <span style="display:flex;align-items:center;gap:.5rem">
-            <img src="https://www.torn.com/images/items/${item.id}/large.png"
-              style="width:22px;height:22px;object-fit:contain;border-radius:3px;image-rendering:pixelated"
-              onerror="this.style.display='none'">
-            ${item.name}
-          </span>
-          <span class="ac-item-type">${item.type || ''}</span>`;
-        div.addEventListener('mousedown', e => {
-          e.preventDefault();
-          selectItem(item);
-        });
-        acDropdown.appendChild(div);
+        if (item.listing_id) {
+          selections.set(item.id, {
+            checked:     item.is_active !== false,
+            price_mode:  item.price_mode || 'market_pct',
+            market_pct:  item.market_pct,
+            fixed_price: item.fixed_price,
+            notes:       item.notes || '',
+          });
+        }
       }
     }
-    acDropdown.classList.add('open');
-  } catch (e) { /* ignore */ }
-}
 
-function selectItem(item) {
-  acSelected = item;
-  itemSearchEl.value   = item.name;
-  selectedId.value     = item.id;
-  selectedType.value   = item.type || 'Other';
-  selectedName.textContent = `✓ ${item.name} · ${item.type || 'Other'}`;
-  acDropdown.classList.remove('open');
-}
+    // Derive category defaults from the most common market_pct in that category
+    for (const { type, items } of catalog) {
+      const pcts = items
+        .map(i => selections.get(i.id))
+        .filter(s => s && s.price_mode === 'market_pct' && s.market_pct)
+        .map(s => Math.round(s.market_pct * 1000) / 10);
 
-document.addEventListener('click', e => {
-  if (!e.target.closest('.ac-wrap')) acDropdown.classList.remove('open');
-});
+      if (pcts.length) {
+        const freq = {};
+        pcts.forEach(p => freq[p] = (freq[p] || 0) + 1);
+        const dominant = Object.entries(freq).sort((a,b) => b[1]-a[1])[0][0];
+        catDefaults.set(type, { market_pct: parseFloat(dominant) });
+      } else {
+        catDefaults.set(type, { market_pct: null });
+      }
+    }
 
-/* ── Price mode toggle (Add form) ─────────────────────────────────────── */
-document.querySelectorAll('.mode-btn[data-mode]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    addMode = btn.dataset.mode;
-    document.querySelectorAll('.mode-btn[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('fixedPriceField').style.display  = addMode === 'fixed'      ? '' : 'none';
-    document.getElementById('marketPctField').style.display   = addMode === 'market_pct' ? '' : 'none';
-  });
-});
-
-/* ── Price mode toggle (Edit modal) ───────────────────────────────────── */
-document.querySelectorAll('.mode-btn[data-emode]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    editMode = btn.dataset.emode;
-    document.querySelectorAll('.mode-btn[data-emode]').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('editFixedField').style.display = editMode === 'fixed'      ? '' : 'none';
-    document.getElementById('editMktField').style.display   = editMode === 'market_pct' ? '' : 'none';
-  });
-});
-
-/* ── Add listing ──────────────────────────────────────────────────────── */
-document.getElementById('addForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!selectedId.value) { toast('Please select an item', true); return; }
-
-  const btn = document.getElementById('addBtn');
-  btn.textContent = 'Adding…'; btn.disabled = true;
-
-  try {
-    await api('/admin/api/trade/listings', {
-      method: 'POST',
-      body: JSON.stringify({
-        torn_item_id: parseInt(selectedId.value),
-        item_name:    itemSearchEl.value.trim(),
-        item_type:    selectedType.value || 'Other',
-        price_mode:   addMode,
-        fixed_price:  addMode === 'fixed'      ? parseInt(document.getElementById('fixedPrice').value) || null : null,
-        market_pct:   addMode === 'market_pct' ? parseFloat(document.getElementById('marketPct').value) / 100 || null : null,
-        notes:        document.getElementById('addNotes').value.trim() || null,
-      }),
-    });
-    toast('Listing added');
-    resetAddForm();
-    loadListings();
-  } catch (e) { toast('Error: ' + e.message, true); }
-
-  btn.textContent = 'Add Listing'; btn.disabled = false;
-});
-
-function resetAddForm() {
-  itemSearchEl.value = '';
-  selectedId.value = '';
-  selectedType.value = '';
-  selectedName.textContent = '';
-  document.getElementById('fixedPrice').value  = '';
-  document.getElementById('marketPct').value   = '';
-  document.getElementById('addNotes').value    = '';
-  acSelected = null;
-}
-
-/* ── Load & render listings ───────────────────────────────────────────── */
-async function loadListings() {
-  try {
-    listings = await api('/admin/api/trade/listings');
-    renderListings();
+    renderCatalog();
     updateStats();
-    updateCatFilter();
+    document.getElementById('saveChangesBtn').disabled = false;
   } catch (e) {
-    document.getElementById('listingsBody').innerHTML =
-      `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--error)">${e.message}</td></tr>`;
+    document.getElementById('catalogBody').innerHTML =
+      `<div style="padding:2rem;text-align:center;color:var(--error)">Error: ${e.message}</div>`;
   }
 }
 
-function updateStats() {
-  const active = listings.filter(l => l.is_active).length;
-  const cats   = new Set(listings.map(l => l.item_type)).size;
-  const mktPct = listings.filter(l => l.price_mode === 'market_pct').length;
-  document.getElementById('statTotal').textContent  = listings.length;
-  document.getElementById('statActive').textContent = active;
-  document.getElementById('statCats').textContent   = cats;
-  document.getElementById('statMktPct').textContent = mktPct;
-}
+/* ── Render catalog ───────────────────────────────────────────────────── */
+function renderCatalog() {
+  const body = document.getElementById('catalogBody');
+  body.innerHTML = '';
 
-function updateCatFilter() {
-  const cats = [...new Set(listings.map(l => l.item_type))].sort();
-  const sel  = document.getElementById('catFilter');
-  const cur  = sel.value;
-  sel.innerHTML = '<option value="">All categories</option>';
-  for (const c of cats) {
-    const o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    if (c === cur) o.selected = true;
-    sel.appendChild(o);
-  }
-}
+  const q = filterQ.toLowerCase();
 
-function renderListings() {
-  const catF   = document.getElementById('catFilter').value;
-  const searchQ = document.getElementById('tableSearch').value.trim().toLowerCase();
+  for (const { type, items } of catalog) {
+    const filtered = q ? items.filter(i => i.name.toLowerCase().includes(q) || type.toLowerCase().includes(q)) : items;
+    if (!filtered.length) continue;
 
-  let filtered = listings;
-  if (catF)    filtered = filtered.filter(l => l.item_type === catF);
-  if (searchQ) filtered = filtered.filter(l => l.item_name.toLowerCase().includes(searchQ));
+    const listedCount = filtered.filter(i => {
+      const s = selections.get(i.id);
+      return s && s.checked;
+    }).length;
 
-  const tbody = document.getElementById('listingsBody');
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">No listings found</td></tr>`;
-    return;
-  }
+    const catDef = catDefaults.get(type) || {};
+    const pctVal = catDef.market_pct != null ? catDef.market_pct : '';
 
-  tbody.innerHTML = filtered.map(l => {
-    const priceHtml = l.price_mode === 'market_pct'
-      ? `<div class="price-mono">${l.effective_price ? fmt(l.effective_price) : '—'}</div>
-         <div style="margin-top:.15rem"><span class="pct-badge-sm">${pct(l.market_pct)} market</span></div>`
-      : `<div class="price-mono">${fmt(l.fixed_price)}</div>`;
+    // Determine category checkbox state
+    const checkedCount = filtered.filter(i => selections.get(i.id)?.checked).length;
+    const catChecked     = checkedCount === filtered.length;
+    const catIndeterminate = checkedCount > 0 && checkedCount < filtered.length;
 
-    const notesHtml = l.notes
-      ? `<span class="notes-cell-text" title="${esc(l.notes)}">${esc(l.notes)}</span>`
-      : `<span class="notes-cell-empty">—</span>`;
+    const sec = document.createElement('div');
+    sec.className = 'cat-section';
+    sec.dataset.type = type;
 
-    return `<tr class="${l.is_active ? '' : 'inactive'}" data-id="${l.id}">
-      <td>
-        <div class="item-cell-admin">
-          <img class="item-icon-sm" src="https://www.torn.com/images/items/${l.torn_item_id}/large.png"
-            alt="" onerror="this.style.display='none'">
-          <span style="font-weight:600">${esc(l.item_name)}</span>
-        </div>
-      </td>
-      <td><span class="type-badge">${esc(l.item_type)}</span></td>
-      <td>${priceHtml}</td>
-      <td>${notesHtml}</td>
-      <td>
-        <span class="badge ${l.is_active ? 'badge-active' : 'badge-inactive'}">
-          ${l.is_active ? 'Active' : 'Hidden'}
+    sec.innerHTML = `
+      <div class="cat-row">
+        <input type="checkbox" class="cat-check" ${catChecked ? 'checked' : ''}>
+        <span class="cat-label">${esc(type)}</span>
+        <span class="cat-tally">
+          <span class="listed">${listedCount}</span> / ${filtered.length}
         </span>
-      </td>
-      <td>
-        <div class="actions">
-          <button class="btn-icon" title="Edit" onclick="openEdit(${l.id})">✏</button>
-          <button class="btn-icon" title="${l.is_active ? 'Hide' : 'Show'}" onclick="toggleListing(${l.id})">
-            ${l.is_active ? '👁' : '👁‍🗨'}
-          </button>
-          <button class="btn-icon danger" title="Delete" onclick="deleteListing(${l.id}, '${esc(l.item_name)}')">🗑</button>
+        <div class="cat-pct-wrap" onclick="event.stopPropagation()">
+          <span class="cat-pct-label">mkt%</span>
+          <input type="number" class="cat-pct-input" min="1" max="300" step="1"
+            value="${pctVal}" placeholder="—" title="Market % for whole category">
+          <button class="cat-apply-btn">Apply all</button>
         </div>
-      </td>
-    </tr>`;
-  }).join('');
+        <span class="cat-chevron">▼</span>
+      </div>
+      <div class="cat-items">
+        ${filtered.map(item => renderItemRow(item)).join('')}
+      </div>
+    `;
+
+    // Category checkbox
+    const catCheck = sec.querySelector('.cat-check');
+    if (catIndeterminate) catCheck.indeterminate = true;
+    catCheck.addEventListener('change', e => {
+      e.stopPropagation();
+      toggleCategory(type, catCheck.checked, filtered);
+    });
+    catCheck.addEventListener('click', e => e.stopPropagation());
+
+    // Expand/collapse on header click
+    sec.querySelector('.cat-row').addEventListener('click', e => {
+      if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-check')) return;
+      sec.classList.toggle('open');
+    });
+
+    // Apply % to all items
+    const applyBtn  = sec.querySelector('.cat-apply-btn');
+    const pctInput  = sec.querySelector('.cat-pct-input');
+    applyBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const v = parseFloat(pctInput.value);
+      if (!v || v <= 0) { toast('Enter a valid %', true); return; }
+      catDefaults.set(type, { market_pct: v });
+      applyPctToCategory(type, v, filtered);
+      renderCatalog();
+      updateStats();
+    });
+
+    // Expand if filter is active or if there are listed items
+    if (q || listedCount > 0) sec.classList.add('open');
+
+    // Wire up item rows
+    wireItemRows(sec, filtered);
+
+    body.appendChild(sec);
+  }
+
+  const total = document.querySelectorAll('.cat-section').length;
+  document.getElementById('catalogSub').textContent =
+    `${catalog.reduce((a,c) => a + c.items.length, 0)} items · ${catalog.length} categories`;
 }
 
-document.getElementById('catFilter').addEventListener('change', renderListings);
-document.getElementById('tableSearch').addEventListener('input', renderListings);
-document.getElementById('refreshBtn').addEventListener('click', loadListings);
+function renderItemRow(item) {
+  const s   = selections.get(item.id);
+  const checked = s?.checked ?? false;
 
-/* ── Toggle active ────────────────────────────────────────────────────── */
-async function toggleListing(id) {
-  try {
-    const r = await api(`/admin/api/trade/listings/${id}/toggle`, { method: 'PATCH', body: '{}' });
-    const item = listings.find(l => l.id === id);
-    if (item) item.is_active = r.is_active;
-    renderListings();
-    updateStats();
-    toast(r.is_active ? 'Listing shown' : 'Listing hidden');
-  } catch (e) { toast('Error: ' + e.message, true); }
+  let priceHtml = '';
+  if (s?.checked) {
+    if (s.price_mode === 'market_pct' && s.market_pct) {
+      const eff = item.market_price ? fmt(Math.round(item.market_price * s.market_pct)) : null;
+      priceHtml = `
+        <span class="price-tag">${eff || '—'}</span>
+        <span class="pct-tag">${pctFmt(s.market_pct)}</span>`;
+    } else if (s.price_mode === 'fixed' && s.fixed_price) {
+      priceHtml = `<span class="price-tag">${fmt(s.fixed_price)}</span>`;
+    } else {
+      priceHtml = `<span class="price-tag none">no price</span>`;
+    }
+    if (s.notes) {
+      priceHtml += `<span class="notes-tag" title="${esc(s.notes)}">${esc(s.notes)}</span>`;
+    }
+  } else {
+    priceHtml = `<span class="price-tag none">not listed</span>`;
+  }
+
+  return `
+    <div class="item-row ${checked ? '' : 'unchecked'}" data-id="${item.id}">
+      <input type="checkbox" class="item-check" ${checked ? 'checked' : ''}>
+      <img class="item-icon-xs" src="https://www.torn.com/images/items/${item.id}/large.png"
+        alt="" onerror="this.style.display='none'">
+      <span class="item-name-col" title="${esc(item.name)}">${esc(item.name)}</span>
+      <div class="item-price-col">
+        ${priceHtml}
+        <button class="item-edit-btn ${s?.checked ? '' : 'hidden'}" title="Edit price">✏</button>
+      </div>
+    </div>
+    <div class="item-editor" data-editor="${item.id}">
+      <div class="mode-toggle-sm">
+        <button class="mode-btn-sm ${!s || s.price_mode === 'market_pct' ? 'active' : ''}" data-emode="market_pct">% Market</button>
+        <button class="mode-btn-sm ${s?.price_mode === 'fixed' ? 'active' : ''}" data-emode="fixed">Fixed $</button>
+      </div>
+      <div class="editor-mkt-wrap" style="display:${!s || s.price_mode !== 'fixed' ? 'flex' : 'none'};align-items:center;gap:.35rem">
+        <span class="editor-label">%</span>
+        <input type="number" class="editor-input editor-pct-val" min="1" max="300" step="0.5"
+          placeholder="e.g. 85"
+          value="${s?.market_pct ? (s.market_pct * 100).toFixed(1).replace(/\.0$/,'') : ''}">
+      </div>
+      <div class="editor-fixed-wrap" style="display:${s?.price_mode === 'fixed' ? 'flex' : 'none'};align-items:center;gap:.35rem">
+        <span class="editor-label">$</span>
+        <input type="number" class="editor-input editor-fixed-val" min="0"
+          placeholder="e.g. 5000000"
+          value="${s?.fixed_price || ''}">
+      </div>
+      <input type="text" class="editor-notes" placeholder="Notes (optional)"
+        value="${esc(s?.notes || '')}">
+      <button class="editor-apply">Apply</button>
+      <button class="editor-clear">Clear price</button>
+    </div>`;
 }
 
-/* ── Delete ───────────────────────────────────────────────────────────── */
-async function deleteListing(id, name) {
-  if (!confirm(`Delete listing for "${name}"?`)) return;
-  try {
-    await api(`/admin/api/trade/listings/${id}`, { method: 'DELETE' });
-    listings = listings.filter(l => l.id !== id);
-    renderListings();
-    updateStats();
-    updateCatFilter();
-    toast('Listing deleted');
-  } catch (e) { toast('Error: ' + e.message, true); }
+function wireItemRows(sec, items) {
+  for (const item of items) {
+    const row    = sec.querySelector(`.item-row[data-id="${item.id}"]`);
+    const editor = sec.querySelector(`.item-editor[data-editor="${item.id}"]`);
+    if (!row || !editor) continue;
+
+    // Checkbox
+    const check = row.querySelector('.item-check');
+    check.addEventListener('change', e => {
+      e.stopPropagation();
+      setItemChecked(item, check.checked);
+      row.classList.toggle('unchecked', !check.checked);
+      const editBtn = row.querySelector('.item-edit-btn');
+      if (editBtn) editBtn.classList.toggle('hidden', !check.checked);
+      updateCatCheckbox(sec, items);
+      updateStats();
+    });
+    check.addEventListener('click', e => e.stopPropagation());
+
+    // Edit button
+    const editBtn = row.querySelector('.item-edit-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = editor.classList.contains('open');
+        // Close any open editor
+        document.querySelectorAll('.item-editor.open').forEach(el => {
+          el.classList.remove('open');
+          el.previousElementSibling?.classList.remove('editing');
+          el.previousElementSibling?.querySelector('.item-edit-btn')?.classList.remove('active');
+        });
+        if (!isOpen) {
+          editor.classList.add('open');
+          row.classList.add('editing');
+          editBtn.classList.add('active');
+          openEditor = item.id;
+        } else {
+          openEditor = null;
+        }
+      });
+    }
+
+    // Mode toggle in editor
+    editor.querySelectorAll('.mode-btn-sm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.emode;
+        editor.querySelectorAll('.mode-btn-sm').forEach(b => b.classList.toggle('active', b === btn));
+        editor.querySelector('.editor-mkt-wrap').style.display   = mode === 'market_pct' ? 'flex' : 'none';
+        editor.querySelector('.editor-fixed-wrap').style.display = mode === 'fixed'      ? 'flex' : 'none';
+      });
+    });
+
+    // Apply button in editor
+    editor.querySelector('.editor-apply').addEventListener('click', () => {
+      const mode     = editor.querySelector('.mode-btn-sm.active').dataset.emode;
+      const pctRaw   = parseFloat(editor.querySelector('.editor-pct-val').value);
+      const fixedRaw = parseInt(editor.querySelector('.editor-fixed-val').value);
+      const notes    = editor.querySelector('.editor-notes').value.trim();
+
+      const mp = mode === 'market_pct' ? (pctRaw > 0 ? pctRaw / 100 : null) : null;
+      const fp = mode === 'fixed'      ? (fixedRaw > 0 ? fixedRaw : null) : null;
+
+      const sel = selections.get(item.id) || { checked: true };
+      selections.set(item.id, { ...sel, checked: true, price_mode: mode, market_pct: mp, fixed_price: fp, notes });
+
+      editor.classList.remove('open');
+      row.classList.remove('editing');
+      editor.previousElementSibling?.querySelector('.item-edit-btn')?.classList.remove('active');
+      openEditor = null;
+      renderCatalog();
+      updateStats();
+    });
+
+    // Clear price
+    editor.querySelector('.editor-clear').addEventListener('click', () => {
+      const sel = selections.get(item.id) || { checked: true };
+      selections.set(item.id, { ...sel, price_mode: 'market_pct', market_pct: null, fixed_price: null, notes: '' });
+      editor.classList.remove('open');
+      row.classList.remove('editing');
+      openEditor = null;
+      renderCatalog();
+      updateStats();
+    });
+  }
 }
 
-/* ── Edit modal ───────────────────────────────────────────────────────── */
-function openEdit(id) {
-  const l = listings.find(l => l.id === id);
-  if (!l) return;
-
-  document.getElementById('editId').value         = l.id;
-  document.getElementById('editModalTitle').textContent = `Edit: ${l.item_name}`;
-  document.getElementById('editItemName').textContent   = `${l.item_name} · ${l.item_type}`;
-
-  editMode = l.price_mode;
-  document.querySelectorAll('.mode-btn[data-emode]').forEach(b =>
-    b.classList.toggle('active', b.dataset.emode === editMode)
-  );
-  document.getElementById('editFixedField').style.display = editMode === 'fixed'      ? '' : 'none';
-  document.getElementById('editMktField').style.display   = editMode === 'market_pct' ? '' : 'none';
-
-  document.getElementById('editFixedPrice').value = l.fixed_price || '';
-  document.getElementById('editMarketPct').value  = l.market_pct ? (l.market_pct * 100).toFixed(1).replace(/\.0$/,'') : '';
-  document.getElementById('editNotes').value      = l.notes || '';
-
-  document.getElementById('editModal').classList.remove('hidden');
+/* ── Item / category helpers ──────────────────────────────────────────── */
+function setItemChecked(item, checked) {
+  const existing = selections.get(item.id) || {
+    price_mode: 'market_pct',
+    market_pct: catDefaults.get(item.type)?.market_pct
+      ? catDefaults.get(item.type).market_pct / 100 : null,
+    fixed_price: null, notes: '',
+  };
+  selections.set(item.id, { ...existing, checked });
 }
 
-function closeEdit() {
-  document.getElementById('editModal').classList.add('hidden');
+function toggleCategory(type, checked, items) {
+  const catDef = catDefaults.get(type) || {};
+  for (const item of items) {
+    if (checked) {
+      const existing = selections.get(item.id);
+      if (existing) {
+        selections.set(item.id, { ...existing, checked: true });
+      } else {
+        // Apply category default
+        selections.set(item.id, {
+          checked:     true,
+          price_mode:  catDef.market_pct ? 'market_pct' : 'market_pct',
+          market_pct:  catDef.market_pct ? catDef.market_pct / 100 : null,
+          fixed_price: null,
+          notes:       '',
+        });
+      }
+    } else {
+      const s = selections.get(item.id);
+      if (s) selections.set(item.id, { ...s, checked: false });
+    }
+  }
+  renderCatalog();
+  updateStats();
 }
 
-document.getElementById('editCancelBtn').addEventListener('click', closeEdit);
-document.getElementById('editOverlay').addEventListener('click', closeEdit);
+function applyPctToCategory(type, pct, items) {
+  for (const item of items) {
+    const existing = selections.get(item.id);
+    if (existing?.checked) {
+      selections.set(item.id, { ...existing, price_mode: 'market_pct', market_pct: pct / 100 });
+    } else if (!existing) {
+      // Don't auto-check items, just store for when they get checked
+    }
+    // If item is checked, apply. If not, don't force-check.
+  }
+}
 
-document.getElementById('editSaveBtn').addEventListener('click', async () => {
-  const id  = parseInt(document.getElementById('editId').value);
-  const btn = document.getElementById('editSaveBtn');
+function updateCatCheckbox(sec, items) {
+  const check  = sec.querySelector('.cat-check');
+  const count  = items.filter(i => selections.get(i.id)?.checked).length;
+  const allOn  = count === items.length;
+  const someOn = count > 0 && count < items.length;
+  check.checked       = allOn;
+  check.indeterminate = someOn;
+}
+
+/* ── Stats ────────────────────────────────────────────────────────────── */
+function updateStats() {
+  const checked  = [...selections.values()].filter(s => s.checked);
+  const mktBased = checked.filter(s => s.price_mode === 'market_pct').length;
+  const fixed    = checked.filter(s => s.price_mode === 'fixed').length;
+  const cats     = new Set(
+    catalog.flatMap(c => c.items.filter(i => selections.get(i.id)?.checked).map(() => c.type))
+  ).size;
+
+  document.getElementById('statTotal').textContent  = checked.length;
+  document.getElementById('statCats').textContent   = cats;
+  document.getElementById('statMktPct').textContent = mktBased;
+  document.getElementById('statFixed').textContent  = fixed;
+
+  const btn = document.getElementById('saveChangesBtn');
+  btn.textContent = `Save (${checked.length})`;
+}
+
+/* ── Save ─────────────────────────────────────────────────────────────── */
+document.getElementById('saveChangesBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('saveChangesBtn');
   btn.textContent = 'Saving…'; btn.disabled = true;
 
-  try {
-    const updated = await api(`/admin/api/trade/listings/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        price_mode:  editMode,
-        fixed_price: editMode === 'fixed'      ? parseInt(document.getElementById('editFixedPrice').value) || null : null,
-        market_pct:  editMode === 'market_pct' ? parseFloat(document.getElementById('editMarketPct').value) / 100 || null : null,
-        notes:       document.getElementById('editNotes').value.trim() || null,
-        is_active:   listings.find(l => l.id === id)?.is_active ?? true,
-      }),
-    });
-    const idx = listings.findIndex(l => l.id === id);
-    if (idx !== -1) listings[idx] = { ...listings[idx], ...updated };
-    closeEdit();
-    renderListings();
-    updateStats();
-    toast('Listing updated');
-  } catch (e) { toast('Error: ' + e.message, true); }
+  // Build the payload: all checked items
+  const listings = [];
+  for (const cat of catalog) {
+    for (const item of cat.items) {
+      const s = selections.get(item.id);
+      if (s?.checked) {
+        listings.push({
+          torn_item_id: item.id,
+          item_name:    item.name,
+          item_type:    item.type,
+          price_mode:   s.price_mode || 'market_pct',
+          market_pct:   s.price_mode === 'market_pct' ? s.market_pct : null,
+          fixed_price:  s.price_mode === 'fixed'      ? s.fixed_price : null,
+          notes:        s.notes || null,
+        });
+      }
+    }
+  }
 
-  btn.textContent = 'Save Changes'; btn.disabled = false;
+  try {
+    const r = await api('/admin/api/trade/bulk-save', {
+      method: 'POST',
+      body: JSON.stringify({ listings }),
+    });
+    toast(`Saved — ${r.count} items listed`);
+    updateStats();
+  } catch (e) {
+    toast('Save failed: ' + e.message, true);
+  }
+
+  btn.textContent = `Save (${[...selections.values()].filter(s=>s.checked).length})`;
+  btn.disabled = false;
+});
+
+/* ── Expand / collapse all ────────────────────────────────────────────── */
+document.getElementById('expandAllBtn').addEventListener('click', () => {
+  document.querySelectorAll('.cat-section').forEach(s => s.classList.add('open'));
+});
+document.getElementById('collapseAllBtn').addEventListener('click', () => {
+  document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('open'));
+});
+
+/* ── Category filter ──────────────────────────────────────────────────── */
+document.getElementById('catSearch').addEventListener('input', e => {
+  filterQ = e.target.value.trim();
+  renderCatalog();
 });
 
 /* ── Logout ───────────────────────────────────────────────────────────── */
@@ -702,14 +800,9 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   location.href = '/admin';
 });
 
-/* ── Utils ────────────────────────────────────────────────────────────── */
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 /* ── Init ─────────────────────────────────────────────────────────────── */
 loadProfile();
-loadListings();
+loadCatalog();
 </script>
 </body>
 </html>
