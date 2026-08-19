@@ -774,6 +774,8 @@ window.clearOverride = function(itemId, e) {
 /* ── Category helpers ─────────────────────────────────────────────────── */
 function toggleCategory(type, checked, items) {
   for (const item of items) {
+    // skip items with no market price when bulk-checking — must be set individually with a fixed price
+    if (checked && !item.market_price) continue;
     const s = selections.get(item.id) || { override: null };
     selections.set(item.id, { ...s, checked });
   }
