@@ -23,7 +23,16 @@
       <button class="btn btn-ghost btn-sm" id="btn-adjust">＋ Adjust</button>
       <button class="btn btn-ghost btn-sm" id="btn-reset">Reset</button>
       <a href="/admin/dashboard" class="btn btn-ghost btn-sm">← Admin</a>
+      <button class="nav-burger" id="navBurger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
+  </div>
+  <div class="nav-dropdown">
+    <button class="btn btn-ghost btn-sm" id="btn-poll-m">↻ Refresh</button>
+    <button class="btn btn-ghost btn-sm" id="btn-adjust-m">＋ Adjust</button>
+    <button class="btn btn-ghost btn-sm" id="btn-reset-m">Reset</button>
+    <a href="/admin/dashboard" class="btn btn-ghost btn-sm">← Admin</a>
   </div>
 </nav>
 
@@ -471,5 +480,16 @@
 <div id="toast"></div>
 </main>
 <script src="app.js"></script>
+<script>
+  document.getElementById('navBurger').addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  document.addEventListener('click', e => { if (!e.target.closest('.nav')) document.body.classList.remove('nav-open'); });
+  // Mirror mobile buttons to desktop handlers
+  ['poll','adjust','reset'].forEach(id => {
+    document.getElementById('btn-' + id + '-m').addEventListener('click', () => {
+      document.body.classList.remove('nav-open');
+      document.getElementById('btn-' + id).click();
+    });
+  });
+</script>
 </body>
 </html>
