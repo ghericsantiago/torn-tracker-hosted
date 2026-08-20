@@ -151,13 +151,6 @@ router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
     const { trade_id, items_override } = req.body;
     if (!trade_id) return res.status(400).json({ error: 'trade_id required' });
 
-    // Idempotent
-    const existing = await db.query('SELECT id FROM trade_receipts WHERE trade_id = $1', [trade_id]);
-    if (existing.rows.length) {
-      const id = existing.rows[0].id;
-      return res.json({ id, url: `/receipt/${id}` });
-    }
-
     const tornData = await fetchTornTrade(trade_id);
     if (tornData.error) return res.status(400).json({ error: `Torn API: ${JSON.stringify(tornData.error)}` });
 
@@ -165,7 +158,17 @@ router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
 
     const { rows: [row] } = await db.query(
       `INSERT INTO trade_receipts (trade_id, buyer_id, buyer_name, seller_id, seller_name, items, total_value)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (trade_id) DO UPDATE
+         SET items = EXCLUDED.items,
+             total_value = EXCLUDED.total_value,
+             buyer_id = EXCLUDED.buyer_id,
+             buyer_name = EXCLUDED.buyer_name,
+             seller_id = EXCLUDED.seller_id,
+             seller_name = EXCLUDED.seller_name,
+             status = 'pending',
+             completed_at = NULL
+       RETURNING id`,
       [trade_id, buyer.id || null, buyer.name || null,
        seller.id || null, seller.name || null,
        JSON.stringify(items), totalValue]
