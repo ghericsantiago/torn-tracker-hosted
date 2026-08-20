@@ -26,11 +26,8 @@
           <button class="tz-btn active" data-tz="tct">TCT</button>
           <button class="tz-btn" data-tz="local">Local</button>
         </div>
-        <span id="timeDisplay" class="time-display"></span>
-        <button id="recoBtn"  class="btn btn-ghost btn-sm">&#x1F4C8; Auto</button>
-        <button id="bestBtn"  class="btn btn-ghost btn-sm">Best Items</button>
-        <button id="calcBtn"  class="btn btn-ghost btn-sm">Calculator</button>
-        <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">Auto-Refresh: Off</button>
+        <span id="timeDisplay" class="time-display desk-only"></span>
+        <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">&#x21BB; Auto</button>
       </div>
     </div>
   </nav>
@@ -109,11 +106,18 @@
           <div class="summary-tile blue"><div class="stile-lbl">Rec Sell</div><div class="stile-val" id="sSell">—</div></div>
         </div>
 
-        <div class="chart-type-tabs">
-          <button class="ct-btn active" data-ct="line">Line</button>
-          <button class="ct-btn" data-ct="bar">Bar</button>
-          <button class="ct-btn" data-ct="scatter">Scatter</button>
-          <button class="ct-btn" data-ct="candlestick">Candlestick</button>
+        <div class="chart-tabs-row">
+          <div class="chart-type-tabs">
+            <button class="ct-btn active" data-ct="line">Line</button>
+            <button class="ct-btn" data-ct="bar">Bar</button>
+            <button class="ct-btn" data-ct="scatter">Scatter</button>
+            <button class="ct-btn" data-ct="candlestick">Candlestick</button>
+          </div>
+          <div class="drawer-btns">
+            <button id="recoBtn" class="btn btn-ghost btn-sm">&#x1F4C8; Auto</button>
+            <button id="bestBtn" class="btn btn-ghost btn-sm">Best Items</button>
+            <button id="calcBtn" class="btn btn-ghost btn-sm">Calculator</button>
+          </div>
         </div>
 
         <div class="chart-area">
