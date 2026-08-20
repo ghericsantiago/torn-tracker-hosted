@@ -52,7 +52,7 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
       state.adjustments
         .filter(a => a.itemId === itemId && (dir === 'both' || a.dir === dir))
         .forEach(a => events.push({ ts: a.ts, logId: null, source: `Manual: ${a.label || 'Manual'}`, qty: a.qty, category: 'Manual', logType: null, dir: a.dir, unitCost: null }));
-      events.sort(dir === 'both' ? ((x, y) => x.ts - y.ts) : ((x, y) => y.ts - x.ts));
+      events.sort((x, y) => y.ts - x.ts);
     }
     const sliced = events.slice(0, limit);
 
