@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.3
+// @version      2.4
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -251,7 +251,7 @@
                      font-family:'Space Grotesk',sans-serif;cursor:pointer;letter-spacing:.02em">
         💰 Get Price
       </button>`;
-    anchor.after(wrap);
+    anchor.before(wrap);
 
     document.getElementById('tt-price-inner').addEventListener('click', async () => {
       const btn = document.getElementById('tt-price-inner');
@@ -273,15 +273,10 @@
   function handleView(tradeId) {
     if (document.getElementById('tt-price-btn')) return;
     let attempts = 0;
-    const SELECTORS = ['.trade-cont', '.trade-wrap', '[class*="tradeCont"]', '.trade'];
     const tryInject = () => {
       if (document.getElementById('tt-price-btn')) return;
-      let anchor = null;
-      for (const sel of SELECTORS) {
-        anchor = document.querySelector(sel);
-        if (anchor) break;
-      }
-      if (anchor) { injectPriceBtn(anchor, tradeId); return; }
+      const textarea = document.getElementById('postTradeMessage');
+      if (textarea) { injectPriceBtn(textarea, tradeId); return; }
       if (++attempts < 20) setTimeout(tryInject, 500);
     };
     tryInject();
