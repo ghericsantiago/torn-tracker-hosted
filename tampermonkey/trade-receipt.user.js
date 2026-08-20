@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.7
+// @version      2.8
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -21,7 +21,7 @@
 
   function parseHash() {
     const params = {};
-    window.location.hash.replace('#', '').split('&').forEach(p => {
+    window.location.hash.replace(/^#\/?/, '').split('&').forEach(p => {
       const [k, v] = p.split('='); if (k) params[k] = v;
     });
     return { step: params.step, id: params.ID };
