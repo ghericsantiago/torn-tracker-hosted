@@ -531,4 +531,13 @@ th.sort-desc::after { border-top:    5px solid var(--accent); }
   .ledger-filter-bar { flex-wrap: wrap; gap: 6px; }
   .ledger-filter-bar input[type="text"] { min-width: 0; flex: 1 1 100%; }
   .ldg-date-group, .ldg-presets { flex: 1 1 100%; justify-content: flex-start; }
+
+  /* Remove per-section internal scroll — let the full page scroll as one */
+  .monitor-main .card,
+  .monitor-sidebar .card {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .monitor-sidebar #activity { overflow-y: visible; max-height: none; }
 }
