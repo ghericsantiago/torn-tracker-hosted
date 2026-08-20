@@ -254,24 +254,76 @@ body {
   .items-card-header { padding: 0.6rem 0.85rem; }
   .items-title { font-size: 0.82rem; }
 
-  /* Hide market price (col 3) and line total (col 5) columns */
-  .receipt-table thead th:nth-child(3),
-  .receipt-table tbody td:nth-child(3),
-  .receipt-table thead th:nth-child(5),
-  .receipt-table tbody td:nth-child(5) { display: none; }
+  /* Card-per-item layout — show all columns without horizontal scroll */
+  .table-wrap { overflow-x: visible; }
+  .receipt-table,
+  .receipt-table tbody,
+  .receipt-table tfoot { display: block; }
+  .receipt-table thead { display: none; }
 
-  /* Tighter table padding and smaller text */
-  .receipt-table thead th { padding: 0.45rem 0.5rem; font-size: 0.62rem; }
-  .receipt-table tbody td { padding: 0.5rem 0.5rem; font-size: 0.82rem; }
-  .receipt-table tfoot .total-row td { padding: 0.6rem 0.5rem; }
+  .receipt-table tbody tr {
+    display: block;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .receipt-table tbody tr:last-child td { border-bottom: none; }
+  .receipt-table tbody tr:hover td { background: transparent; }
+
+  /* Item name — full width, no label needed */
+  .receipt-table tbody td:nth-child(1) {
+    display: block;
+    padding: 0 0 0.45rem 0;
+    border: none;
+  }
+
+  /* Qty, Market Price, Our Price, Line Total — label on left, value on right */
+  .receipt-table tbody td:nth-child(2),
+  .receipt-table tbody td:nth-child(3),
+  .receipt-table tbody td:nth-child(4),
+  .receipt-table tbody td:nth-child(5) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.1rem 0;
+    border: none;
+    font-size: 0.82rem;
+    text-align: left !important;
+  }
+
+  .receipt-table tbody td:nth-child(2)::before,
+  .receipt-table tbody td:nth-child(3)::before,
+  .receipt-table tbody td:nth-child(4)::before,
+  .receipt-table tbody td:nth-child(5)::before {
+    font-size: 0.63rem;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+  }
+  .receipt-table tbody td:nth-child(2)::before { content: "Qty"; }
+  .receipt-table tbody td:nth-child(3)::before { content: "Market Price"; }
+  .receipt-table tbody td:nth-child(4)::before { content: "Our Price"; }
+  .receipt-table tbody td:nth-child(5)::before { content: "Line Total"; }
 
   /* Smaller item icons */
   .item-icon { width: 26px; height: 26px; }
-  .item-name { font-size: 0.82rem; }
+  .item-name { font-size: 0.85rem; }
   .item-type { font-size: 0.63rem; }
 
-  /* Total row: hide colspan label, right-align the value */
-  .receipt-table tfoot .total-row td:nth-child(1) { display: none; }
+  /* Total footer row — label + value side by side */
+  .receipt-table tfoot .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.85rem;
+  }
+  .receipt-table tfoot .total-row td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
   .receipt-table tfoot .total-row td:nth-child(2) { text-align: right; }
 
   /* Explanation card */
