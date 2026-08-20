@@ -1007,6 +1007,15 @@ const ldgState = {
   filters: { q: '', category: '', channel: '', side: '', from_ts: '', to_ts: '' },
 };
 
+// Default date inputs to today in Torn City time (ET)
+{
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
+  $('ldg-from').value = today;
+  $('ldg-to').value   = today;
+  ldgState.filters.from_ts = String(new Date(today).setHours(0, 0, 0, 0));
+  ldgState.filters.to_ts   = String(new Date(today).setHours(23, 59, 59, 999));
+}
+
 async function loadLedger(reset) {
   if (ldgState.loading) return;
   if (reset) {
@@ -1135,8 +1144,7 @@ $('ldg-q').addEventListener('input', () => { clearTimeout(ldgDebounce); ldgDebou
 ['ldg-from','ldg-to'].forEach(id => $(id).addEventListener('change', applyLedgerFilters));
 
 $('ldg-today').addEventListener('click', () => {
-  const d = new Date(); d.setHours(0,0,0,0);
-  const s = d.toISOString().slice(0,10);
+  const s = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
   $('ldg-from').value = s; $('ldg-to').value = s;
   applyLedgerFilters();
 });
