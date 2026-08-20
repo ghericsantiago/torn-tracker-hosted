@@ -62,6 +62,23 @@ router.get('/api/receipts', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.patch('/api/receipts/:id/status', requireAuth, async (req, res) => {
+  const { status } = req.body;
+  if (!['pending', 'completed', 'cancelled'].includes(status))
+    return res.status(400).json({ error: 'Invalid status' });
+  try {
+    const { rows } = await db.query(
+      `UPDATE trade_receipts
+       SET status = $1,
+           completed_at = CASE WHEN $1 = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END
+       WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // List all items (including inactive)
 router.get('/api/items', requireAuth, async (req, res) => {
   try {

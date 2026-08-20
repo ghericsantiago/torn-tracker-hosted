@@ -15,9 +15,31 @@
       font-size: 0.7rem; font-family: var(--mono); font-weight: 600;
       text-transform: uppercase; letter-spacing: .06em;
     }
-    .status-pill.completed { background: rgba(74,222,128,.12); color: #4ade80; border: 1px solid rgba(74,222,128,.25); }
-    .status-pill.pending   { background: rgba(110,231,247,.1);  color: var(--accent); border: 1px solid rgba(110,231,247,.2); }
+    .status-pill.completed  { background: rgba(74,222,128,.12);  color: #4ade80;       border: 1px solid rgba(74,222,128,.25); }
+    .status-pill.pending    { background: rgba(110,231,247,.1);  color: var(--accent); border: 1px solid rgba(110,231,247,.2); }
+    .status-pill.cancelled  { background: rgba(248,113,113,.1);  color: #f87171;       border: 1px solid rgba(248,113,113,.25); }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status-wrap { position: relative; display: inline-block; }
+    .status-pill { cursor: pointer; user-select: none; }
+    .status-pill::after { content: ' ▾'; font-size: 0.6rem; opacity: 0.6; }
+    .status-menu {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0;
+      background: #0d0f1a; border: 1px solid var(--glass-border);
+      border-radius: 8px; padding: 0.3rem; z-index: 100;
+      min-width: 130px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    }
+    .status-wrap.open .status-menu { display: block; }
+    .status-menu-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.35rem 0.6rem; border-radius: 5px;
+      font-size: 0.72rem; font-family: var(--mono); font-weight: 600;
+      cursor: pointer; text-transform: uppercase; letter-spacing: .06em;
+      transition: background 0.15s;
+    }
+    .status-menu-item:hover { background: rgba(255,255,255,0.06); }
+    .status-menu-item.opt-pending   { color: var(--accent); }
+    .status-menu-item.opt-completed { color: #4ade80; }
+    .status-menu-item.opt-cancelled { color: #f87171; }
     .receipts-table td { vertical-align: middle; }
     .trade-link { font-family: var(--mono); font-size: 0.82rem; color: var(--accent); text-decoration: none; }
     .trade-link:hover { text-decoration: underline; }
@@ -116,6 +138,12 @@
         hour: '2-digit', minute: '2-digit'
       });
     }
+    function statusLabel(s) {
+      return s === 'completed' ? 'Completed' : s === 'cancelled' ? 'Cancelled' : 'Pending';
+    }
+    function statusPill(s) {
+      return `<span class="status-pill ${s}"><span class="status-dot"></span>${statusLabel(s)}</span>`;
+    }
 
     async function load() {
       const res = await fetch('/admin/api/receipts');
@@ -132,23 +160,80 @@
       if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No receipts yet.</td></tr>'; return; }
 
       tbody.innerHTML = rows.map(r => `
-        <tr>
+        <tr data-id="${r.id}">
           <td><span class="mono" style="font-size:.82rem">#${r.trade_id}</span></td>
           <td style="font-size:.875rem">${r.buyer_name || `Player #${r.buyer_id}` || '—'}</td>
           <td style="text-align:right"><span class="total-val">${fmt(r.total_value)}</span></td>
           <td>
-            <span class="status-pill ${r.status}">
-              <span class="status-dot"></span>
-              ${r.status === 'completed' ? 'Completed' : 'Pending'}
-            </span>
+            <div class="status-wrap" data-id="${r.id}">
+              ${statusPill(r.status)}
+              <div class="status-menu">
+                <div class="status-menu-item opt-pending"   data-val="pending"><span class="status-dot" style="background:var(--accent)"></span>Pending</div>
+                <div class="status-menu-item opt-completed" data-val="completed"><span class="status-dot" style="background:#4ade80"></span>Completed</div>
+                <div class="status-menu-item opt-cancelled" data-val="cancelled"><span class="status-dot" style="background:#f87171"></span>Cancelled</div>
+              </div>
+            </div>
           </td>
           <td class="date-cell">${fmtDate(r.created_at)}</td>
-          <td class="date-cell">${fmtDate(r.completed_at)}</td>
+          <td class="date-cell" id="completed-${r.id}">${fmtDate(r.completed_at)}</td>
           <td style="text-align:right">
             <a href="/receipt/${r.id}" target="_blank" class="view-link">View →</a>
           </td>
         </tr>`).join('');
     }
+
+    // Status dropdown toggle
+    document.getElementById('receiptsBody').addEventListener('click', async e => {
+      const pill = e.target.closest('.status-pill');
+      const item = e.target.closest('.status-menu-item');
+      const wrap = e.target.closest('.status-wrap');
+
+      if (pill && wrap) {
+        // toggle this menu, close others
+        document.querySelectorAll('.status-wrap.open').forEach(w => { if (w !== wrap) w.classList.remove('open'); });
+        wrap.classList.toggle('open');
+        return;
+      }
+
+      if (item && wrap) {
+        const newStatus = item.dataset.val;
+        const id = wrap.dataset.id;
+        wrap.classList.remove('open');
+
+        const res = await fetch(`/admin/api/receipts/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (!res.ok) { alert('Failed to update status'); return; }
+        const updated = await res.json();
+
+        // Update pill in place
+        wrap.querySelector('.status-pill')?.remove();
+        wrap.insertAdjacentHTML('afterbegin', statusPill(newStatus));
+
+        // Update completed_at cell
+        const cell = document.getElementById(`completed-${id}`);
+        if (cell) cell.textContent = fmtDate(updated.completed_at);
+
+        // Re-tally stats
+        const allRows = [...document.querySelectorAll('#receiptsBody tr[data-id]')];
+        const statuses = allRows.map(tr => tr.querySelector('.status-pill')?.className.split(' ').find(c => ['pending','completed','cancelled'].includes(c)));
+        document.getElementById('statPending').textContent   = statuses.filter(s => s === 'pending').length;
+        document.getElementById('statCompleted').textContent = statuses.filter(s => s === 'completed').length;
+        return;
+      }
+
+      // Click outside → close all
+      if (!wrap) document.querySelectorAll('.status-wrap.open').forEach(w => w.classList.remove('open'));
+    });
+
+    // Close menus on outside click
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.status-wrap')) {
+        document.querySelectorAll('.status-wrap.open').forEach(w => w.classList.remove('open'));
+      }
+    });
 
     // Logout
     document.getElementById('logoutBtn').addEventListener('click', async () => {
