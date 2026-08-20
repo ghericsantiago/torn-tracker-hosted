@@ -376,6 +376,53 @@ canvas#priceChart { max-height: 360px; }
 .bi-conf.high { color: var(--success); background: rgba(74,222,128,0.12); }
 .loading-msg { color: var(--text-muted); font-size: 0.8rem; padding: 0.5rem 0; }
 
+/* ── Summary bar ── */
+.summary-bar { display: flex; border-bottom: 1px solid var(--glass-border); flex-shrink: 0; margin: 0 -1.25rem; }
+.summary-tile { flex: 1; padding: 8px 10px; border-right: 1px solid var(--glass-border); }
+.summary-tile:last-child { border-right: none; }
+.stile-lbl { font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 3px; }
+.stile-val { font-family: var(--mono); font-size: 0.8rem; font-weight: 500; }
+.summary-tile.gold  .stile-val { color: var(--warn, #fbbf24); }
+.summary-tile.green .stile-val { color: var(--success); }
+.summary-tile.red   .stile-val { color: var(--error); }
+.summary-tile.blue  .stile-val { color: var(--accent); }
+
+/* ── Timezone toggle ── */
+.tz-toggle { display: inline-flex; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: 7px; padding: 2px; }
+.tz-btn { background: transparent; border: none; color: var(--text-muted); padding: 2px 10px; border-radius: 5px; font-size: 0.7rem; font-family: var(--mono); cursor: pointer; transition: all var(--tr); }
+.tz-btn.active { background: var(--accent-dim); color: var(--accent); }
+
+/* ── Time display ── */
+.time-display { font-family: var(--mono); font-size: 0.7rem; color: var(--text-muted); background: rgba(110,231,247,0.05); border: 1px solid var(--glass-border); border-radius: 6px; padding: 3px 10px; white-space: nowrap; }
+.time-display .tl { color: var(--accent); font-weight: 600; }
+
+/* ── Click hint ── */
+.click-hint { font-family: var(--mono); font-size: 0.62rem; color: var(--text-muted); text-align: center; padding: 5px 14px; border-top: 1px solid var(--glass-border); letter-spacing: 0.05em; }
+
+/* ── Recommendation card ── */
+.reco-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.reco-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.reco-body.hidden { display: none; }
+.reco-section { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.75rem; }
+.reco-section-title { font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 0.5rem; }
+.reco-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.75rem; }
+.reco-row:last-child { border-bottom: none; }
+.reco-label { color: var(--text-muted); font-size: 0.72rem; }
+.reco-value { font-family: var(--mono); font-weight: 500; color: var(--text-dim); }
+.reco-value.buy   { color: var(--success); }
+.reco-value.sell  { color: var(--accent); }
+.reco-value.profit { color: var(--success); }
+.reco-value.loss   { color: var(--error); }
+.reco-badge { display: inline-block; padding: 3px 12px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; font-family: var(--sans); }
+.reco-badge.buy         { background: rgba(74,222,128,0.15); color: var(--success); }
+.reco-badge.sell        { background: rgba(110,231,247,0.15); color: var(--accent); }
+.reco-badge.hold        { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+.reco-badge.strong-buy  { background: rgba(74,222,128,0.25);  color: var(--success); font-weight: 700; }
+.reco-status { text-align: center; color: var(--text-muted); padding: 20px 0; font-size: 0.8rem; }
+
+/* ── Calc auto-open toggle ── */
+.calc-auto-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--glass-border); margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); }
+
 @media (max-width: 1024px) {
   /* Release fixed viewport height so the page scrolls as one */
   html, body { height: auto; overflow: auto; }

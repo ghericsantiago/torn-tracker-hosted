@@ -22,6 +22,11 @@
     <div class="nav-inner">
       <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Item Tracker</span>
       <div class="nav-right">
+        <div class="tz-toggle">
+          <button class="tz-btn active" data-tz="tct">TCT</button>
+          <button class="tz-btn" data-tz="local">Local</button>
+        </div>
+        <span id="timeDisplay" class="time-display"></span>
         <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">Auto-Refresh: Off</button>
       </div>
     </div>
@@ -93,6 +98,14 @@
           </div>
         </div>
 
+        <div class="summary-bar">
+          <div class="summary-tile gold"><div class="stile-lbl">Avg Price</div><div class="stile-val" id="sAvg">—</div></div>
+          <div class="summary-tile green"><div class="stile-lbl">Min</div><div class="stile-val" id="sMin">—</div></div>
+          <div class="summary-tile red"><div class="stile-lbl">Max</div><div class="stile-val" id="sMax">—</div></div>
+          <div class="summary-tile green"><div class="stile-lbl">Rec Buy</div><div class="stile-val" id="sBuy">—</div></div>
+          <div class="summary-tile blue"><div class="stile-lbl">Rec Sell</div><div class="stile-val" id="sSell">—</div></div>
+        </div>
+
         <div class="chart-type-tabs">
           <button class="ct-btn active" data-ct="line">Line</button>
           <button class="ct-btn" data-ct="bar">Bar</button>
@@ -105,6 +118,8 @@
           <div id="candlestickChart" style="display:none;width:100%;height:360px;"></div>
           <div id="chartStatus" class="chart-status">Select an item to view market data</div>
         </div>
+
+        <div id="clickHint" class="click-hint" style="display:none">Click once → set Buy price · Click again → set Sell price · 3rd click resets</div>
 
         <div class="chart-footer">
           <button id="toggleTable" class="btn btn-ghost btn-sm">Show Data Table</button>
@@ -152,6 +167,18 @@
           </div>
         </div>
         <button id="resetCalc" class="btn btn-ghost btn-sm btn-full">Reset</button>
+        <div class="calc-auto-row">
+          <span class="calc-auto-lbl">Auto-open on fill</span>
+          <button id="calcAutoOpen" class="btn btn-ghost btn-sm active">On</button>
+        </div>
+      </div>
+
+      <div class="glass-card sidebar-section" id="recoCard">
+        <div class="reco-toggle-row">
+          <div class="section-title" style="margin-bottom:0">📈 Recommendation</div>
+          <button id="recoToggle" class="btn btn-ghost btn-sm">Show</button>
+        </div>
+        <div id="recoBody" class="reco-body hidden"></div>
       </div>
 
       <div class="glass-card sidebar-section">
