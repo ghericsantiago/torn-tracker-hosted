@@ -73,8 +73,8 @@
 
       const pctBadge = item.price_mode === 'market_pct' && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
-      const notInCatalog = !item.in_catalog
-        ? `<span class="not-listed">global rate</span>` : '';
+      const notInCatalog = !item.in_catalog && item.resolved_pct
+        ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
 
       let adjustBadge = '';
       if (item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
@@ -140,7 +140,7 @@
 
     const lines = [];
     for (const [, g] of Object.entries(modeGroups)) {
-      const allNames = [...g.items, ...g.unlisted.map(n => `${n} <em style="opacity:.6">(global rate)</em>`)];
+      const allNames = [...g.items, ...g.unlisted];
       if (!allNames.length) continue;
       if (g.mode === 'fixed') {
         lines.push(`<li><strong>Fixed price</strong>: ${allNames.join(', ')}</li>`);
