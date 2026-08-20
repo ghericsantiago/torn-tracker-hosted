@@ -305,6 +305,14 @@ body {
   .receipt-table tbody td:nth-child(2)::before { content: "Qty"; }
   .receipt-table tbody td:nth-child(3)::before { content: "Market Price"; }
   .receipt-table tbody td:nth-child(4)::before { content: "Our Price"; }
+
+  /* Badge before price on mobile */
+  .receipt-table tbody td:nth-child(4) .price-val-wrap {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 0.35rem;
+  }
   .receipt-table tbody td:nth-child(5)::before { content: "Line Total"; }
 
   /* Smaller item icons */

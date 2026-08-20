@@ -100,8 +100,7 @@
         <td class="col-num">${item.quantity}</td>
         <td class="col-num price-cell">${item.market_price != null ? fmt(item.market_price) : '—'}</td>
         <td class="col-num price-cell">
-          ${item.effective_price != null ? fmt(item.effective_price) : '—'}
-          ${pctBadge}${notInCatalog}${adjustBadge}
+          <span class="price-val-wrap">${item.effective_price != null ? fmt(item.effective_price) : '—'}${pctBadge}${notInCatalog}${adjustBadge}</span>
         </td>
         <td class="col-num price-cell total-cell">
           ${item.effective_total != null ? fmt(item.effective_total) : '—'}
