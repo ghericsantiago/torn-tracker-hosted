@@ -531,6 +531,11 @@
   });
 
   // ── Init ──
+  // Default date range to today in Torn City time (ET)
+  const tornToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  document.getElementById('startDate').value = tornToday;
+  document.getElementById('endDate').value   = tornToday;
+
   loadBestItems();
   showStatus('Select an item to view market data');
 })();

@@ -377,8 +377,10 @@ canvas#priceChart { max-height: 360px; }
 .loading-msg { color: var(--text-muted); font-size: 0.8rem; padding: 0.5rem 0; }
 
 @media (max-width: 1024px) {
-  html, body { overflow: auto; }
-  .layout { grid-template-columns: 1fr; grid-template-rows: auto; }
-  .sidebar-left, .sidebar-right { border: none; }
-  .main-area { padding: 0.75rem; }
+  /* Release fixed viewport height so the page scrolls as one */
+  html, body { height: auto; overflow: auto; }
+  .layout { grid-template-columns: 1fr; grid-template-rows: auto; overflow: visible; }
+  /* Each section expands to content height — no independent scroll */
+  .sidebar-left, .sidebar-right { border: none; overflow-y: visible; height: auto; }
+  .main-area { padding: 0.75rem; overflow-y: visible; height: auto; }
 }
