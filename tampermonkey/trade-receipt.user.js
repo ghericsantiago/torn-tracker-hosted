@@ -16,7 +16,7 @@
   // ── CONFIG ───────────────────────────────────────────────────────────────────
   // RECEIPT_TOKEN: go to your Admin Dashboard → Settings → "Receipt Token" → Copy
   const APP_URL       = 'https://torn-imarket-tracker.gvsantiago.com';
-  const RECEIPT_TOKEN = 'PASTE-YOUR-RECEIPT-TOKEN-FROM-ADMIN-SETTINGS';
+  const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   // ─────────────────────────────────────────────────────────────────────────────
 
   function parseHash() {
