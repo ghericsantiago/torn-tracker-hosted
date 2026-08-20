@@ -74,7 +74,7 @@
       const pctBadge = item.price_mode === 'market_pct' && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
       const notInCatalog = !item.in_catalog
-        ? `<span class="not-listed">not in catalog</span>` : '';
+        ? `<span class="not-listed">global rate</span>` : '';
 
       let adjustBadge = '';
       if (item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
@@ -126,30 +126,29 @@
   function buildExplanation(items) {
     const card = document.getElementById('explainCard');
     const body = document.getElementById('explainBody');
-    const catalogItems = items.filter(i => i.in_catalog);
-    if (!catalogItems.length) { card.style.display = 'none'; return; }
+    if (!items.length) { card.style.display = 'none'; return; }
 
     const modeGroups = {};
-    for (const item of catalogItems) {
+    for (const item of items) {
       const key = item.price_mode === 'fixed'
         ? 'fixed'
         : item.resolved_pct != null ? pct(item.resolved_pct) + '_market' : 'unknown';
-      if (!modeGroups[key]) modeGroups[key] = { items: [], mode: item.price_mode, pct: item.resolved_pct };
-      modeGroups[key].items.push(item.item_name);
+      if (!modeGroups[key]) modeGroups[key] = { items: [], mode: item.price_mode, pct: item.resolved_pct, unlisted: [] };
+      if (item.in_catalog) modeGroups[key].items.push(item.item_name);
+      else                 modeGroups[key].unlisted.push(item.item_name);
     }
 
     const lines = [];
     for (const [, g] of Object.entries(modeGroups)) {
+      const allNames = [...g.items, ...g.unlisted.map(n => `${n} <em style="opacity:.6">(global rate)</em>`)];
+      if (!allNames.length) continue;
       if (g.mode === 'fixed') {
-        lines.push(`<li><strong>Fixed price</strong>: ${g.items.join(', ')}</li>`);
+        lines.push(`<li><strong>Fixed price</strong>: ${allNames.join(', ')}</li>`);
+      } else if (g.pct != null) {
+        lines.push(`<li><strong>${pct(g.pct)} of current market price</strong>: ${allNames.join(', ')}</li>`);
       } else {
-        lines.push(`<li><strong>${pct(g.pct)} of current market price</strong>: ${g.items.join(', ')}</li>`);
+        lines.push(`<li class="muted"><strong>No price data</strong>: ${allNames.join(', ')}</li>`);
       }
-    }
-
-    const notListed = items.filter(i => !i.in_catalog);
-    if (notListed.length) {
-      lines.push(`<li class="muted"><strong>Not in our catalog</strong> (no price applied): ${notListed.map(i => i.item_name).join(', ')}</li>`);
     }
 
     body.innerHTML = `<ul>${lines.join('')}</ul>`;
