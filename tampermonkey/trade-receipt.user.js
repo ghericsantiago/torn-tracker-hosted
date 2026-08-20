@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.4
+// @version      2.5
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -270,16 +270,25 @@
     });
   }
 
+  let viewObserver = null;
+
+  function stopViewObserver() {
+    if (viewObserver) { viewObserver.disconnect(); viewObserver = null; }
+    document.getElementById('tt-price-btn')?.remove();
+  }
+
   function handleView(tradeId) {
-    if (document.getElementById('tt-price-btn')) return;
-    let attempts = 0;
-    const tryInject = () => {
-      if (document.getElementById('tt-price-btn')) return;
+    stopViewObserver();
+
+    const inject = () => {
       const textarea = document.getElementById('postTradeMessage');
-      if (textarea) { injectPriceBtn(textarea, tradeId); return; }
-      if (++attempts < 20) setTimeout(tryInject, 500);
+      if (!textarea) return;
+      if (!document.getElementById('tt-price-btn')) injectPriceBtn(textarea, tradeId);
     };
-    tryInject();
+
+    inject();
+    viewObserver = new MutationObserver(inject);
+    viewObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   // ── Mark receipt complete when trade is accepted ───────────────────────────
@@ -300,7 +309,7 @@
       const hash = window.location.hash;
       if (hash === lastHash) return;
       lastHash = hash;
-      document.getElementById('tt-price-btn')?.remove();
+      stopViewObserver();
 
       const { step, id } = parseHash();
       if (!id) return;
