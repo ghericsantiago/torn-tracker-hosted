@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torn Tracker — Receipts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 0.18rem 0.6rem; border-radius: 20px;
+      font-size: 0.7rem; font-family: var(--mono); font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .status-pill.completed { background: rgba(74,222,128,.12); color: #4ade80; border: 1px solid rgba(74,222,128,.25); }
+    .status-pill.pending   { background: rgba(110,231,247,.1);  color: var(--accent); border: 1px solid rgba(110,231,247,.2); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .receipts-table td { vertical-align: middle; }
+    .trade-link { font-family: var(--mono); font-size: 0.82rem; color: var(--accent); text-decoration: none; }
+    .trade-link:hover { text-decoration: underline; }
+    .view-link { font-size: 0.75rem; color: var(--text-muted); text-decoration: none; font-family: var(--mono); }
+    .view-link:hover { color: var(--accent); }
+    .total-val { font-family: var(--mono); font-weight: 600; }
+    .date-cell { font-size: 0.75rem; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
+      <div class="nav-right">
+        <a href="/admin/dashboard" class="btn btn-ghost btn-sm mobile-hide">Dashboard</a>
+        <a href="/admin/trade" class="btn btn-ghost btn-sm mobile-hide">Trade Admin</a>
+        <a href="/admin/inventory" class="btn btn-ghost btn-sm mobile-hide">Inventory</a>
+        <a href="/admin/receipts" class="btn btn-ghost btn-sm mobile-hide" style="color:var(--accent)">Receipts</a>
+        <button id="logoutBtn" class="btn btn-ghost btn-sm mobile-hide">Logout</button>
+        <button class="nav-burger" id="navBurger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="/admin/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+      <a href="/admin/trade" class="btn btn-ghost btn-sm">Trade Admin</a>
+      <a href="/admin/inventory" class="btn btn-ghost btn-sm">Inventory</a>
+      <a href="/admin/receipts" class="btn btn-ghost btn-sm">Receipts</a>
+      <button id="logoutBtnMobile" class="btn btn-ghost btn-sm">Logout</button>
+    </div>
+  </nav>
+
+  <main class="dashboard">
+
+    <!-- Stats bar -->
+    <div class="glass-card stats-bar">
+      <div class="sbar-item">
+        <span class="sbar-val" id="statTotal">—</span>
+        <span class="sbar-label">Total</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statPending">—</span>
+        <span class="sbar-label">Pending</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statCompleted">—</span>
+        <span class="sbar-label">Completed</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val accent" id="statVolume">—</span>
+        <span class="sbar-label">Total Volume</span>
+      </div>
+    </div>
+
+    <!-- Receipts table -->
+    <div class="glass-card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid var(--glass-border)">
+        <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">Trade Receipts</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table receipts-table" style="min-width:700px">
+          <thead>
+            <tr>
+              <th>Trade ID</th>
+              <th>Buyer</th>
+              <th style="text-align:right">Total</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Completed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="receiptsBody">
+            <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function fmt(n) {
+      return n == null ? '—' : '$' + Number(n).toLocaleString();
+    }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    async function load() {
+      const res = await fetch('/api/admin/receipts');
+      if (!res.ok) { document.getElementById('receiptsBody').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load receipts.</td></tr>'; return; }
+      const rows = await res.json();
+
+      document.getElementById('statTotal').textContent     = rows.length;
+      document.getElementById('statPending').textContent   = rows.filter(r => r.status === 'pending').length;
+      document.getElementById('statCompleted').textContent = rows.filter(r => r.status === 'completed').length;
+      const vol = rows.reduce((s, r) => s + (Number(r.total_value) || 0), 0);
+      document.getElementById('statVolume').textContent    = fmt(vol);
+
+      const tbody = document.getElementById('receiptsBody');
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No receipts yet.</td></tr>'; return; }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td><span class="mono" style="font-size:.82rem">#${r.trade_id}</span></td>
+          <td style="font-size:.875rem">${r.buyer_name || `Player #${r.buyer_id}` || '—'}</td>
+          <td style="text-align:right"><span class="total-val">${fmt(r.total_value)}</span></td>
+          <td>
+            <span class="status-pill ${r.status}">
+              <span class="status-dot"></span>
+              ${r.status === 'completed' ? 'Completed' : 'Pending'}
+            </span>
+          </td>
+          <td class="date-cell">${fmtDate(r.created_at)}</td>
+          <td class="date-cell">${fmtDate(r.completed_at)}</td>
+          <td style="text-align:right">
+            <a href="/receipt/${r.id}" target="_blank" class="view-link">View →</a>
+          </td>
+        </tr>`).join('');
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      location.href = '/admin';
+    });
+    document.getElementById('logoutBtnMobile')?.addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      location.href = '/admin';
+    });
+
+    // Mobile nav burger
+    document.getElementById('navBurger').addEventListener('click', () => {
+      document.getElementById('navDropdown').classList.toggle('open');
+    });
+
+    load();
+  </script>
+</body>
+</html>

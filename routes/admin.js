@@ -45,7 +45,22 @@ router.get('/dashboard', requireAuth, (req, res) => {
   res.sendFile('dashboard.html', { root: 'public/admin' });
 });
 
+router.get('/receipts', requireAuth, (req, res) => {
+  res.sendFile('receipts.html', { root: 'public/admin' });
+});
+
 // --- Admin API (all require auth) ---
+
+router.get('/api/admin/receipts', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
+              total_value, created_at, completed_at
+       FROM trade_receipts ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // List all items (including inactive)
 router.get('/api/items', requireAuth, async (req, res) => {
