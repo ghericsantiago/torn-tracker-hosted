@@ -16,7 +16,6 @@
       <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
       <div class="nav-right">
         <a href="/" target="_blank" class="btn btn-ghost btn-sm mobile-hide">View Client</a>
-        <a href="/trade" target="_blank" class="btn btn-ghost btn-sm mobile-hide">Trade Listing</a>
         <a href="/admin/trade" class="btn btn-ghost btn-sm mobile-hide">Trade Admin</a>
         <a href="/admin/inventory" class="btn btn-ghost btn-sm mobile-hide">Inventory</a>
         <button id="settingsBtn" class="btn btn-ghost btn-sm mobile-hide">⚙ Settings</button>
@@ -28,7 +27,6 @@
     </div>
     <div class="nav-dropdown" id="navDropdown">
       <a href="/" target="_blank" class="btn btn-ghost btn-sm">View Client</a>
-      <a href="/trade" target="_blank" class="btn btn-ghost btn-sm">Trade Listing</a>
       <a href="/admin/trade" class="btn btn-ghost btn-sm">Trade Admin</a>
       <a href="/admin/inventory" class="btn btn-ghost btn-sm">Inventory</a>
       <button id="settingsBtnMobile" class="btn btn-ghost btn-sm">⚙ Settings</button>
@@ -159,17 +157,6 @@
               <span class="sync-time"  id="syncTime"></span>
             </div>
             <button id="syncItemsBtn" class="btn btn-ghost btn-sm">Sync Items</button>
-          </div>
-        </div>
-
-        <div class="settings-divider"></div>
-
-        <div class="settings-section">
-          <div class="settings-section-title">Receipt Token</div>
-          <p class="settings-desc">Copy this token into your Tampermonkey script so it can create and complete trade receipts.</p>
-          <div class="token-row">
-            <input id="receiptTokenInput" type="text" readonly class="token-input" value="Loading…" />
-            <button class="btn btn-ghost btn-sm" id="copyTokenBtn">Copy</button>
           </div>
         </div>
 

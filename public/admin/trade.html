@@ -315,6 +315,14 @@
           </div>
         </div>
       </form>
+      <div style="border-top:1px solid var(--glass-border);margin-top:.75rem;padding-top:.75rem">
+        <div style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;font-family:var(--mono)">Receipt Token</div>
+        <p style="font-size:.75rem;color:var(--text-muted);margin:0 0 .5rem">Copy this token into your Tampermonkey script so it can create and complete trade receipts.</p>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input id="receiptTokenInput" type="text" readonly style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:6px;padding:.3rem .6rem;color:var(--text);font-family:var(--mono);font-size:.78rem;outline:none" value="Loading…" />
+          <button class="btn btn-ghost btn-sm" id="copyTokenBtn">Copy</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -888,9 +896,26 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   await fetch('/admin/logout', { method: 'POST' }); location.href = '/admin';
 });
 
+/* ── Receipt token ────────────────────────────────────────────────────── */
+async function loadReceiptToken() {
+  try {
+    const s = await api('/admin/api/settings');
+    document.getElementById('receiptTokenInput').value = s.receipt_token || '(not set)';
+  } catch (e) { document.getElementById('receiptTokenInput').value = 'Error loading'; }
+}
+document.getElementById('copyTokenBtn').addEventListener('click', () => {
+  const val = document.getElementById('receiptTokenInput').value;
+  navigator.clipboard.writeText(val).then(() => toast('Token copied!')).catch(() => {
+    document.getElementById('receiptTokenInput').select();
+    document.execCommand('copy');
+    toast('Token copied!');
+  });
+});
+
 /* ── Init ─────────────────────────────────────────────────────────────── */
 loadProfile();
 loadCatalog();
+loadReceiptToken();
 </script>
 </body>
 </html>
