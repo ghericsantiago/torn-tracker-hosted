@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.0
+// @version      2.1
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -119,6 +119,7 @@
         <div style="padding:12px 18px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px">
           <span id="tt-status" style="font-size:11px;font-family:monospace;color:#64748b;flex:1"></span>
           <button id="tt-cancel" style="background:none;border:1px solid rgba(255,255,255,.1);color:#94a3b8;padding:6px 16px;border-radius:7px;cursor:pointer;font-size:12px">Cancel</button>
+          <button id="tt-refresh" style="background:none;border:1px solid rgba(110,231,247,.25);color:#6ee7f7;padding:6px 16px;border-radius:7px;cursor:pointer;font-size:12px">↻ Refresh</button>
           <button id="tt-confirm" style="background:#6ee7f7;color:#07080f;border:none;padding:6px 20px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700">Confirm & Create Receipt</button>
         </div>
       </div>`;
@@ -142,6 +143,27 @@
     document.getElementById('tt-close').addEventListener('click', close);
     document.getElementById('tt-cancel').addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    document.getElementById('tt-refresh').addEventListener('click', async () => {
+      const btn = document.getElementById('tt-refresh');
+      btn.textContent = 'Refreshing…';
+      btn.disabled = true;
+      try {
+        const fresh = await gmPost(`${APP_URL}/api/receipt/preview`, { trade_id: Number(tradeId) });
+        if (fresh.error) {
+          document.getElementById('tt-status').textContent = 'Refresh failed: ' + fresh.error;
+          document.getElementById('tt-status').style.color = '#f87171';
+          btn.textContent = '↻ Refresh'; btn.disabled = false;
+          return;
+        }
+        overlay.remove();
+        buildModal(fresh, tradeId);
+      } catch (e) {
+        document.getElementById('tt-status').textContent = 'Network error — try again';
+        document.getElementById('tt-status').style.color = '#f87171';
+        btn.textContent = '↻ Refresh'; btn.disabled = false;
+      }
+    });
 
     document.getElementById('tt-confirm').addEventListener('click', async () => {
       const btn    = document.getElementById('tt-confirm');
