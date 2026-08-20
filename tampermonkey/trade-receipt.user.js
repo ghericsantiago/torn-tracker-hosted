@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.5
+// @version      2.6
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -53,15 +53,18 @@
     const itemsCopy = JSON.parse(JSON.stringify(data.items));
 
     const rowsHtml = itemsCopy.map((item, idx) => `
-      <tr data-idx="${idx}" style="border-bottom:1px solid rgba(255,255,255,.04)">
+      <tr data-idx="${idx}" style="border-bottom:1px solid rgba(255,255,255,.04);${!item.in_catalog ? 'background:rgba(251,191,36,.04);box-shadow:inset 3px 0 0 #f59e0b;' : ''}">
         <td style="padding:8px 12px">
           <div style="display:flex;align-items:center;gap:8px">
             <img src="https://www.torn.com/images/items/${item.torn_item_id}/large.png"
                  style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0"
                  onerror="this.style.display='none'">
             <div>
-              <div style="font-size:13px;color:#e2e8f0">${item.item_name}</div>
-              <div style="font-size:10px;color:#64748b">qty: ${item.quantity}${item.in_catalog ? (item.resolved_pct ? ' · ' + (item.resolved_pct * 100).toFixed(0) + '% mkt' : '') : ' · not in catalog'}</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:13px;color:#e2e8f0">${item.item_name}</span>
+                ${!item.in_catalog ? '<span style="font-size:9px;font-family:monospace;background:rgba(251,191,36,.15);color:#f59e0b;border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:1px 5px;letter-spacing:.06em">UNLISTED</span>' : ''}
+              </div>
+              <div style="font-size:10px;color:#64748b">qty: ${item.quantity}${item.in_catalog ? (item.resolved_pct ? ' · ' + (item.resolved_pct * 100).toFixed(0) + '% mkt' : '') : ' · global rate applied'}</div>
             </div>
           </div>
         </td>
