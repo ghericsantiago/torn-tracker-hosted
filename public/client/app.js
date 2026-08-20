@@ -531,10 +531,11 @@
   });
 
   // ── Init ──
-  // Default date range to today in Torn City time (ET)
-  const tornToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
-  document.getElementById('startDate').value = tornToday;
-  document.getElementById('endDate').value   = tornToday;
+  // Default: end = today in ET, start = 7 days ago so timeframes have data
+  const ET_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' });
+  const _now   = new Date();
+  document.getElementById('endDate').value   = ET_FMT.format(_now);
+  document.getElementById('startDate').value = ET_FMT.format(new Date(_now.getTime() - 7 * 24 * 60 * 60 * 1000));
 
   loadBestItems();
   showStatus('Select an item to view market data');
