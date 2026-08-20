@@ -77,6 +77,31 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
       } catch { /* non-fatal — price enrichment is best-effort */ }
     }
 
+    // Enrich Trade events with receipt prices: join trade_events → trade_receipts by ts + itemId.
+    // trade events have logId=null so the logId enrichment above skips them; this fills the gap.
+    const tradeEventsToEnrich = sliced.filter(e => e.source === 'Trade' && e.unitCost === null && e.dir === 'in');
+    if (tradeEventsToEnrich.length > 0) {
+      try {
+        const tradeTss = [...new Set(tradeEventsToEnrich.map(e => e.ts))];
+        const rows = await db.pool.query(
+          `SELECT te.ts, (j.item_data->>'effective_price')::numeric AS effective_price
+           FROM trade_events te
+           JOIN trade_receipts tr ON tr.trade_id::text = te.trade_id
+           CROSS JOIN LATERAL jsonb_array_elements(tr.items) AS j(item_data)
+           WHERE te.ts = ANY($1)
+             AND (j.item_data->>'torn_item_id')::int = $2
+             AND j.item_data->>'effective_price' IS NOT NULL`,
+          [tradeTss, parseInt(itemId, 10)]
+        );
+        const priceByTs = new Map(rows.rows.map(r => [Number(r.ts), Number(r.effective_price)]));
+        for (const e of sliced) {
+          if (e.source === 'Trade' && e.unitCost === null && e.dir === 'in' && priceByTs.has(e.ts)) {
+            e.unitCost = priceByTs.get(e.ts);
+          }
+        }
+      } catch { /* non-fatal — receipt enrichment is best-effort */ }
+    }
+
     // Detect when totals exist but all activity records were evicted from the rolling window.
     let truncated = false;
     if (sliced.length === 0 && !source) {
