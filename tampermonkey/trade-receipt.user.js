@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.2
+// @version      2.3
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -205,8 +205,7 @@
         }
 
         close();
-        document.getElementById('tt-price-btn')?.remove();
-        setTimeout(() => handleView(tradeId), 300);
+        handleView(tradeId);
         showWidget(result.id, result.url, result.total);
       } catch (e) {
         status.textContent = 'Network error — try again';
@@ -240,12 +239,8 @@
   }
 
   // ── Inject "Get Price" button ─────────────────────────────────────────────────
-  async function handleView(tradeId) {
-    if (document.getElementById('tt-price-btn')) return;
-
-    const tradeCont = document.querySelector('.trade-cont');
-    if (!tradeCont) return;
-
+  function injectPriceBtn(anchor, tradeId) {
+    document.getElementById('tt-price-btn')?.remove();
     const wrap = document.createElement('div');
     wrap.id = 'tt-price-btn';
     wrap.style.cssText = 'margin:8px 0';
@@ -256,7 +251,7 @@
                      font-family:'Space Grotesk',sans-serif;cursor:pointer;letter-spacing:.02em">
         💰 Get Price
       </button>`;
-    tradeCont.after(wrap);
+    anchor.after(wrap);
 
     document.getElementById('tt-price-inner').addEventListener('click', async () => {
       const btn = document.getElementById('tt-price-inner');
@@ -273,6 +268,23 @@
         btn.disabled = false;
       }
     });
+  }
+
+  function handleView(tradeId) {
+    if (document.getElementById('tt-price-btn')) return;
+    let attempts = 0;
+    const SELECTORS = ['.trade-cont', '.trade-wrap', '[class*="tradeCont"]', '.trade'];
+    const tryInject = () => {
+      if (document.getElementById('tt-price-btn')) return;
+      let anchor = null;
+      for (const sel of SELECTORS) {
+        anchor = document.querySelector(sel);
+        if (anchor) break;
+      }
+      if (anchor) { injectPriceBtn(anchor, tradeId); return; }
+      if (++attempts < 20) setTimeout(tryInject, 500);
+    };
+    tryInject();
   }
 
   // ── Mark receipt complete when trade is accepted ───────────────────────────
@@ -298,7 +310,7 @@
       const { step, id } = parseHash();
       if (!id) return;
 
-      if (step === 'view')    setTimeout(() => handleView(id), 800);
+      if (step === 'view')    handleView(id);
       if (step === 'accept2') handleAccept2(id);
     }, 200);
   }
