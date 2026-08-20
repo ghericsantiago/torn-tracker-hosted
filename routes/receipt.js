@@ -1,7 +1,10 @@
 const express = require('express');
 const cors    = require('cors');
+const https   = require('https');
 const router  = express.Router();
 const db      = require('../db');
+
+const APP_URL = 'https://torn-imarket-tracker.gvsantiago.com';
 
 const CORS_TORN = {
   origin: 'https://www.torn.com',
@@ -12,19 +15,33 @@ const CORS_TORN = {
 async function verifyToken(req, res) {
   const token = req.headers['x-receipt-token'];
   if (!token) { res.status(401).json({ error: 'Missing X-Receipt-Token' }); return false; }
-  const { rows } = await db.query(
-    'SELECT receipt_token FROM trade_profiles WHERE id = 1'
-  );
+  const { rows } = await db.query('SELECT receipt_token FROM trade_profiles WHERE id = 1');
   if (!rows.length || String(rows[0].receipt_token) !== String(token)) {
     res.status(403).json({ error: 'Invalid token' }); return false;
   }
   return true;
 }
 
-// ── Price lookup using cascade SQL ────────────────────────────────────────────
+function fetchTornTrade(tradeId) {
+  return new Promise((resolve, reject) => {
+    const url = `https://api.torn.com/v2/user/${tradeId}/trade?key=${process.env.TORN_API_KEY}`;
+    https.get(url, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('Invalid JSON from Torn API')); }
+      });
+    }).on('error', reject);
+  });
+}
+
+// ── Price lookup using 3-level cascade SQL ─────────────────────────────────────
 const PRICE_LOOKUP = `
   SELECT
-    tl.torn_item_id, tl.item_name, tl.item_type,
+    tl.torn_item_id,
+    COALESCE(tl.item_name, ti.name) AS item_name,
+    tl.item_type,
     tl.price_mode, tl.fixed_price,
     ti.market_price,
     COALESCE(tl.market_pct, tcc.market_pct, tp.default_market_pct) AS resolved_pct,
@@ -37,76 +54,124 @@ const PRICE_LOOKUP = `
     END AS effective_price
   FROM trade_listings tl
   LEFT JOIN torn_items ti  ON ti.id = tl.torn_item_id
-  LEFT JOIN trade_category_configs tcc
-         ON tcc.profile_id = tl.profile_id AND tcc.item_type = tl.item_type
+  LEFT JOIN trade_category_configs tcc ON tcc.profile_id = tl.profile_id AND tcc.item_type = tl.item_type
   LEFT JOIN trade_profiles tp ON tp.id = tl.profile_id
   WHERE tl.profile_id = 1 AND tl.torn_item_id = ANY($1::int[])
 `;
+
+async function buildPricedItems(tornData, itemsOverride) {
+  const trade  = tornData?.trade || {};
+  const buyer  = trade.user   || {};   // the other party — they're offering items to us
+  const seller = trade.trader || {};   // us
+
+  // Only price items offered by the OTHER party (buyer)
+  const rawItems = (trade.items || []).filter(
+    i => i.type === 'Item' && i.user_id === buyer.id
+  );
+  const itemIds = rawItems.map(i => i.details?.id).filter(Boolean);
+
+  // Catalog price lookup + name fallback for uncatalogued items
+  const priceMap = {}, nameMap = {};
+  if (itemIds.length) {
+    const [priceRes, nameRes] = await Promise.all([
+      db.query(PRICE_LOOKUP, [itemIds]),
+      db.query('SELECT id, name FROM torn_items WHERE id = ANY($1::int[])', [itemIds]),
+    ]);
+    for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
+    for (const r of nameRes.rows)  nameMap[r.id] = r.name;
+  }
+
+  // Override map: { torn_item_id → unit_price }
+  const overrideMap = {};
+  if (Array.isArray(itemsOverride)) {
+    for (const ov of itemsOverride) overrideMap[ov.torn_item_id] = Number(ov.unit_price);
+  }
+
+  let totalValue = 0;
+  const items = rawItems.map(ti => {
+    const id      = ti.details?.id;
+    const qty     = ti.details?.amount || 1;
+    const listing = priceMap[id];
+
+    let effectiveUnit = listing ? (Number(listing.effective_price) || null) : null;
+    if (overrideMap[id] != null) effectiveUnit = overrideMap[id];
+
+    const effectiveTotal = effectiveUnit != null ? effectiveUnit * qty : null;
+    if (effectiveTotal != null) totalValue += effectiveTotal;
+
+    return {
+      torn_item_id:    id,
+      item_name:       listing?.item_name || nameMap[id] || `Item #${id}`,
+      item_type:       listing?.item_type || null,
+      quantity:        qty,
+      market_price:    listing ? Number(listing.market_price) : null,
+      price_mode:      listing?.price_mode || null,
+      resolved_pct:    listing ? Number(listing.resolved_pct) : null,
+      effective_price: effectiveUnit,
+      effective_total: effectiveTotal,
+      in_catalog:      !!listing,
+    };
+  });
+
+  return { buyer, seller, items, totalValue: totalValue || null };
+}
+
+// ── GET /api/receipt/token (admin) — MUST be before /:id ─────────────────────
+router.get('/api/receipt/token', require('../middleware/auth'), async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT receipt_token FROM trade_profiles WHERE id = 1');
+    res.json({ token: rows[0]?.receipt_token || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/receipt/preview — price without creating receipt ────────────────
+router.options('/api/receipt/preview', cors(CORS_TORN));
+router.post('/api/receipt/preview', cors(CORS_TORN), async (req, res) => {
+  try {
+    if (!await verifyToken(req, res)) return;
+    const { trade_id } = req.body;
+    if (!trade_id) return res.status(400).json({ error: 'trade_id required' });
+
+    const tornData = await fetchTornTrade(trade_id);
+    if (tornData.error) return res.status(400).json({ error: `Torn API: ${JSON.stringify(tornData.error)}` });
+
+    const { buyer, seller, items, totalValue } = await buildPricedItems(tornData, null);
+    res.json({ trade_id, buyer, seller, items, total: totalValue });
+  } catch (e) {
+    console.error('[receipt] preview error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ── POST /api/receipt/create ──────────────────────────────────────────────────
 router.options('/api/receipt/create', cors(CORS_TORN));
 router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
   try {
     if (!await verifyToken(req, res)) return;
-
-    const { trade_id, trade_data } = req.body;
+    const { trade_id, items_override } = req.body;
     if (!trade_id) return res.status(400).json({ error: 'trade_id required' });
 
-    // Idempotent: return existing receipt if already created for this trade
-    const existing = await db.query(
-      'SELECT id FROM trade_receipts WHERE trade_id = $1', [trade_id]
-    );
+    // Idempotent
+    const existing = await db.query('SELECT id FROM trade_receipts WHERE trade_id = $1', [trade_id]);
     if (existing.rows.length) {
       const id = existing.rows[0].id;
       return res.json({ id, url: `/receipt/${id}` });
     }
 
-    const trade = trade_data?.trade || {};
-    const buyer  = trade.user   || {};
-    const seller = trade.trader || {};
-    const tornItems = Array.isArray(trade.items) ? trade.items : [];
+    const tornData = await fetchTornTrade(trade_id);
+    if (tornData.error) return res.status(400).json({ error: `Torn API: ${JSON.stringify(tornData.error)}` });
 
-    // Look up prices for all items in the trade that are in our catalog
-    const itemIds = tornItems.map(i => i.id).filter(Boolean);
-    const priceMap = {};
-    if (itemIds.length) {
-      const { rows } = await db.query(PRICE_LOOKUP, [itemIds]);
-      for (const r of rows) priceMap[r.torn_item_id] = r;
-    }
-
-    // Build snapshot
-    let totalValue = 0;
-    const items = tornItems.map(ti => {
-      const listing = priceMap[ti.id];
-      const qty = ti.quantity || 1;
-      const effectiveUnit = listing ? (Number(listing.effective_price) || null) : null;
-      const effectiveTotal = effectiveUnit != null ? effectiveUnit * qty : null;
-      if (effectiveTotal != null) totalValue += effectiveTotal;
-      return {
-        torn_item_id:   ti.id,
-        item_name:      ti.name || (listing ? listing.item_name : `Item #${ti.id}`),
-        item_type:      listing ? listing.item_type : null,
-        quantity:       qty,
-        market_price:   ti.market_price != null ? ti.market_price : (listing ? Number(listing.market_price) : null),
-        price_mode:     listing ? listing.price_mode : null,
-        resolved_pct:   listing ? Number(listing.resolved_pct) : null,
-        effective_price: effectiveUnit,
-        effective_total: effectiveTotal,
-        in_catalog:     !!listing,
-      };
-    });
+    const { buyer, seller, items, totalValue } = await buildPricedItems(tornData, items_override);
 
     const { rows: [row] } = await db.query(
-      `INSERT INTO trade_receipts
-         (trade_id, buyer_id, buyer_name, seller_id, seller_name, items, total_value)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       RETURNING id`,
+      `INSERT INTO trade_receipts (trade_id, buyer_id, buyer_name, seller_id, seller_name, items, total_value)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [trade_id, buyer.id || null, buyer.name || null,
        seller.id || null, seller.name || null,
-       JSON.stringify(items), totalValue || null]
+       JSON.stringify(items), totalValue]
     );
 
-    res.json({ id: row.id, url: `/receipt/${row.id}` });
+    res.json({ id: row.id, url: `/receipt/${row.id}`, total: totalValue });
   } catch (e) {
     console.error('[receipt] create error:', e.message);
     res.status(500).json({ error: e.message });
@@ -118,42 +183,21 @@ router.options('/api/receipt/:id/complete', cors(CORS_TORN));
 router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
   try {
     if (!await verifyToken(req, res)) return;
-    const { id } = req.params;
-    const { rowCount } = await db.query(
-      `UPDATE trade_receipts
-       SET status = 'completed', completed_at = NOW()
-       WHERE id = $1 AND status = 'pending'`,
-      [id]
+    await db.query(
+      `UPDATE trade_receipts SET status='completed', completed_at=NOW() WHERE id=$1 AND status='pending'`,
+      [req.params.id]
     );
-    res.json({ ok: true, updated: rowCount > 0 });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── GET /api/receipt/:id ──────────────────────────────────────────────────────
+// ── GET /api/receipt/:id (public) ─────────────────────────────────────────────
 router.get('/api/receipt/:id', async (req, res) => {
   try {
-    const { rows } = await db.query(
-      'SELECT * FROM trade_receipts WHERE id = $1', [req.params.id]
-    );
+    const { rows } = await db.query('SELECT * FROM trade_receipts WHERE id = $1', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── GET /api/receipt/token (admin — get receipt token) ────────────────────────
-router.get('/api/receipt/token', require('../middleware/auth'), async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      'SELECT receipt_token FROM trade_profiles WHERE id = 1'
-    );
-    res.json({ token: rows[0]?.receipt_token || null });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
