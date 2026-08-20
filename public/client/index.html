@@ -114,9 +114,12 @@
             <button class="ct-btn" data-ct="candlestick">Candlestick</button>
           </div>
           <div class="drawer-btns">
-            <button id="recoBtn" class="btn btn-ghost btn-sm">&#x1F4C8; Auto</button>
-            <button id="bestBtn" class="btn btn-ghost btn-sm">Best Items</button>
-            <button id="calcBtn" class="btn btn-ghost btn-sm">Calculator</button>
+            <button class="tf-btn" data-tf="day">1D</button>
+            <button class="tf-btn" data-tf="1h">1H</button>
+            <button class="tf-btn active" data-tf="30m">30M</button>
+            <button class="tf-btn" data-tf="15m">15M</button>
+            <button class="tf-btn" data-tf="5m">5M</button>
+            <button class="tf-btn" data-tf="1m">1M</button>
           </div>
         </div>
 
@@ -129,13 +132,9 @@
         <div id="clickHint" class="click-hint" style="display:none">Click once → set Buy price · Click again → set Sell price · 3rd click resets</div>
 
         <div class="chart-tf-bar">
-          <span class="tf-lbl">TF</span>
-          <button class="tf-btn" data-tf="day">1D</button>
-          <button class="tf-btn" data-tf="1h">1H</button>
-          <button class="tf-btn active" data-tf="30m">30M</button>
-          <button class="tf-btn" data-tf="15m">15M</button>
-          <button class="tf-btn" data-tf="5m">5M</button>
-          <button class="tf-btn" data-tf="1m">1M</button>
+          <button id="recoBtn" class="btn btn-ghost btn-sm">&#x1F4C8; Auto</button>
+          <button id="bestBtn" class="btn btn-ghost btn-sm">Best Items</button>
+          <button id="calcBtn" class="btn btn-ghost btn-sm">Calculator</button>
           <div style="flex:1"></div>
           <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">&#x21BB; Auto</button>
         </div>
