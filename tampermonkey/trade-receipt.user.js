@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.1
+// @version      2.2
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -205,6 +205,8 @@
         }
 
         close();
+        document.getElementById('tt-price-btn')?.remove();
+        setTimeout(() => handleView(tradeId), 300);
         showWidget(result.id, result.url, result.total);
       } catch (e) {
         status.textContent = 'Network error — try again';
