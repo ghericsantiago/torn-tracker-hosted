@@ -71,7 +71,7 @@
       const tr = document.createElement('tr');
       const imgSrc = `https://www.torn.com/images/items/${item.torn_item_id}/large.png`;
 
-      const pctBadge = item.price_mode === 'market_pct' && item.resolved_pct
+      const pctBadge = item.in_catalog && item.price_mode === 'market_pct' && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
       const notInCatalog = !item.in_catalog && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
