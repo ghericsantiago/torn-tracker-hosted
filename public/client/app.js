@@ -28,6 +28,16 @@
     status.classList.add('hidden');
   }
 
+  const tfWindowMs = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, 'day': null };
+
+  function filterByTimeframe(rows) {
+    if (!rows.length) return rows;
+    const ms = tfWindowMs[timeframe];
+    if (!ms) return rows;
+    const latest = new Date(rows[rows.length - 1].created_at).getTime();
+    return rows.filter(r => latest - new Date(r.created_at).getTime() <= ms);
+  }
+
   function buildChartDatasets(rows) {
     const lowestOffer = rows.map(r => ({ x: new Date(r.created_at), y: Number(r.price) }));
     const avgPrice    = rows.map(r => ({ x: new Date(r.created_at), y: Number(r.average_price) }));
@@ -273,7 +283,7 @@
       const res  = await fetch(`/api/market/${currentItemId}?${params}`);
       const rows = await res.json();
       currentData = rows;
-      renderChart(rows);
+      renderChart(filterByTimeframe(rows));
       updateTable(rows);
       if (rows.length) {
         const last = rows[rows.length - 1];
@@ -434,7 +444,7 @@
       document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       timeframe = this.dataset.tf;
-      renderChart(currentData);
+      renderChart(filterByTimeframe(currentData));
     });
   });
 
@@ -444,7 +454,7 @@
       document.querySelectorAll('.ct-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       chartType = this.dataset.ct;
-      renderChart(currentData);
+      renderChart(filterByTimeframe(currentData));
     });
   });
 
@@ -531,11 +541,10 @@
   });
 
   // ── Init ──
-  // Default: end = today in ET, start = 7 days ago so timeframes have data
-  const ET_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' });
-  const _now   = new Date();
-  document.getElementById('endDate').value   = ET_FMT.format(_now);
-  document.getElementById('startDate').value = ET_FMT.format(new Date(_now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  // Default to today in Torn City time (ET)
+  const tornToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  document.getElementById('startDate').value = tornToday;
+  document.getElementById('endDate').value   = tornToday;
 
   loadBestItems();
   showStatus('Select an item to view market data');
