@@ -247,6 +247,12 @@ body {
   .party-arrow { display: none; }
   .party-name { font-size: 0.88rem; }
 
+  /* Swap Buyer/Seller labels on mobile */
+  .receipt-parties .party-block:nth-child(1) .party-label { font-size: 0; }
+  .receipt-parties .party-block:nth-child(1) .party-label::after { content: "Seller"; font-size: 0.65rem; }
+  .receipt-parties .party-block:nth-child(3) .party-label { font-size: 0; }
+  .receipt-parties .party-block:nth-child(3) .party-label::after { content: "Buyer"; font-size: 0.65rem; }
+
   /* Timestamps: smaller text */
   .ts-label, .ts-val { font-size: 0.66rem; }
 
