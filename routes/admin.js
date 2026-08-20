@@ -69,8 +69,8 @@ router.patch('/api/receipts/:id/status', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
       `UPDATE trade_receipts
-       SET status = $1,
-           completed_at = CASE WHEN $1 = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END
+       SET status = $1::text,
+           completed_at = CASE WHEN $1::text = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END
        WHERE id = $2 RETURNING *`,
       [status, req.params.id]
     );
