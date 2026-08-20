@@ -24,6 +24,7 @@ app.use(session({
 app.use('/admin',   express.static(path.join(__dirname, 'public/admin')));
 app.use('/trade',   express.static(path.join(__dirname, 'public/trade')));
 app.use('/receipt', express.static(path.join(__dirname, 'public/receipt')));
+app.get('/receipt/*', (req, res) => res.sendFile(path.join(__dirname, 'public/receipt/index.html')));
 app.use('/',        express.static(path.join(__dirname, 'public/client')));
 
 // Routes
