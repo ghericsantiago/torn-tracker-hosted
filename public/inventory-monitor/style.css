@@ -532,6 +532,9 @@ th.sort-desc::after { border-top:    5px solid var(--accent); }
   .ledger-filter-bar input[type="text"] { min-width: 0; flex: 1 1 100%; }
   .ldg-date-group, .ldg-presets { flex: 1 1 100%; justify-content: flex-start; }
 
+  /* Release fixed viewport height so the page can scroll naturally */
+  html, body { height: auto; }
+
   /* Remove per-section internal scroll — let the full page scroll as one */
   .monitor-main .card,
   .monitor-sidebar .card {
