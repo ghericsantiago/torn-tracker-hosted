@@ -327,7 +327,7 @@ code { font-family: var(--mono); color: var(--accent); font-size: 0.85em; }
 .hv-cell { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,.2); }
 .hv-cell:hover { background: var(--glass-hover); }
 #hover-pop {
-  position: fixed; z-index: 1000; min-width: 260px; max-width: 340px;
+  position: fixed; z-index: 1000; min-width: 320px; max-width: 480px;
   background: #0d1117; border: 1px solid var(--glass-border); border-radius: 10px;
   padding: 8px 10px; box-shadow: 0 8px 32px rgba(0,0,0,.6); font-size: 12px;
 }
