@@ -9,9 +9,9 @@
   let timeframe      = '30m';
   let autoRefresh    = null;
 
-  const tfIntervalMap = {
-    '1m': '1 minute', '5m': '5 minutes', '15m': '15 minutes',
-    '30m': '30 minutes', '1h': '1 hour', 'day': '1 day',
+  const tfBucketMs = {
+    '1m': 60000, '5m': 300000, '15m': 900000,
+    '30m': 1800000, '1h': 3600000, 'day': 86400000,
   };
 
   // ── Chart.js setup ──
@@ -28,14 +28,23 @@
     status.classList.add('hidden');
   }
 
-  const tfWindowMs = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, 'day': null };
-
-  function filterByTimeframe(rows) {
-    if (!rows.length) return rows;
-    const ms = tfWindowMs[timeframe];
-    if (!ms) return rows;
-    const latest = new Date(rows[rows.length - 1].created_at).getTime();
-    return rows.filter(r => latest - new Date(r.created_at).getTime() <= ms);
+  function aggregateByTF(rows) {
+    const ms = tfBucketMs[timeframe] || 1800000;
+    const buckets = new Map();
+    rows.forEach(r => {
+      const t = Math.floor(new Date(r.created_at).getTime() / ms) * ms;
+      if (!buckets.has(t)) buckets.set(t, []);
+      buckets.get(t).push(r);
+    });
+    return Array.from(buckets.entries()).sort((a, b) => a[0] - b[0]).map(([t, recs]) => {
+      const last = recs[recs.length - 1];
+      return {
+        created_at:    new Date(t).toISOString(),
+        price:         Number(last.price),
+        average_price: recs.reduce((s, r) => s + Number(r.average_price), 0) / recs.length,
+        quantity:      Number(last.quantity),
+      };
+    });
   }
 
   function buildChartDatasets(rows) {
@@ -59,7 +68,7 @@
 
     if (activeChart) activeChart.destroy();
 
-    const { lowestOffer, avgPrice, quantity } = buildChartDatasets(rows);
+    const { lowestOffer, avgPrice, quantity } = buildChartDatasets(aggregateByTF(rows));
     const isBar     = chartType === 'bar';
     const isScatter = chartType === 'scatter';
 
@@ -283,7 +292,7 @@
       const res  = await fetch(`/api/market/${currentItemId}?${params}`);
       const rows = await res.json();
       currentData = rows;
-      renderChart(filterByTimeframe(rows));
+      renderChart(rows);
       updateTable(rows);
       if (rows.length) {
         const last = rows[rows.length - 1];
@@ -444,7 +453,7 @@
       document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       timeframe = this.dataset.tf;
-      renderChart(filterByTimeframe(currentData));
+      if (currentData.length) renderChart(currentData);
     });
   });
 
@@ -454,7 +463,7 @@
       document.querySelectorAll('.ct-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
       chartType = this.dataset.ct;
-      renderChart(filterByTimeframe(currentData));
+      if (currentData.length) renderChart(currentData);
     });
   });
 
@@ -541,8 +550,8 @@
   });
 
   // ── Init ──
-  // Default to today in Torn City time (ET)
-  const tornToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  // Default to today in Torn City Time (TCT = UTC)
+  const tornToday = new Date().toISOString().slice(0, 10);
   document.getElementById('startDate').value = tornToday;
   document.getElementById('endDate').value   = tornToday;
 
