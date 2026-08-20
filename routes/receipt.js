@@ -70,15 +70,18 @@ async function buildPricedItems(tornData, itemsOverride) {
   );
   const itemIds = rawItems.map(i => i.details?.id).filter(Boolean);
 
-  // Catalog price lookup + name fallback for uncatalogued items
-  const priceMap = {}, nameMap = {};
+  // Catalog price lookup + name/market fallback for uncatalogued items + global pct
+  const priceMap = {}, itemMap = {};
+  let globalPct = null;
   if (itemIds.length) {
-    const [priceRes, nameRes] = await Promise.all([
+    const [priceRes, itemRes, profileRes] = await Promise.all([
       db.query(PRICE_LOOKUP, [itemIds]),
-      db.query('SELECT id, name FROM torn_items WHERE id = ANY($1::int[])', [itemIds]),
+      db.query('SELECT id, name, market_price FROM torn_items WHERE id = ANY($1::int[])', [itemIds]),
+      db.query('SELECT default_market_pct FROM trade_profiles WHERE id = 1'),
     ]);
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
-    for (const r of nameRes.rows)  nameMap[r.id] = r.name;
+    for (const r of itemRes.rows)  itemMap[r.id] = r;
+    globalPct = profileRes.rows[0]?.default_market_pct ?? null;
   }
 
   // Override map: { torn_item_id → unit_price }
@@ -92,21 +95,29 @@ async function buildPricedItems(tornData, itemsOverride) {
     const id      = ti.details?.id;
     const qty     = ti.details?.amount || 1;
     const listing = priceMap[id];
+    const baseItem = itemMap[id];
 
     let effectiveUnit = listing ? (Number(listing.effective_price) || null) : null;
+
+    // Fallback for uncatalogued items: apply global pct to market price
+    if (!listing && baseItem?.market_price && globalPct) {
+      effectiveUnit = Math.round(Number(baseItem.market_price) * Number(globalPct));
+    }
+
     if (overrideMap[id] != null) effectiveUnit = overrideMap[id];
 
+    const marketPrice = listing ? Number(listing.market_price) : (baseItem?.market_price ? Number(baseItem.market_price) : null);
     const effectiveTotal = effectiveUnit != null ? effectiveUnit * qty : null;
     if (effectiveTotal != null) totalValue += effectiveTotal;
 
     return {
       torn_item_id:    id,
-      item_name:       listing?.item_name || nameMap[id] || `Item #${id}`,
+      item_name:       listing?.item_name || baseItem?.name || `Item #${id}`,
       item_type:       listing?.item_type || null,
       quantity:        qty,
-      market_price:    listing ? Number(listing.market_price) : null,
-      price_mode:      listing?.price_mode || null,
-      resolved_pct:    listing ? Number(listing.resolved_pct) : null,
+      market_price:    marketPrice,
+      price_mode:      listing?.price_mode || (effectiveUnit != null && !listing ? 'market_pct' : null),
+      resolved_pct:    listing ? Number(listing.resolved_pct) : (!listing && globalPct ? Number(globalPct) : null),
       effective_price: effectiveUnit,
       effective_total: effectiveTotal,
       in_catalog:      !!listing,
