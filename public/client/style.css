@@ -119,10 +119,10 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
-#calcDrawer { right: -320px; width: 300px; }
-#bestDrawer { right: -380px; width: 360px; }
-#recoDrawer { right: -380px; width: 360px; }
-.drawer.visible { right: 0 !important; }
+#calcDrawer { right: -320px; width: 300px; opacity: 0; pointer-events: none; }
+#bestDrawer { right: -380px; width: 360px; opacity: 0; pointer-events: none; }
+#recoDrawer { right: -380px; width: 360px; opacity: 0; pointer-events: none; }
+.drawer.visible { right: 0 !important; opacity: 1; pointer-events: auto; }
 
 .drawer-hdr {
   display: flex; align-items: center; justify-content: space-between;
@@ -365,6 +365,11 @@ canvas#priceChart { max-height: 360px; }
 }
 .chart-status.hidden { display: none; }
 
+.chart-tf-bar {
+  display: flex; align-items: center; gap: 0.3rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 0.6rem;
+}
 .chart-footer { display: flex; justify-content: flex-end; }
 
 /* Data table */
