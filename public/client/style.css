@@ -86,7 +86,7 @@ body {
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 250px 1fr;
   gap: 0;
   overflow: hidden;
 }
@@ -211,6 +211,77 @@ body {
 
 .day-nav { display: flex; gap: 0.4rem; margin-bottom: 0.65rem; }
 .day-nav .btn { flex: 1; justify-content: center; }
+
+/* ── imarket-style controls ── */
+.ctrl-row { display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.4rem; }
+.ctrl-spacer { flex: 1; }
+.nav-row { margin-top: 0.35rem; }
+
+.day-nav-btn {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 26px; height: 26px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--tr);
+}
+.day-nav-btn:hover { border-color: rgba(110,231,247,0.3); color: var(--accent); }
+
+/* Mobile date accordion header — hidden on desktop */
+.mob-dt-hdr {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+  margin: 0.3rem 0;
+  user-select: none;
+}
+.mob-dt-title {
+  font-family: var(--mono); font-size: 0.65rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent);
+}
+.mob-dt-arrow { font-size: 0.6rem; color: var(--text-muted); transition: transform var(--tr); }
+.mob-dt-hdr.open .mob-dt-arrow { transform: rotate(180deg); }
+
+/* Collapsible date section */
+.date-collapse { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+.date-collapse.open { max-height: 220px; }
+
+.date-field-group { display: flex; gap: 0.4rem; margin-bottom: 0.4rem; }
+.date-field { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
+.field-lbl { font-size: 0.65rem; color: var(--text-muted); font-family: var(--mono); letter-spacing: 0.05em; }
+.date-field input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.35rem;
+  color: var(--text);
+  font-size: 0.7rem;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--tr);
+}
+.date-field input:focus { border-color: rgba(110,231,247,0.4); }
+.date-reset-row { display: flex; justify-content: flex-end; margin-bottom: 0.4rem; }
+
+/* Timeframe row in sidebar */
+.tf-row {
+  flex-wrap: wrap; gap: 0.2rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 0.5rem;
+  margin-top: 0.15rem;
+  margin-bottom: 0 !important;
+}
+.tf-lbl { font-family: var(--mono); font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.08em; flex-shrink: 0; }
+.ar-btn { padding: 0.2rem 0.45rem; font-size: 0.8rem; margin-left: auto; }
 
 /* ── MAIN ── */
 .main-area {
@@ -479,4 +550,5 @@ canvas#priceChart { max-height: 360px; }
   .drawer { top: 48px; width: min(340px, 100vw) !important; }
   .main-area { padding: 0.75rem; overflow-y: visible; height: auto; }
   .desk-only { display: none !important; }
+  .mob-dt-hdr { display: flex; }
 }

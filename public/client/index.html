@@ -27,7 +27,6 @@
           <button class="tz-btn" data-tz="local">Local</button>
         </div>
         <span id="timeDisplay" class="time-display desk-only"></span>
-        <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">&#x21BB; Auto</button>
       </div>
     </div>
   </nav>
@@ -36,47 +35,67 @@
 
     <!-- LEFT SIDEBAR: Filters -->
     <aside class="sidebar-left">
-
       <div class="glass-card sidebar-section item-search-card">
         <div class="section-title">Item</div>
         <div class="search-wrap">
           <input id="itemSearch" type="text" placeholder="Search item name…" autocomplete="off" />
           <div id="autocomplete" class="autocomplete hidden"></div>
         </div>
-        <div class="field-row">
-          <label>Item ID</label>
-          <input id="itemIdInput" type="number" placeholder="e.g. 206" />
+
+        <!-- Nav row: date toggle + ‹ Apply › -->
+        <div class="ctrl-row nav-row">
+          <button id="dateToggle" class="btn btn-ghost btn-sm desk-only">&#x2699; Date</button>
+          <div class="ctrl-spacer"></div>
+          <button id="prevDay" class="day-nav-btn">&#x2039;</button>
+          <button id="applyFilters" class="btn btn-primary btn-sm">Apply</button>
+          <button id="nextDay" class="day-nav-btn">&#x203A;</button>
+        </div>
+
+        <!-- Mobile accordion header -->
+        <div id="dateToggleMob" class="mob-dt-hdr">
+          <span class="mob-dt-title">&#x25C8; DATE / TIME</span>
+          <span class="mob-dt-arrow">&#x25BC;</span>
+        </div>
+
+        <!-- Collapsible date/time section -->
+        <div id="dateCollapse" class="date-collapse">
+          <div class="date-field-group">
+            <div class="date-field">
+              <label class="field-lbl">From</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="date-field">
+              <label class="field-lbl">To</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+          <div class="date-field-group">
+            <div class="date-field">
+              <label class="field-lbl">Start</label>
+              <input id="startTime" type="time" value="00:00" />
+            </div>
+            <div class="date-field">
+              <label class="field-lbl">End</label>
+              <input id="endTime" type="time" value="23:59" />
+            </div>
+          </div>
+          <div class="date-reset-row">
+            <button id="resetFilters" class="btn btn-ghost btn-sm">Reset</button>
+          </div>
+        </div>
+
+        <!-- Timeframe + auto-refresh row -->
+        <div class="ctrl-row tf-row">
+          <span class="tf-lbl">TF</span>
+          <button class="tf-btn" data-tf="day">1D</button>
+          <button class="tf-btn" data-tf="1h">1H</button>
+          <button class="tf-btn active" data-tf="30m">30M</button>
+          <button class="tf-btn" data-tf="15m">15M</button>
+          <button class="tf-btn" data-tf="5m">5M</button>
+          <button class="tf-btn" data-tf="1m">1M</button>
+          <button id="autoRefreshToggle" class="btn btn-ghost btn-sm ar-btn">&#x21BB;</button>
         </div>
       </div>
-
-      <div class="glass-card sidebar-section">
-        <div class="section-title">Date Range</div>
-        <div class="field-row">
-          <label>From</label>
-          <input id="startDate" type="date" />
-        </div>
-        <div class="field-row">
-          <label>To</label>
-          <input id="endDate" type="date" />
-        </div>
-        <div class="day-nav">
-          <button id="prevDay" class="btn btn-ghost btn-sm">← Prev</button>
-          <button id="nextDay" class="btn btn-ghost btn-sm">Next →</button>
-        </div>
-        <div class="field-row">
-          <label>Start Time</label>
-          <input id="startTime" type="time" value="00:00" />
-        </div>
-        <div class="field-row">
-          <label>End Time</label>
-          <input id="endTime" type="time" value="23:59" />
-        </div>
-        <div class="btn-row">
-          <button id="applyFilters" class="btn btn-primary btn-sm btn-full">Apply</button>
-          <button id="resetFilters" class="btn btn-ghost btn-sm btn-full">Reset</button>
-        </div>
-      </div>
-
     </aside>
 
     <!-- MAIN: Chart -->
@@ -87,14 +106,6 @@
           <div class="item-info" id="itemInfo">
             <span class="item-name" id="displayName">Select an item</span>
             <span class="item-price" id="displayPrice"></span>
-          </div>
-          <div class="timeframe-btns">
-            <button class="tf-btn" data-tf="1m">1m</button>
-            <button class="tf-btn" data-tf="5m">5m</button>
-            <button class="tf-btn" data-tf="15m">15m</button>
-            <button class="tf-btn active" data-tf="30m">30m</button>
-            <button class="tf-btn" data-tf="1h">1h</button>
-            <button class="tf-btn" data-tf="day">1D</button>
           </div>
         </div>
 

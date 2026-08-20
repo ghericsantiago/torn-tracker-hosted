@@ -574,7 +574,6 @@
   window.selectItem = function (id, name) {
     currentItemId = id;
     document.getElementById('itemSearch').value   = name || '';
-    document.getElementById('itemIdInput').value  = id;
     document.getElementById('displayName').textContent = name || `Item #${id}`;
     document.getElementById('autocomplete').classList.add('hidden');
     fetchData();
@@ -600,10 +599,20 @@
     }, 250);
   });
 
-  document.getElementById('itemIdInput').addEventListener('change', function () {
-    const id = parseInt(this.value);
-    if (id) selectItem(id, `Item #${id}`);
-  });
+  // ── Date collapse toggle ──
+  function toggleDateCollapse(open) {
+    const el = document.getElementById('dateCollapse');
+    const mob = document.getElementById('dateToggleMob');
+    const forceOpen = open !== undefined ? open : !el.classList.contains('open');
+    el.classList.toggle('open', forceOpen);
+    if (mob) mob.classList.toggle('open', forceOpen);
+  }
+
+  const dtToggleBtn = document.getElementById('dateToggle');
+  if (dtToggleBtn) dtToggleBtn.addEventListener('click', () => toggleDateCollapse());
+
+  const dtToggleMob = document.getElementById('dateToggleMob');
+  if (dtToggleMob) dtToggleMob.addEventListener('click', () => toggleDateCollapse());
 
   document.addEventListener('click', e => {
     if (!e.target.closest('.search-wrap')) {
