@@ -1,0 +1,233 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #07080f;
+  --glass-bg:     rgba(255,255,255,0.035);
+  --glass-border: rgba(255,255,255,0.07);
+  --glass-hover:  rgba(255,255,255,0.06);
+  --accent:       #6ee7f7;
+  --accent-dim:   rgba(110,231,247,0.12);
+  --error:        #f87171;
+  --success:      #4ade80;
+  --warn:         #fbbf24;
+  --text:         #e2e8f0;
+  --text-muted:   #64748b;
+  --text-dim:     #94a3b8;
+  --mono:         'JetBrains Mono', monospace;
+  --sans:         'Space Grotesk', sans-serif;
+  --radius:       14px;
+  --tr:           0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.accent { color: var(--accent); }
+.mono   { font-family: var(--mono); }
+.muted  { color: var(--text-muted); }
+.hidden { display: none !important; }
+
+/* ── Glass ── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.2rem; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500; font-family: var(--sans);
+  cursor: pointer; border: none; text-decoration: none;
+  transition: all var(--tr);
+}
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--glass-border); }
+.btn-ghost:hover { background: var(--glass-hover); color: var(--text); }
+.btn-sm { padding: 0.35rem 0.85rem; font-size: 0.8rem; }
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(7,8,15,0.85); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0 2rem;
+}
+.nav-inner {
+  max-width: 860px; margin: 0 auto; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand {
+  font-weight: 700; font-size: 1rem; letter-spacing: -0.01em;
+  text-decoration: none; color: var(--text);
+}
+.nav-right { display: flex; gap: 0.75rem; align-items: center; }
+
+/* ── Page layout ── */
+.receipt-page {
+  max-width: 860px; margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex; flex-direction: column; gap: 0.85rem;
+}
+
+/* ── Skeleton ── */
+.skel-card { padding: 1.25rem 1.5rem; }
+.skel-card.tall { height: 220px; }
+.skel-line {
+  height: 1rem; border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  margin-bottom: 0.65rem;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skel-line.thin { height: 0.65rem; }
+.skel-line.w40  { width: 40%; }
+.skel-line.w60  { width: 60%; }
+@keyframes shimmer {
+  0%,100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* ── Error ── */
+.error-card {
+  padding: 2rem; text-align: center;
+  color: var(--text-muted);
+}
+.error-icon { font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--warn); }
+
+/* ── Receipt header card ── */
+.receipt-header-card { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.9rem; }
+
+.receipt-meta-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+}
+.receipt-id-block { display: flex; flex-direction: column; gap: 0.15rem; }
+.receipt-label {
+  font-size: 0.68rem; font-family: var(--mono);
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);
+}
+.receipt-trade-id { font-size: 1.3rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.3rem 0.75rem; border-radius: 20px;
+  font-size: 0.78rem; font-weight: 600; font-family: var(--mono);
+  flex-shrink: 0;
+}
+.status-pill.pending {
+  background: rgba(110,231,247,0.1); border: 1px solid rgba(110,231,247,0.25); color: var(--accent);
+}
+.status-pill.completed {
+  background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: var(--success);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.pending .status-dot {
+  background: var(--accent);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.completed .status-dot { background: var(--success); }
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* Parties */
+.receipt-parties { display: flex; align-items: center; gap: 0.75rem; }
+.party-block { display: flex; flex-direction: column; gap: 0.1rem; }
+.party-label {
+  font-size: 0.65rem; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text-muted);
+}
+.party-name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.party-arrow { color: var(--text-muted); font-size: 1.1rem; }
+
+/* Timestamps */
+.receipt-timestamps { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ts-label { font-size: 0.72rem; color: var(--text-muted); }
+.ts-val   { font-size: 0.72rem; color: var(--text-dim); }
+.ts-sep   { color: var(--glass-border); }
+
+/* ── Items card ── */
+.items-card { overflow: hidden; padding: 0 0 0.5rem; }
+.items-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+.items-title { font-size: 0.88rem; font-weight: 600; }
+.items-count { font-size: 0.72rem; color: var(--text-muted); }
+
+.table-wrap { overflow-x: auto; }
+.receipt-table { width: 100%; border-collapse: collapse; }
+.receipt-table thead th {
+  text-align: left; padding: 0.6rem 0.85rem;
+  font-family: var(--mono); font-size: 0.68rem;
+  text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--text-muted); border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+.receipt-table tbody td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
+  vertical-align: middle; font-size: 0.875rem;
+}
+.receipt-table tbody tr:last-child td { border-bottom: 1px solid var(--glass-border); }
+.receipt-table tbody tr:hover td { background: rgba(255,255,255,0.018); }
+.col-num { text-align: right; }
+.price-cell { font-family: var(--mono); color: var(--accent); }
+.total-cell { font-weight: 600; }
+
+.receipt-table tfoot .total-row td { padding: 0.75rem 0.85rem; }
+.total-label { text-align: right; font-size: 0.78rem; color: var(--text-muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+.total-value { font-size: 1.05rem; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+
+/* Item cell */
+.item-cell { display: flex; align-items: center; gap: 0.6rem; }
+.item-icon { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; border-radius: 4px; }
+.item-name { font-size: 0.875rem; }
+.item-type { font-size: 0.7rem; color: var(--text-muted); }
+.pct-badge {
+  display: inline-block; margin-left: 0.35rem;
+  padding: 0.1rem 0.35rem; border-radius: 4px;
+  background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.15);
+  font-size: 0.68rem; font-family: var(--mono); color: var(--accent);
+}
+.not-listed {
+  display: inline-block; margin-left: 0.35rem;
+  font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono);
+  font-style: italic;
+}
+
+/* ── Explanation card ── */
+.explain-card { padding: 1rem 1.5rem; }
+.explain-title {
+  font-size: 0.72rem; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text-muted); margin-bottom: 0.6rem;
+}
+.explain-body ul { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.explain-body li { font-size: 0.85rem; color: var(--text-dim); }
+.explain-body li.muted { color: var(--text-muted); }
+.explain-body strong { color: var(--text); font-weight: 600; }
+
+@media (max-width: 600px) {
+  .nav { padding: 0 1rem; }
+  .receipt-page { padding: 0.75rem 0.65rem; }
+  /* Hide market price column on small screens */
+  .receipt-table thead th:nth-child(3),
+  .receipt-table tbody td:nth-child(3),
+  .receipt-table thead th:nth-child(5),
+  .receipt-table tbody td:nth-child(5) { display: none; }
+  /* Show line total as the visible price */
+  .receipt-table tfoot .total-row td:nth-child(1) { display: none; }
+  .receipt-table tfoot .total-row td:nth-child(2) { text-align: right; }
+}

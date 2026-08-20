@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade Receipt — Torn Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/receipt/style.css" />
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/trade" class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</a>
+      <div class="nav-right">
+        <a href="/trade" class="btn btn-ghost btn-sm">Trade Listing</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="receipt-page">
+
+    <!-- Loading skeleton -->
+    <div id="skeleton">
+      <div class="glass-card skel-card">
+        <div class="skel-line w40"></div>
+        <div class="skel-line w60 thin"></div>
+      </div>
+      <div class="glass-card skel-card tall"></div>
+    </div>
+
+    <!-- Error state -->
+    <div id="errorState" class="glass-card error-card hidden">
+      <div class="error-icon">⚠</div>
+      <div id="errorMsg">Receipt not found.</div>
+    </div>
+
+    <!-- Receipt content -->
+    <div id="receiptContent" class="hidden">
+
+      <!-- Header card -->
+      <div class="glass-card receipt-header-card">
+        <div class="receipt-meta-row">
+          <div class="receipt-id-block">
+            <span class="receipt-label">Trade Receipt</span>
+            <span class="receipt-trade-id mono" id="receiptTradeId">#—</span>
+          </div>
+          <div id="statusPill" class="status-pill pending">
+            <span class="status-dot"></span>
+            <span id="statusText">In Progress</span>
+          </div>
+        </div>
+
+        <div class="receipt-parties">
+          <div class="party-block">
+            <span class="party-label">Buyer</span>
+            <span class="party-name" id="buyerName">—</span>
+          </div>
+          <div class="party-arrow">→</div>
+          <div class="party-block">
+            <span class="party-label">Seller</span>
+            <span class="party-name" id="sellerName">—</span>
+          </div>
+        </div>
+
+        <div class="receipt-timestamps">
+          <span class="ts-label">Created</span>
+          <span class="ts-val mono" id="createdAt">—</span>
+          <span class="ts-sep" id="completedSep" style="display:none">·</span>
+          <span class="ts-label" id="completedLabel" style="display:none">Completed</span>
+          <span class="ts-val mono" id="completedAt" style="display:none">—</span>
+        </div>
+      </div>
+
+      <!-- Items table card -->
+      <div class="glass-card items-card">
+        <div class="items-card-header">
+          <span class="items-title">Items</span>
+          <span class="items-count mono" id="itemsCount">—</span>
+        </div>
+        <div class="table-wrap">
+          <table class="receipt-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="col-num">Qty</th>
+                <th class="col-num">Market Price</th>
+                <th class="col-num">Our Price</th>
+                <th class="col-num">Line Total</th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+            <tfoot id="itemsFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Price explanation card -->
+      <div class="glass-card explain-card" id="explainCard">
+        <div class="explain-title">How prices are calculated</div>
+        <div id="explainBody" class="explain-body"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/receipt/app.js"></script>
+</body>
+</html>

@@ -550,6 +550,22 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   margin: 1.25rem 0;
 }
 
+/* ── Receipt token row ── */
+.token-row { display: flex; gap: 0.5rem; align-items: center; }
+.token-input {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  outline: none;
+  cursor: text;
+  min-width: 0;
+}
+
 /* ── Retention section ── */
 .retention-section { display: flex; flex-direction: column; gap: 0.6rem; }
 .retention-header {
