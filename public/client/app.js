@@ -389,9 +389,7 @@
             awaitingSell = false;
             autoCalc = false;
             calcProfit();
-            if (calcAutoOpen) {
-              document.querySelector('.sidebar-right').scrollTo({ top: 0, behavior: 'smooth' });
-            }
+            if (calcAutoOpen) openDrawer('calcDrawer');
           } else {
             // First/third click: set buy price, clear sell, start cycle
             buyEl.value    = clickedPrice;
@@ -545,6 +543,7 @@
   }
 
   async function loadBestItems() {
+    bestLoaded = false;
     const btn = document.getElementById('refreshBestBtn');
     if (btn) { btn.classList.add('spinning'); btn.disabled = true; }
     try {
@@ -552,6 +551,7 @@
       const fee = isNaN(rawFee) ? 5 : rawFee;
       const res = await fetch(`/api/best-items?fee=${fee}`);
       bestItems = await res.json();
+      bestLoaded = true;
       renderBestItems();
     } catch (e) {
       document.getElementById('bestItemsList').innerHTML = '<div class="loading-msg">Failed to load</div>';
@@ -774,12 +774,47 @@
     this.classList.toggle('active', calcAutoOpen);
   });
 
-  // ── Recommendation toggle ──
-  document.getElementById('recoToggle').addEventListener('click', function () {
-    const body = document.getElementById('recoBody');
-    const hidden = body.classList.toggle('hidden');
-    this.textContent = hidden ? 'Show' : 'Hide';
-    if (!hidden) generateRecommendation();
+  // ── Drawer system ──
+  function openDrawer(id) {
+    ['calcDrawer','bestDrawer','recoDrawer'].forEach(d => {
+      const el  = document.getElementById(d);
+      const btn = document.getElementById(d.replace('Drawer','Btn'));
+      el.classList.toggle('visible', d === id);
+      if (btn) btn.classList.toggle('active', d === id);
+    });
+    if (id === 'recoDrawer')  generateRecommendation();
+    if (id === 'bestDrawer' && !bestLoaded) loadBestItems();
+  }
+
+  function toggleDrawer(id) {
+    const isOpen = document.getElementById(id).classList.contains('visible');
+    isOpen ? (() => {
+      document.getElementById(id).classList.remove('visible');
+      const btn = document.getElementById(id.replace('Drawer','Btn'));
+      if (btn) btn.classList.remove('active');
+    })() : openDrawer(id);
+  }
+
+  let bestLoaded = false;
+
+  document.getElementById('calcBtn') .addEventListener('click', () => toggleDrawer('calcDrawer'));
+  document.getElementById('bestBtn') .addEventListener('click', () => toggleDrawer('bestDrawer'));
+  document.getElementById('recoBtn') .addEventListener('click', () => toggleDrawer('recoDrawer'));
+
+  document.querySelectorAll('.drawer-close').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.drawer;
+      document.getElementById(id).classList.remove('visible');
+      const nb = document.getElementById(id.replace('Drawer','Btn'));
+      if (nb) nb.classList.remove('active');
+    });
+  });
+
+  // Sync txFeeDrawer ↔ txFee
+  document.getElementById('txFeeDrawer').addEventListener('input', function () {
+    document.getElementById('txFee').value = this.value;
+    clearTimeout(feeReloadTimer);
+    feeReloadTimer = setTimeout(loadBestItems, 700);
   });
 
   // ── Init ──
