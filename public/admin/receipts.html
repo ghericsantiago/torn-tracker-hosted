@@ -115,7 +115,7 @@
           <thead>
             <tr>
               <th>Trade ID</th>
-              <th>Buyer</th>
+              <th>Seller</th>
               <th style="text-align:right">Total</th>
               <th>Status</th>
               <th>Created</th>
@@ -167,7 +167,7 @@
       tbody.innerHTML = rows.map(r => `
         <tr data-id="${r.id}">
           <td><span class="mono" style="font-size:.82rem">#${r.trade_id}</span></td>
-          <td style="font-size:.875rem">${r.buyer_name || `Player #${r.buyer_id}` || '—'}</td>
+          <td style="font-size:.875rem">${r.seller_name || `Player #${r.seller_id}` || '—'}</td>
           <td style="text-align:right"><span class="total-val">${fmt(r.total_value)}</span></td>
           <td>${statusPill(r.status, r.id)}</td>
           <td class="date-cell">${fmtDate(r.created_at)}</td>
