@@ -76,6 +76,17 @@
       const notInCatalog = !item.in_catalog
         ? `<span class="not-listed">not in catalog</span>` : '';
 
+      let adjustBadge = '';
+      if (item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
+        const delta = item.effective_price - item.catalog_price;
+        const deltaPct = Math.abs((delta / item.catalog_price) * 100).toFixed(1);
+        if (delta < 0) {
+          adjustBadge = `<span class="adjust-badge discount">↓ −${deltaPct}%</span>`;
+        } else {
+          adjustBadge = `<span class="adjust-badge markup">↑ +${deltaPct}%</span>`;
+        }
+      }
+
       tr.innerHTML = `
         <td>
           <div class="item-cell">
@@ -90,7 +101,7 @@
         <td class="col-num price-cell">${item.market_price != null ? fmt(item.market_price) : '—'}</td>
         <td class="col-num price-cell">
           ${item.effective_price != null ? fmt(item.effective_price) : '—'}
-          ${pctBadge}${notInCatalog}
+          ${pctBadge}${notInCatalog}${adjustBadge}
         </td>
         <td class="col-num price-cell total-cell">
           ${item.effective_total != null ? fmt(item.effective_total) : '—'}

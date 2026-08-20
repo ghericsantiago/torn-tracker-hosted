@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.6
+// @version      2.7
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -70,11 +70,12 @@
         </td>
         <td style="padding:8px 12px;text-align:right;font-family:monospace;color:#94a3b8;font-size:12px">${fmt(item.market_price)}</td>
         <td style="padding:8px 12px;text-align:right">
-          <input type="number" class="tt-unit" data-idx="${idx}"
+          <input type="number" class="tt-unit" data-idx="${idx}" data-original="${item.effective_price ?? 0}"
             value="${item.effective_price ?? 0}"
             style="width:110px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
                    border-radius:6px;padding:4px 8px;color:#6ee7f7;font-family:monospace;font-size:12px;
                    text-align:right;outline:none">
+          <div id="tt-delta-${idx}" style="font-size:10px;font-family:monospace;min-height:14px;text-align:right;margin-top:2px"></div>
         </td>
         <td class="tt-sub" style="padding:8px 12px;text-align:right;font-family:monospace;color:#6ee7f7;font-size:13px">
           ${fmt((item.effective_price ?? 0) * item.quantity)}
@@ -132,13 +133,28 @@
     // Live recalculate on price input change
     overlay.querySelectorAll('.tt-unit').forEach(input => {
       input.addEventListener('input', () => {
-        const idx  = Number(input.dataset.idx);
-        const unit = Number(input.value) || 0;
+        const idx      = Number(input.dataset.idx);
+        const unit     = Number(input.value) || 0;
+        const original = Number(input.dataset.original) || 0;
         itemsCopy[idx].effective_price = unit;
         const row = overlay.querySelector(`tr[data-idx="${idx}"]`);
         row.querySelector('.tt-sub').textContent = fmt(unit * itemsCopy[idx].quantity);
         const newTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
         document.getElementById('tt-total').textContent = fmt(newTotal);
+
+        const deltaEl = document.getElementById(`tt-delta-${idx}`);
+        if (deltaEl && original > 0 && unit !== original) {
+          const pct = Math.abs(((unit - original) / original) * 100).toFixed(1);
+          if (unit < original) {
+            deltaEl.textContent = '↓ −' + pct + '% discount';
+            deltaEl.style.color = '#4ade80';
+          } else {
+            deltaEl.textContent = '↑ +' + pct + '% markup';
+            deltaEl.style.color = '#f87171';
+          }
+        } else if (deltaEl) {
+          deltaEl.textContent = '';
+        }
       });
     });
 

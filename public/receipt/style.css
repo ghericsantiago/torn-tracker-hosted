@@ -207,6 +207,21 @@ body {
   font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono);
   font-style: italic;
 }
+.adjust-badge {
+  display: inline-block; margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem; border-radius: 4px;
+  font-size: 0.68rem; font-family: var(--mono); font-weight: 600;
+}
+.adjust-badge.discount {
+  background: rgba(74,222,128,.12);
+  border: 1px solid rgba(74,222,128,.3);
+  color: #4ade80;
+}
+.adjust-badge.markup {
+  background: rgba(248,113,113,.12);
+  border: 1px solid rgba(248,113,113,.3);
+  color: #f87171;
+}
 
 /* ── Explanation card ── */
 .explain-card { padding: 1rem 1.5rem; }

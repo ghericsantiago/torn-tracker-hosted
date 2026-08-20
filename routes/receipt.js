@@ -97,13 +97,12 @@ async function buildPricedItems(tornData, itemsOverride) {
     const listing = priceMap[id];
     const baseItem = itemMap[id];
 
-    let effectiveUnit = listing ? (Number(listing.effective_price) || null) : null;
-
-    // Fallback for uncatalogued items: apply global pct to market price
+    let catalogPrice = listing ? (Number(listing.effective_price) || null) : null;
     if (!listing && baseItem?.market_price && globalPct) {
-      effectiveUnit = Math.round(Number(baseItem.market_price) * Number(globalPct));
+      catalogPrice = Math.round(Number(baseItem.market_price) * Number(globalPct));
     }
 
+    let effectiveUnit = catalogPrice;
     if (overrideMap[id] != null) effectiveUnit = overrideMap[id];
 
     const marketPrice = listing ? Number(listing.market_price) : (baseItem?.market_price ? Number(baseItem.market_price) : null);
@@ -116,8 +115,9 @@ async function buildPricedItems(tornData, itemsOverride) {
       item_type:       listing?.item_type || null,
       quantity:        qty,
       market_price:    marketPrice,
-      price_mode:      listing?.price_mode || (effectiveUnit != null && !listing ? 'market_pct' : null),
+      price_mode:      listing?.price_mode || (catalogPrice != null && !listing ? 'market_pct' : null),
       resolved_pct:    listing ? Number(listing.resolved_pct) : (!listing && globalPct ? Number(globalPct) : null),
+      catalog_price:   catalogPrice,
       effective_price: effectiveUnit,
       effective_total: effectiveTotal,
       in_catalog:      !!listing,
