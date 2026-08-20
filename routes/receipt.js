@@ -1,8 +1,13 @@
 const express = require('express');
 const cors    = require('cors');
 const https   = require('https');
+const crypto  = require('crypto');
 const router  = express.Router();
 const db      = require('../db');
+
+function shortId() {
+  return crypto.randomBytes(6).toString('base64url').slice(0, 8);
+}
 
 const APP_URL = 'https://torn-imarket-tracker.gvsantiago.com';
 
@@ -167,9 +172,10 @@ router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
 
     const { buyer, seller, items, totalValue } = await buildPricedItems(tornData, items_override);
 
+    const sid = shortId();
     const { rows: [row] } = await db.query(
-      `INSERT INTO trade_receipts (trade_id, buyer_id, buyer_name, seller_id, seller_name, items, total_value)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO trade_receipts (trade_id, short_id, buyer_id, buyer_name, seller_id, seller_name, items, total_value)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (trade_id) DO UPDATE
          SET items = EXCLUDED.items,
              total_value = EXCLUDED.total_value,
@@ -179,13 +185,14 @@ router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
              seller_name = EXCLUDED.seller_name,
              status = 'pending',
              completed_at = NULL
-       RETURNING id`,
-      [trade_id, buyer.id || null, buyer.name || null,
+       RETURNING id, short_id`,
+      [trade_id, sid, buyer.id || null, buyer.name || null,
        seller.id || null, seller.name || null,
        JSON.stringify(items), totalValue]
     );
 
-    res.json({ id: row.id, url: `/receipt/${row.id}`, total: totalValue });
+    const publicId = row.short_id || row.id;
+    res.json({ id: row.id, short_id: row.short_id, url: `/receipt/${publicId}`, total: totalValue });
   } catch (e) {
     console.error('[receipt] create error:', e.message);
     res.status(500).json({ error: e.message });
@@ -198,7 +205,8 @@ router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
   try {
     if (!await verifyToken(req, res)) return;
     await db.query(
-      `UPDATE trade_receipts SET status='completed', completed_at=NOW() WHERE id=$1 AND status='pending'`,
+      `UPDATE trade_receipts SET status='completed', completed_at=NOW()
+       WHERE (short_id=$1 OR id::text=$1) AND status='pending'`,
       [req.params.id]
     );
     res.json({ ok: true });
@@ -208,7 +216,10 @@ router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
 // ── GET /api/receipt/:id (public) ─────────────────────────────────────────────
 router.get('/api/receipt/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT * FROM trade_receipts WHERE id = $1', [req.params.id]);
+    const { rows } = await db.query(
+      'SELECT * FROM trade_receipts WHERE short_id=$1 OR id::text=$1',
+      [req.params.id]
+    );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }

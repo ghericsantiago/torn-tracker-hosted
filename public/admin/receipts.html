@@ -173,7 +173,7 @@
           <td class="date-cell">${fmtDate(r.created_at)}</td>
           <td class="date-cell" id="completed-${r.id}">${fmtDate(r.completed_at)}</td>
           <td style="text-align:right">
-            <a href="/receipt/${r.id}" target="_blank" class="view-link">View →</a>
+            <a href="/receipt/${r.short_id || r.id}" target="_blank" class="view-link">View →</a>
           </td>
         </tr>`).join('');
     }
