@@ -122,7 +122,7 @@ body {
 #calcDrawer { right: -320px; width: 300px; }
 #bestDrawer { right: -380px; width: 360px; }
 #recoDrawer { right: -380px; width: 360px; }
-.drawer.visible { right: 0; }
+.drawer.visible { right: 0 !important; }
 
 .drawer-hdr {
   display: flex; align-items: center; justify-content: space-between;
