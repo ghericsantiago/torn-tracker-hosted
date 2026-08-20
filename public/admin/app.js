@@ -2,30 +2,14 @@
   'use strict';
 
   // ── Settings modal ──
-  document.getElementById('settingsBtn').addEventListener('click', async () => {
+  document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.remove('hidden');
-    // Load receipt token on open
-    try {
-      const r = await fetch('/api/receipt/token');
-      const d = await r.json();
-      document.getElementById('receiptTokenInput').value = d.token || '—';
-    } catch (_) {}
   });
   document.getElementById('closeSettings').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.add('hidden');
   });
   document.getElementById('settingsOverlay').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.add('hidden');
-  });
-
-  // Copy receipt token
-  document.getElementById('copyTokenBtn').addEventListener('click', () => {
-    const val = document.getElementById('receiptTokenInput').value;
-    navigator.clipboard.writeText(val).then(() => {
-      const btn = document.getElementById('copyTokenBtn');
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = 'Copy'; }, 1800);
-    });
   });
 
   // ── Logout ──
