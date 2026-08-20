@@ -51,7 +51,7 @@ router.get('/receipts', requireAuth, (req, res) => {
 
 // --- Admin API (all require auth) ---
 
-router.get('/api/admin/receipts', requireAuth, async (req, res) => {
+router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,

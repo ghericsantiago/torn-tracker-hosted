@@ -118,7 +118,7 @@
     }
 
     async function load() {
-      const res = await fetch('/api/admin/receipts');
+      const res = await fetch('/admin/api/receipts');
       if (!res.ok) { document.getElementById('receiptsBody').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load receipts.</td></tr>'; return; }
       const rows = await res.json();
 
