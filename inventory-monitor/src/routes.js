@@ -201,6 +201,8 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
 
   router.post('/api/poll', async (_req, res) => {
     const r = await poller.poll();
+    // After each poll, correct any new Trade lots that have a receipt price
+    enrichTradeLotsFromReceipts().catch(() => {});
     res.json({ ok: !r.error, ...r, state: summary() });
   });
 
@@ -498,6 +500,65 @@ function createRoutes({ state, catalog, summary, poller, db, reconcileFifo }) {
         costBasis: totalCost,
       },
     });
+  });
+
+  // Retroactively correct Trade FIFO lots + transactions using receipt effective_price.
+  // Joins fifo_lots (source=Trade) → trade_events → trade_receipts by ts + item_id.
+  // Safe to call repeatedly — only updates lots where a receipt price exists.
+  async function enrichTradeLotsFromReceipts() {
+    const rows = await db.pool.query(`
+      SELECT fl.id          AS lot_id,
+             fl.item_id,
+             fl.ts,
+             fl.total_qty,
+             (j.item_data->>'effective_price')::numeric AS receipt_unit_price
+      FROM fifo_lots fl
+      JOIN trade_events te ON te.ts = fl.ts
+      JOIN trade_receipts tr ON tr.trade_id::text = te.trade_id
+      CROSS JOIN LATERAL jsonb_array_elements(tr.items) AS j(item_data)
+      WHERE fl.source = 'Trade'
+        AND (j.item_data->>'torn_item_id')::int::text = fl.item_id
+        AND j.item_data->>'effective_price' IS NOT NULL
+    `);
+
+    let updated = 0;
+    for (const row of rows.rows) {
+      const unitCost = Math.round(Number(row.receipt_unit_price));
+      if (!Number.isFinite(unitCost) || unitCost < 0) continue;
+
+      // Update fifo_lot
+      await db.pool.query(
+        'UPDATE fifo_lots SET unit_cost = $1 WHERE id = $2',
+        [unitCost, row.lot_id]
+      );
+
+      // Sync in-memory lot
+      for (const lots of state.fifo.lots.values()) {
+        for (const lot of lots) {
+          if (lot.id === Number(row.lot_id)) { lot.unitCost = unitCost; break; }
+        }
+      }
+
+      // Update matching transaction row (trade buy, same ts + item_id)
+      await db.pool.query(
+        `UPDATE transactions SET unit_price = $1, total_price = $2
+         WHERE channel = 'trade' AND side = 'buy'
+           AND item_id = $3 AND ts = $4 AND log_id IS NULL`,
+        [unitCost, unitCost * Number(row.total_qty), row.item_id, row.ts]
+      );
+
+      updated++;
+    }
+    return updated;
+  }
+
+  router.post('/api/fifo/enrich-from-receipts', async (_req, res) => {
+    try {
+      const updated = await enrichTradeLotsFromReceipts();
+      res.json({ ok: true, updated });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
   });
 
   router.post('/api/reset', async (_req, res) => {
