@@ -80,10 +80,10 @@
       if (item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
         const delta = item.effective_price - item.catalog_price;
         const deltaPct = Math.abs((delta / item.catalog_price) * 100).toFixed(1);
-        if (delta < 0) {
-          adjustBadge = `<span class="adjust-badge discount">↓ −${deltaPct}%</span>`;
+        if (delta > 0) {
+          adjustBadge = `<span class="adjust-badge discount">↑ +${deltaPct}% bonus</span>`;
         } else {
-          adjustBadge = `<span class="adjust-badge markup">↑ +${deltaPct}%</span>`;
+          adjustBadge = `<span class="adjust-badge markup">↓ −${deltaPct}% below rate</span>`;
         }
       }
 

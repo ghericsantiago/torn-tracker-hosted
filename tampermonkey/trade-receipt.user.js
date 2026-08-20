@@ -145,11 +145,11 @@
         const deltaEl = document.getElementById(`tt-delta-${idx}`);
         if (deltaEl && original > 0 && unit !== original) {
           const pct = Math.abs(((unit - original) / original) * 100).toFixed(1);
-          if (unit < original) {
-            deltaEl.textContent = '↓ −' + pct + '% discount';
+          if (unit > original) {
+            deltaEl.textContent = '↑ +' + pct + '% discount';
             deltaEl.style.color = '#4ade80';
           } else {
-            deltaEl.textContent = '↑ +' + pct + '% markup';
+            deltaEl.textContent = '↓ −' + pct + '% below rate';
             deltaEl.style.color = '#f87171';
           }
         } else if (deltaEl) {
