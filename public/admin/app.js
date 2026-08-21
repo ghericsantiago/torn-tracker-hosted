@@ -168,14 +168,19 @@
   const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count', 'priority']);
   const selectedIds = new Set();
 
+  const bulkBar         = document.getElementById('bulkBar');
   const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
   const bulkDeleteCount = document.getElementById('bulkDeleteCount');
+  const bulkPriorityBtn   = document.getElementById('bulkPriorityBtn');
+  const bulkPriorityCount = document.getElementById('bulkPriorityCount');
+  const bulkPrioritySel   = document.getElementById('bulkPrioritySelect');
   const selectAllCb     = document.getElementById('selectAll');
 
   function updateBulkBar() {
     const n = selectedIds.size;
-    bulkDeleteBtn.style.display = n > 0 ? '' : 'none';
-    bulkDeleteCount.textContent = n;
+    bulkBar.style.display = n > 0 ? 'flex' : 'none';
+    bulkDeleteCount.textContent  = n;
+    bulkPriorityCount.textContent = n;
     if (selectAllCb) {
       const pageIds = [...document.querySelectorAll('.row-check')].map(c => Number(c.dataset.id));
       selectAllCb.checked       = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
@@ -193,6 +198,20 @@
       updateBulkBar();
     });
   }
+
+  bulkPriorityBtn.addEventListener('click', async () => {
+    const p = Number(bulkPrioritySel.value);
+    if (!p) { bulkPrioritySel.focus(); return; }
+    const ids = [...selectedIds];
+    bulkPriorityBtn.disabled = true;
+    await Promise.all(ids.map(id => api(`/admin/api/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ priority: p }),
+    })));
+    bulkPrioritySel.value = '';
+    bulkPriorityBtn.disabled = false;
+    await loadItems();
+  });
 
   bulkDeleteBtn.addEventListener('click', async () => {
     const ids = [...selectedIds];

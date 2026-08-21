@@ -96,7 +96,19 @@
           <h2>Monitored Items</h2>
           <div class="table-controls">
             <input id="tableSearch" type="text" placeholder="Search…" class="table-search" />
-            <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="display:none;color:var(--error);border-color:var(--error)">Delete selected (<span id="bulkDeleteCount">0</span>)</button>
+            <div id="bulkBar" style="display:none;align-items:center;gap:.5rem">
+              <select id="bulkPrioritySelect" class="priority-select" style="font-size:12px;padding:4px 6px">
+                <option value="">Set priority…</option>
+                <option value="1">P1 · 1m</option>
+                <option value="2">P2 · 5m</option>
+                <option value="3">P3 · 15m</option>
+                <option value="4">P4 · 30m</option>
+                <option value="5">P5 · 1h</option>
+                <option value="6">P6 · 1d</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="bulkPriorityBtn">Apply to selected (<span id="bulkPriorityCount">0</span>)</button>
+              <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="color:var(--error);border-color:var(--error)">Delete selected (<span id="bulkDeleteCount">0</span>)</button>
+            </div>
             <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
             <button class="btn btn-ghost btn-sm" id="addToggleBtn">＋ Add</button>
           </div>
