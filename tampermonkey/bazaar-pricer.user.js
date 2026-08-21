@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar Pricer
 // @namespace    https://itrade.devs.surf
-// @version      1.4
+// @version      1.5
 // @description  Price chart button on Torn bazaar manage and add-item pages
 // @match        https://www.torn.com/bazaar.php*
 // @grant        GM_xmlhttpRequest
@@ -204,6 +204,13 @@
       cursor: pointer; transition: all 0.12s; user-select: none;
     }
     .bp-reset-btn-add:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: #f87171; }
+
+    /* Add page: align chart button inline with the price input */
+    li.clearfix[data-group] div.price {
+      display: flex !important; align-items: center; gap: 4px;
+    }
+    li.clearfix[data-group] div.price .input-money-group { flex: 1; }
+    li.clearfix[data-group] div.price .bp-chart-btn { margin-left: 0; flex-shrink: 0; }
   `);
 
   // ── Modal DOM (created once) ───────────────────────────────────────────────
@@ -583,13 +590,25 @@
   function applyPriceToRow(row, applied) {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
     if (row.tagName === 'LI') {
-      // Add page: plain text input managed by tornInputMoney jQuery plugin
+      // Add page: price — plain text input managed by tornInputMoney jQuery plugin
       const inp = row.querySelector('div.price input.input-money');
-      if (!inp) return;
-      setter.call(inp, String(applied));
-      inp.dispatchEvent(new Event('input',  { bubbles: true }));
-      inp.dispatchEvent(new Event('change', { bubbles: true }));
-      if (window.jQuery) window.jQuery(inp).trigger('change').trigger('input');
+      if (inp) {
+        setter.call(inp, String(applied));
+        inp.dispatchEvent(new Event('input',  { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        if (window.jQuery) window.jQuery(inp).trigger('change').trigger('input');
+      }
+      // Add page: qty — fill with the max available count from inventory
+      const qty = row.dataset.bpQty;
+      if (qty) {
+        const qtyInp = row.querySelector('div.amount input[name="amount"]');
+        if (qtyInp) {
+          setter.call(qtyInp, qty);
+          qtyInp.dispatchEvent(new Event('input',  { bubbles: true }));
+          qtyInp.dispatchEvent(new Event('change', { bubbles: true }));
+          if (window.jQuery) window.jQuery(qtyInp).trigger('change').trigger('input');
+        }
+      }
     } else {
       // Manage page: React hidden + visible inputs
       const wrap = row.querySelector('.price___WxxqO');
@@ -757,6 +776,10 @@
     li.dataset.bpId   = match[1];
     li.dataset.bpName = nameEl ? nameEl.textContent.trim() : `Item #${match[1]}`;
 
+    // Store available qty from thumbnail badge
+    const qtyEl = li.querySelector('.item-amount.qty');
+    li.dataset.bpQty = qtyEl ? qtyEl.textContent.trim() : '';
+
     const priceDiv = li.querySelector('div.price');
     if (!priceDiv) return;
 
@@ -766,6 +789,7 @@
     btn.title       = 'Show price chart';
     btn.type        = 'button';
     btn.addEventListener('click', e => { e.stopPropagation(); openModal(li); });
+    // CSS makes div.price flex so btn sits inline with the price input
     priceDiv.appendChild(btn);
   }
 
