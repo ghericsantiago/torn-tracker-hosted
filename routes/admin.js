@@ -85,14 +85,23 @@ router.get('/api/items', requireAuth, async (req, res) => {
     const { rows } = await db.query(`
       SELECT
         mi.*,
-        (SELECT price FROM item_market WHERE item_id = mi.torn_item_id
-         ORDER BY created_at DESC LIMIT 1) AS latest_price,
-        (SELECT created_at FROM item_market WHERE item_id = mi.torn_item_id
-         ORDER BY created_at DESC LIMIT 1) AS price_at,
-        (SELECT COUNT(*) FROM item_market WHERE item_id = mi.torn_item_id) AS record_count,
-        (SELECT type FROM item_market WHERE item_id = mi.torn_item_id
-         ORDER BY created_at DESC LIMIT 1) AS item_type
+        latest.price       AS latest_price,
+        latest.created_at  AS price_at,
+        latest.type        AS item_type,
+        COALESCE(cnt.record_count, 0) AS record_count
       FROM monitored_items mi
+      LEFT JOIN LATERAL (
+        SELECT price, created_at, type
+        FROM item_market
+        WHERE item_id = mi.torn_item_id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON TRUE
+      LEFT JOIN (
+        SELECT item_id, COUNT(*) AS record_count
+        FROM item_market
+        GROUP BY item_id
+      ) cnt ON cnt.item_id = mi.torn_item_id
       ORDER BY mi.created_at DESC
     `);
     res.json(rows);
