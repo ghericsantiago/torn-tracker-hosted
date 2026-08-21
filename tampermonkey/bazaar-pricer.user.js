@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.8
+// @version      3.9
 // @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
 // @match        https://www.torn.com/page.php*
@@ -17,7 +17,7 @@
   'use strict';
 
   const API_BASE = 'https://itrade.devs.surf';
-  const RECENTLY_PRICED_MS = 30 * 60 * 1000;
+  const RECENTLY_PRICED_MS = 24 * 60 * 60 * 1000;
 
   // ── Settings ──────────────────────────────────────────────────────────────
   const settings = {
@@ -861,7 +861,7 @@
     filterBtn.disabled = n === 0;
     filterBtn.classList.toggle('active', filterActive);
     filterBtn.querySelector('#bp-filter-count').textContent = n;
-    filterBtn.title = filterActive ? 'Click to show all items' : 'Hide items priced in the last 30 minutes';
+    filterBtn.title = filterActive ? 'Click to show all items' : 'Hide items priced in the last 24 hours';
   }
 
   function applyFilterToRow(row) {
@@ -1082,7 +1082,7 @@
     addFilterBtn.disabled = n === 0;
     addFilterBtn.classList.toggle('active', addFilterActive);
     addFilterBtn.querySelector('.bp-filter-count').textContent = n;
-    addFilterBtn.title = addFilterActive ? 'Click to show all items' : 'Hide items priced in the last 30 minutes';
+    addFilterBtn.title = addFilterActive ? 'Click to show all items' : 'Hide items priced in the last 24 hours';
   }
 
   function applyAddFilter() {

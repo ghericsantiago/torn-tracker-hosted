@@ -213,7 +213,8 @@ Your **Bazaar** is a separate stock location from your person inventory:
   price through Torn's normal input workflow; quantity autofill and final submission rules
   remain unchanged. The modal keeps this control visible as disabled **No saved price**
   when no numeric state exists (older releases stored only recent-item timestamps); opening
-  a priced Bazaar Manage row imports its current per-unit value into the new state.
+  a priced Bazaar Manage row imports its current per-unit value into the new state. The
+  helper's recently-priced marker/filter retains entries for 24 hours.
 - **Bazaar buy** (1220/1225) is the *opposite* direction — *you* buying from another
   player's bazaar → items go to **your inventory** (this is a regular "Buy" flow, not a
   bazaar-stock flow).
