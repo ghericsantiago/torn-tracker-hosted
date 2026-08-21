@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.7
+// @version      3.8
 // @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
 // @match        https://www.torn.com/page.php*
@@ -124,11 +124,12 @@
     }
     #bp-selected-row b { color: #6ee7f7; }
     #bp-saved-price-btn {
-      display: none; margin-left: auto; padding: 3px 9px; border-radius: 5px;
+      margin-left: auto; padding: 3px 9px; border-radius: 5px;
       background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.4);
       color: #6ee7b7; cursor: pointer; font-size: 11px; font-weight: 700;
     }
     #bp-saved-price-btn:hover { background: rgba(52,211,153,0.26); }
+    #bp-saved-price-btn:disabled { opacity: 0.45; cursor: default; }
     #bp-apply-inp {
       width: 110px; padding: 2px 7px; border-radius: 4px;
       border: 1px solid rgba(110,231,247,0.35);
@@ -281,13 +282,13 @@
           Selected: <b id="bp-sel-price"></b>&ensp;→&ensp;Apply:
           <input id="bp-apply-inp" type="number" min="0" step="1">
         </span>
-        <button id="bp-saved-price-btn" type="button"></button>
       </div>
       <div id="bp-footer">
         <span class="bp-lbl">Deduct:</span>
         <button class="bp-type-btn" id="bp-type-fixed">Fixed</button>
         <button class="bp-type-btn" id="bp-type-pct">%</button>
         <input id="bp-deduct-inp" type="number" min="0" step="1" placeholder="0">
+        <button id="bp-saved-price-btn" type="button" disabled>No saved price</button>
         <button id="bp-apply-btn" disabled>Apply to bazaar</button>
       </div>
     </div>
@@ -662,16 +663,28 @@
     elItemName.textContent = row.dataset.bpName || `Item #${currentItemId}`;
     elApplyBtn.textContent = row.dataset.bpMarketAdd ? 'Apply to item market' : 'Apply to bazaar';
 
+    // Older releases only recorded a recent-item timestamp. Opening an existing
+    // Bazaar Manage row now migrates its visible per-unit value into price state.
+    const curPrice = getCurrentPrice(row);
+    const isBazaarManageRow = !row.dataset.bpMarketAdd && row.tagName !== 'LI';
+    if (curPrice != null && isBazaarManageRow) {
+      saveAssignedPrice(row, currentItemId, curPrice);
+    }
+
     const savedPrice = getAssignedPrice(row, currentItemId);
     if (savedPrice != null) {
       elSavedPriceBtn.textContent = `Apply saved ${fmtPrice(savedPrice)}`;
-      elSavedPriceBtn.style.display = '';
+      elSavedPriceBtn.disabled = false;
+      elSavedPriceBtn.title = 'Apply the last price saved for this item';
     } else {
-      elSavedPriceBtn.style.display = 'none';
+      elSavedPriceBtn.textContent = 'No saved price';
+      elSavedPriceBtn.disabled = true;
+      elSavedPriceBtn.title = row.dataset.bpMarketAdd
+        ? 'Apply a price once to save it for this Item Market item'
+        : 'Visit Bazaar Manage with this item visible to import its assigned price';
     }
 
     // Pre-fill with the item's current bazaar price so Apply works immediately
-    const curPrice = getCurrentPrice(row);
     if (curPrice != null) {
       elSelPrice.textContent    = 'Current';
       elApplyInp.value          = curPrice;
