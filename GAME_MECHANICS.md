@@ -200,7 +200,8 @@ Your **Bazaar** is a separate stock location from your person inventory:
   per-unit price on both desktop and mobile. The Bazaar & Item Market Pricer can attach a
   chart action beside the price input, populate both React-facing price inputs, and use the
   amount input's available maximum when filling listing quantity. Submitting the listing
-  remains a separate user action.
+  remains a separate user action. Helper controls use their own elevated stacking level so
+  third-party market-price overlays do not cover their tap target.
 - **Bazaar buy** (1220/1225) is the *opposite* direction — *you* buying from another
   player's bazaar → items go to **your inventory** (this is a regular "Buy" flow, not a
   bazaar-stock flow).

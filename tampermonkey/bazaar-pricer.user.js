@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.3
+// @version      3.4
 // @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
 // @match        https://www.torn.com/page.php*
@@ -69,6 +69,7 @@
   GM_addStyle(`
     .bp-chart-btn {
       display: inline-flex; align-items: center; justify-content: center;
+      position: relative !important; z-index: 10000 !important;
       padding: 2px 7px; margin-left: 6px; min-width: 34px;
       background: rgba(110,231,247,0.12); border: 1px solid rgba(110,231,247,0.3);
       border-radius: 4px; color: #6ee7f7; font-size: 12px; cursor: pointer;
