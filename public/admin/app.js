@@ -166,6 +166,43 @@
   let tablePage   = 0;
   const PAGE_SIZE = 20;
   const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count']);
+  const selectedIds = new Set();
+
+  const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
+  const bulkDeleteCount = document.getElementById('bulkDeleteCount');
+  const selectAllCb     = document.getElementById('selectAll');
+
+  function updateBulkBar() {
+    const n = selectedIds.size;
+    bulkDeleteBtn.style.display = n > 0 ? '' : 'none';
+    bulkDeleteCount.textContent = n;
+    if (selectAllCb) {
+      const pageIds = [...document.querySelectorAll('.row-check')].map(c => Number(c.dataset.id));
+      selectAllCb.checked       = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+      selectAllCb.indeterminate = pageIds.some(id => selectedIds.has(id)) && !selectAllCb.checked;
+    }
+  }
+
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', () => {
+      document.querySelectorAll('.row-check').forEach(cb => {
+        const id = Number(cb.dataset.id);
+        if (selectAllCb.checked) { selectedIds.add(id); cb.checked = true; }
+        else                     { selectedIds.delete(id); cb.checked = false; }
+      });
+      updateBulkBar();
+    });
+  }
+
+  bulkDeleteBtn.addEventListener('click', async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} item(s) and all their market data?`)) return;
+    await api('/admin/api/items/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    selectedIds.clear();
+    updateBulkBar();
+    await refresh();
+  });
 
   function setStatusFilter(type) {
     statusFilter = statusFilter === type ? null : type;
@@ -233,6 +270,7 @@
     tbody.innerHTML = page.length
       ? page.map(item => `
           <tr data-id="${item.id}">
+            <td style="text-align:center"><input type="checkbox" class="row-check" data-id="${item.id}" ${selectedIds.has(item.id) ? 'checked' : ''}></td>
             <td class="mono" style="color:var(--text-dim)">${item.torn_item_id}</td>
             <td>${item.name || '<span style="color:var(--text-muted)">Pending…</span>'}</td>
             <td style="color:var(--text-dim);font-size:11px">${item.item_type || '<span style="color:var(--text-muted)">—</span>'}</td>
@@ -253,7 +291,16 @@
               </div>
             </td>
           </tr>`).join('')
-      : `<tr><td colspan="9" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+      : `<tr><td colspan="10" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+
+    // wire row checkboxes after render
+    tbody.querySelectorAll('.row-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = Number(cb.dataset.id);
+        if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+        updateBulkBar();
+      });
+    });
 
     const pag = document.getElementById('pagination');
     if (totalPages <= 1) {

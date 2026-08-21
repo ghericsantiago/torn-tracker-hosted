@@ -150,6 +150,21 @@ router.delete('/api/items/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Bulk delete items
+router.post('/api/items/bulk-delete', requireAuth, async (req, res) => {
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids required' });
+  try {
+    const { rowCount } = await db.query(
+      'DELETE FROM monitored_items WHERE id = ANY($1::int[])',
+      [ids]
+    );
+    res.json({ ok: true, deleted: rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Manual sync — always resets error state so deactivated items can retry
 router.post('/api/items/:id/sync', requireAuth, async (req, res) => {
   try {

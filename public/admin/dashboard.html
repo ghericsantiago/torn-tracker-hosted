@@ -96,6 +96,7 @@
           <h2>Monitored Items</h2>
           <div class="table-controls">
             <input id="tableSearch" type="text" placeholder="Search…" class="table-search" />
+            <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="display:none;color:var(--error);border-color:var(--error)">Delete selected (<span id="bulkDeleteCount">0</span>)</button>
             <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
             <button class="btn btn-ghost btn-sm" id="addToggleBtn">＋ Add</button>
           </div>
@@ -104,6 +105,7 @@
           <table id="itemsTable">
             <thead>
               <tr>
+                <th style="width:32px;text-align:center"><input type="checkbox" id="selectAll" title="Select all"></th>
                 <th class="sortable" data-col="torn_item_id">Item ID <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="name">Name <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="item_type">Category <span class="sort-icon">↕</span></th>
@@ -116,7 +118,7 @@
               </tr>
             </thead>
             <tbody id="itemsBody">
-              <tr><td colspan="9" class="loading-cell">Loading…</td></tr>
+              <tr><td colspan="10" class="loading-cell">Loading…</td></tr>
             </tbody>
           </table>
         </div>
