@@ -66,12 +66,16 @@ const PRICE_LOOKUP = `
 
 async function buildPricedItems(tornData, itemsOverride) {
   const trade  = tornData?.trade || {};
-  const buyer  = trade.user   || {};   // the other party — they're offering items to us
-  const seller = trade.trader || {};   // us
+  const partyA = trade.user   || {};
+  const partyB = trade.trader || {};
 
-  // Only price items offered by the OTHER party (buyer)
+  // PoorMe is always the buyer regardless of which side of the trade they appear on
+  const buyer  = partyA.name === 'PoorMe' ? partyA : partyB;
+  const seller = partyA.name === 'PoorMe' ? partyB : partyA;
+
+  // Price items offered by the seller (what PoorMe is buying)
   const rawItems = (trade.items || []).filter(
-    i => i.type === 'Item' && i.user_id === buyer.id
+    i => i.type === 'Item' && i.user_id === seller.id
   );
   const itemIds = rawItems.map(i => i.details?.id).filter(Boolean);
 
