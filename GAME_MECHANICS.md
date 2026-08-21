@@ -206,6 +206,12 @@ Your **Bazaar** is a separate stock location from your person inventory:
   so neighboring RRP text cannot paint across the chart icon. On touch/pointer input,
   the chart action consumes the pointer sequence and suppresses its synthetic follow-up
   click so the surrounding Item Market row does not open item details.
+- The Bazaar & Item Market Pricer persists the last successfully assigned per-item price in
+  separate `bazaar` and `itemMarket` scopes. Bazaar Manage rows also seed the Bazaar scope
+  from their existing per-unit inputs. A matching chart modal can therefore offer
+  **Apply saved $…** on Bazaar Add Items or Item Market Add Listing and replay the stored
+  price through Torn's normal input workflow; quantity autofill and final submission rules
+  remain unchanged.
 - **Bazaar buy** (1220/1225) is the *opposite* direction — *you* buying from another
   player's bazaar → items go to **your inventory** (this is a regular "Buy" flow, not a
   bazaar-stock flow).

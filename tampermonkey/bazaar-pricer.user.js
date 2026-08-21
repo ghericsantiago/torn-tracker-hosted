@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.6
+// @version      3.7
 // @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
 // @match        https://www.torn.com/page.php*
@@ -123,6 +123,12 @@
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     }
     #bp-selected-row b { color: #6ee7f7; }
+    #bp-saved-price-btn {
+      display: none; margin-left: auto; padding: 3px 9px; border-radius: 5px;
+      background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.4);
+      color: #6ee7b7; cursor: pointer; font-size: 11px; font-weight: 700;
+    }
+    #bp-saved-price-btn:hover { background: rgba(52,211,153,0.26); }
     #bp-apply-inp {
       width: 110px; padding: 2px 7px; border-radius: 4px;
       border: 1px solid rgba(110,231,247,0.35);
@@ -275,6 +281,7 @@
           Selected: <b id="bp-sel-price"></b>&ensp;→&ensp;Apply:
           <input id="bp-apply-inp" type="number" min="0" step="1">
         </span>
+        <button id="bp-saved-price-btn" type="button"></button>
       </div>
       <div id="bp-footer">
         <span class="bp-lbl">Deduct:</span>
@@ -295,6 +302,7 @@
   const elSelDetail = overlay.querySelector('#bp-sel-detail');
   const elSelPrice  = overlay.querySelector('#bp-sel-price');
   const elApplyInp  = overlay.querySelector('#bp-apply-inp');
+  const elSavedPriceBtn = overlay.querySelector('#bp-saved-price-btn');
   const elTypeFixed = overlay.querySelector('#bp-type-fixed');
   const elTypePct   = overlay.querySelector('#bp-type-pct');
   const elDeductInp = overlay.querySelector('#bp-deduct-inp');
@@ -316,6 +324,7 @@
   let addFilterBtn   = null;
   let addFilterActive = false;
   const pricedItems  = loadPricedItems();
+  const assignedPrices = loadAssignedPrices();
   let filterActive   = false;
   let filterBtn      = null;
 
@@ -344,6 +353,37 @@
 
   function savePricedItems() {
     GM_setValue('bp_priced', JSON.stringify(Object.fromEntries(pricedItems)));
+  }
+
+  function loadAssignedPrices() {
+    try {
+      const saved = JSON.parse(GM_getValue('bp_assigned_prices_v1', '{}'));
+      return {
+        bazaar: saved?.bazaar && typeof saved.bazaar === 'object' ? saved.bazaar : {},
+        itemMarket: saved?.itemMarket && typeof saved.itemMarket === 'object' ? saved.itemMarket : {},
+      };
+    } catch (_error) {
+      return { bazaar: {}, itemMarket: {} };
+    }
+  }
+
+  function assignedPriceScope(row) {
+    return row?.dataset.bpMarketAdd ? 'itemMarket' : 'bazaar';
+  }
+
+  function saveAssignedPrice(row, itemId, price) {
+    if (!Number.isFinite(price) || price < 0 || !itemId) return;
+    assignedPrices[assignedPriceScope(row)][String(itemId)] = {
+      price: Math.round(price),
+      updatedAt: Date.now(),
+    };
+    GM_setValue('bp_assigned_prices_v1', JSON.stringify(assignedPrices));
+  }
+
+  function getAssignedPrice(row, itemId) {
+    const entry = assignedPrices[assignedPriceScope(row)]?.[String(itemId)];
+    const price = Number(entry?.price ?? entry);
+    return Number.isFinite(price) && price >= 0 ? Math.round(price) : null;
   }
 
   function pruneExpiredPricedItems() {
@@ -392,6 +432,15 @@
     elSelDetail.style.display = 'none';
     elApplyBtn.disabled       = true;
   }
+
+  elSavedPriceBtn.addEventListener('click', () => {
+    if (!currentRow || !currentItemId) return;
+    const savedPrice = getAssignedPrice(currentRow, currentItemId);
+    if (savedPrice == null) return;
+    elApplyInp.value = savedPrice;
+    elApplyBtn.disabled = false;
+    elApplyBtn.click();
+  });
 
   elCloseBtn.addEventListener('click', closeModal);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
@@ -611,6 +660,15 @@
     viewDate      = utcMidnightToday();
 
     elItemName.textContent = row.dataset.bpName || `Item #${currentItemId}`;
+    elApplyBtn.textContent = row.dataset.bpMarketAdd ? 'Apply to item market' : 'Apply to bazaar';
+
+    const savedPrice = getAssignedPrice(row, currentItemId);
+    if (savedPrice != null) {
+      elSavedPriceBtn.textContent = `Apply saved ${fmtPrice(savedPrice)}`;
+      elSavedPriceBtn.style.display = '';
+    } else {
+      elSavedPriceBtn.style.display = 'none';
+    }
 
     // Pre-fill with the item's current bazaar price so Apply works immediately
     const curPrice = getCurrentPrice(row);
@@ -753,7 +811,7 @@
     elApplyBtn.textContent = 'Applying…';
     currentRow = await ensureMobilePriceInputs(currentRow);
     const appliedToTorn = applyPriceToRow(currentRow, applied);
-    elApplyBtn.textContent = 'Apply to bazaar';
+    elApplyBtn.textContent = currentRow.dataset.bpMarketAdd ? 'Apply to item market' : 'Apply to bazaar';
     if (!appliedToTorn) {
       elSelHint.textContent = 'Could not open Torn’s mobile price input. Tap Manage, then try again.';
       elSelHint.style.color = '#f87171';
@@ -765,6 +823,7 @@
 
     pricedItems.set(currentItemId, Date.now());
     savePricedItems();
+    saveAssignedPrice(currentRow, currentItemId, applied);
     updateFilterBtn();
     updateAddFilterBtn();
     const chartBtn = currentRow.querySelector('.bp-chart-btn');
@@ -1088,6 +1147,11 @@
     const nameEl = row.querySelector('.desc___TpUlk b');
     row.dataset.bpId   = match[1];
     row.dataset.bpName = nameEl ? nameEl.textContent.trim() : `Item #${match[1]}`;
+
+    // Learn prices already assigned in Bazaar Manage, including values created
+    // before persistent assigned-price state was introduced.
+    const existingPrice = getCurrentPrice(row);
+    if (existingPrice != null) saveAssignedPrice(row, match[1], existingPrice);
 
     const priceWrap = row.querySelector('.price___WxxqO');
     const mobileActions = row.querySelector('.mobileContainer___IP3uc .menuActivators___I7505');
