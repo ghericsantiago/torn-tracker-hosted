@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      3.1
+// @version      3.2
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -129,6 +129,21 @@
       </div>`;
 
     document.body.appendChild(overlay);
+
+    // Copy total to clipboard on click
+    const totalEl = document.getElementById('tt-total');
+    totalEl.style.cursor = 'pointer';
+    totalEl.title = 'Click to copy';
+    totalEl.addEventListener('click', () => {
+      const raw = totalEl.textContent.replace(/[^0-9]/g, '');
+      navigator.clipboard.writeText(raw).then(() => {
+        const orig = totalEl.textContent;
+        const origColor = totalEl.style.color;
+        totalEl.textContent = 'Copied!';
+        totalEl.style.color = '#4ade80';
+        setTimeout(() => { totalEl.textContent = orig; totalEl.style.color = origColor; }, 1000);
+      });
+    });
 
     // Live recalculate on price input change
     overlay.querySelectorAll('.tt-unit').forEach(input => {
