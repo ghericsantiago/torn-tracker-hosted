@@ -193,7 +193,8 @@
     let filtered = allItems;
     if (q) filtered = filtered.filter(i =>
       String(i.torn_item_id).includes(q) ||
-      (i.name || '').toLowerCase().includes(q)
+      (i.name || '').toLowerCase().includes(q) ||
+      (i.item_type || '').toLowerCase().includes(q)
     );
     if (statusFilter === 'inactive') filtered = filtered.filter(i => !i.is_active);
     if (statusFilter === 'error')    filtered = filtered.filter(i => !!i.last_error);
