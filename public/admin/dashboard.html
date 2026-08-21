@@ -80,6 +80,17 @@
                 <div id="addItemAc" class="ac-dropdown hidden"></div>
               </div>
             </div>
+            <div class="field" style="flex:0 0 auto">
+              <label>Priority</label>
+              <select id="addPriority" class="priority-select" style="font-size:13px;padding:6px 8px;width:100%">
+                <option value="1">P1 · 1m</option>
+                <option value="2">P2 · 5m</option>
+                <option value="3">P3 · 15m</option>
+                <option value="4" selected>P4 · 30m</option>
+                <option value="5">P5 · 1h</option>
+                <option value="6">P6 · 1d</option>
+              </select>
+            </div>
             <div style="display:flex;align-items:flex-end;gap:.5rem">
               <div id="addError" class="error-msg hidden" style="flex:1"></div>
               <button type="submit" class="btn btn-primary btn-sm">Add Item</button>

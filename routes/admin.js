@@ -106,15 +106,16 @@ router.get('/api/items', requireAuth, async (req, res) => {
 
 // Add item
 router.post('/api/items', requireAuth, async (req, res) => {
-  const { torn_item_id, name, api_key } = req.body;
+  const { torn_item_id, name, api_key, priority } = req.body;
   if (!torn_item_id || !api_key) return res.status(400).json({ error: 'torn_item_id and api_key are required' });
+  const p = priority !== undefined ? Math.min(6, Math.max(1, parseInt(priority))) : 4;
   try {
     const { rows } = await db.query(
-      `INSERT INTO monitored_items (torn_item_id, name, api_key)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (torn_item_id) DO UPDATE SET name = COALESCE(EXCLUDED.name, monitored_items.name), api_key = EXCLUDED.api_key, is_active = TRUE
+      `INSERT INTO monitored_items (torn_item_id, name, api_key, priority)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (torn_item_id) DO UPDATE SET name = COALESCE(EXCLUDED.name, monitored_items.name), api_key = EXCLUDED.api_key, priority = EXCLUDED.priority, is_active = TRUE
        RETURNING *`,
-      [parseInt(torn_item_id), name ? name.trim() : null, api_key.trim()]
+      [parseInt(torn_item_id), name ? name.trim() : null, api_key.trim(), p]
     );
     res.json(rows[0]);
   } catch (err) {

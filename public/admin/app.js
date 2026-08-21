@@ -523,9 +523,10 @@
   // ── Add item(s) ──
   document.getElementById('addForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const err    = document.getElementById('addError');
-    const apiKey = document.getElementById('addApiKey').value;
-    const items  = [...selectedItems.values()];
+    const err      = document.getElementById('addError');
+    const apiKey   = document.getElementById('addApiKey').value;
+    const priority = Number(document.getElementById('addPriority').value) || 4;
+    const items    = [...selectedItems.values()];
     err.classList.add('hidden');
 
     if (!items.length) {
@@ -542,7 +543,7 @@
       btn.textContent = `Adding ${item.name}…`;
       const res = await api('/admin/api/items', {
         method: 'POST',
-        body: JSON.stringify({ torn_item_id: item.id, name: item.name, api_key: apiKey }),
+        body: JSON.stringify({ torn_item_id: item.id, name: item.name, api_key: apiKey, priority }),
       });
       if (res && res.ok) added++;
       else failed++;
