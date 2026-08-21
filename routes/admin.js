@@ -89,7 +89,9 @@ router.get('/api/items', requireAuth, async (req, res) => {
          ORDER BY created_at DESC LIMIT 1) AS latest_price,
         (SELECT created_at FROM item_market WHERE item_id = mi.torn_item_id
          ORDER BY created_at DESC LIMIT 1) AS price_at,
-        (SELECT COUNT(*) FROM item_market WHERE item_id = mi.torn_item_id) AS record_count
+        (SELECT COUNT(*) FROM item_market WHERE item_id = mi.torn_item_id) AS record_count,
+        (SELECT type FROM item_market WHERE item_id = mi.torn_item_id
+         ORDER BY created_at DESC LIMIT 1) AS item_type
       FROM monitored_items mi
       ORDER BY mi.created_at DESC
     `);

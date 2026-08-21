@@ -234,6 +234,7 @@
           <tr data-id="${item.id}">
             <td class="mono" style="color:var(--text-dim)">${item.torn_item_id}</td>
             <td>${item.name || '<span style="color:var(--text-muted)">Pending…</span>'}</td>
+            <td style="color:var(--text-dim);font-size:11px">${item.item_type || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${badge(item)}</td>
             <td>${fmtPrice(item.latest_price)}</td>
             <td>${fmtTime(item.last_sync)}</td>
@@ -251,7 +252,7 @@
               </div>
             </td>
           </tr>`).join('')
-      : `<tr><td colspan="8" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+      : `<tr><td colspan="9" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
 
     const pag = document.getElementById('pagination');
     if (totalPages <= 1) {
