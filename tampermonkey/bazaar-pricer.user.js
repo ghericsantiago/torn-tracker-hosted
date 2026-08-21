@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.4
+// @version      3.6
 // @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
 // @match        https://www.torn.com/page.php*
@@ -238,11 +238,16 @@
     }
     .bp-market-price-wrap {
       display: flex !important; align-items: center; gap: 4px;
+      position: relative !important; z-index: 2147483000 !important;
+      isolation: isolate;
     }
     .bp-market-price-wrap > .input-money-group { flex: 1 1 auto; min-width: 0; }
     .bp-market-price-wrap > .bp-chart-btn {
       width: 32px; min-width: 32px; height: 28px; padding: 0; margin: 0;
       flex: 0 0 32px;
+      background: #252525 !important;
+      box-shadow: 0 0 0 2px #252525;
+      overflow: hidden;
     }
   `);
 
@@ -954,12 +959,28 @@
     btn.textContent = pricedItems.has(match[1]) ? '✓' : '📈';
     btn.title = 'Show price chart';
     btn.type = 'button';
-    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend']
-      .forEach(type => btn.addEventListener(type, event => event.stopPropagation()));
+    let openedFromPointer = false;
+    btn.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    });
+    btn.addEventListener('pointerup', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openedFromPointer = true;
+      openModal(row);
+      setTimeout(() => { openedFromPointer = false; }, 0);
+    });
+    ['mousedown', 'mouseup', 'touchstart', 'touchend']
+      .forEach(type => btn.addEventListener(type, event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }));
     btn.addEventListener('click', event => {
       event.preventDefault();
-      event.stopPropagation();
-      openModal(row);
+      event.stopImmediatePropagation();
+      if (!openedFromPointer) openModal(row);
+      openedFromPointer = false;
     });
     priceWrap.appendChild(btn);
   }

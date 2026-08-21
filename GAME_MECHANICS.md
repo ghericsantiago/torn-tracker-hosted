@@ -201,7 +201,11 @@ Your **Bazaar** is a separate stock location from your person inventory:
   chart action beside the price input, populate both React-facing price inputs, and use the
   amount input's available maximum when filling listing quantity. Submitting the listing
   remains a separate user action. Helper controls use their own elevated stacking level so
-  third-party market-price overlays do not cover their tap target.
+  third-party market-price overlays do not cover their tap target; the Item Market price
+  control also creates an isolated high-level stacking context and opaque button surface
+  so neighboring RRP text cannot paint across the chart icon. On touch/pointer input,
+  the chart action consumes the pointer sequence and suppresses its synthetic follow-up
+  click so the surrounding Item Market row does not open item details.
 - **Bazaar buy** (1220/1225) is the *opposite* direction — *you* buying from another
   player's bazaar → items go to **your inventory** (this is a regular "Buy" flow, not a
   bazaar-stock flow).
