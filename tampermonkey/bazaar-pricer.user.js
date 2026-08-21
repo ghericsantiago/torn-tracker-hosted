@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Bazaar Pricer
 // @namespace    https://itrade.devs.surf
-// @version      1.5
+// @version      3.2
 // @description  Price chart button on Torn bazaar manage and add-item pages
 // @match        https://www.torn.com/bazaar.php*
 // @grant        GM_xmlhttpRequest
@@ -66,6 +66,10 @@
       line-height: 1.4; vertical-align: middle; transition: background 0.15s;
     }
     .bp-chart-btn:hover { background: rgba(110,231,247,0.28); }
+    .bp-chart-btn.bp-chart-btn-mobile {
+      width: 30px; min-width: 30px; height: 28px; padding: 0; margin-left: 0;
+      font-size: 13px; flex: 0 0 30px;
+    }
     .bp-filter-shifted { transform: translateY(var(--bp-filter-offset, 0)); }
 
     #bp-overlay {
@@ -211,6 +215,17 @@
     }
     li.clearfix[data-group] div.price .input-money-group { flex: 1; }
     li.clearfix[data-group] div.price .bp-chart-btn { margin-left: 0; flex-shrink: 0; }
+    li.clearfix[data-group] .name-wrap.bp-add-name-with-chart {
+      display: flex !important; align-items: center; gap: 4px; min-width: 0;
+    }
+    li.clearfix[data-group] .name-wrap.bp-add-name-with-chart .t-overflow {
+      display: block; flex: 1 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    li.clearfix[data-group] .name-wrap .bp-chart-btn.bp-add-name-chart {
+      width: 30px; min-width: 30px; height: 24px; padding: 0; margin: 0 2px 0 0;
+      flex: 0 0 30px;
+    }
   `);
 
   // ── Modal DOM (created once) ───────────────────────────────────────────────
@@ -586,6 +601,49 @@
     fetchChartData(++loadToken);
   }
 
+  function findManageMoneyInputs(row) {
+    const wrap = row.querySelector('.price___WxxqO');
+    if (wrap) return [...wrap.querySelectorAll('input')];
+    // Mobile creates the same money-input pair only after Manage is expanded,
+    // but does not retain the desktop price-cell wrapper.
+    return [...row.querySelectorAll('input[data-testid="legacy-money-input"], input.input-money[data-money]')];
+  }
+
+  async function ensureMobilePriceInputs(row) {
+    if (findManageMoneyInputs(row).length) return row;
+    const manageBtn = row.querySelector('.mobileContainer___IP3uc button[aria-label="Manage"]');
+    if (!manageBtn) return row;
+    manageBtn.click();
+
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      // React may replace the row while opening the mobile editor.
+      if (!document.contains(row) && bazaarList) {
+        row = [...bazaarList.querySelectorAll('[data-testid="sortable-item"]')]
+          .find(candidate => candidate.dataset.bpId === currentItemId) || row;
+      }
+      if (findManageMoneyInputs(row).length) return row;
+    }
+    return row;
+  }
+
+  async function closeMobilePricePanel(row, itemId) {
+    if (!row.querySelector('.mobileContainer___IP3uc')) return;
+
+    // Let React finish processing the price change before checking whether its
+    // mobile editor survived the render.
+    await new Promise(resolve => setTimeout(resolve, 100));
+    if (!document.contains(row) && bazaarList) {
+      row = [...bazaarList.querySelectorAll('[data-testid="sortable-item"]')]
+        .find(candidate => candidate.dataset.bpId === itemId) || row;
+    }
+    if (!document.contains(row)) return;
+
+    if (findManageMoneyInputs(row).length) {
+      row.querySelector('.mobileContainer___IP3uc button[aria-label="Manage"]')?.click();
+    }
+  }
+
   // ── Apply price: handles both manage page (React inputs) and add page (tornInputMoney)
   function applyPriceToRow(row, applied) {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
@@ -609,12 +667,12 @@
           if (window.jQuery) window.jQuery(qtyInp).trigger('change').trigger('input');
         }
       }
+      return !!inp;
     } else {
       // Manage page: React hidden + visible inputs
-      const wrap = row.querySelector('.price___WxxqO');
-      if (!wrap) return;
-      const hidden  = wrap.querySelector('input[type="hidden"]');
-      const visible = wrap.querySelector('input:not([type="hidden"])');
+      const inputs = findManageMoneyInputs(row);
+      const hidden  = inputs.find(input => input.type === 'hidden');
+      const visible = inputs.find(input => input.type !== 'hidden');
       if (hidden) {
         setter.call(hidden, String(applied));
         hidden.dispatchEvent(new Event('input',  { bubbles: true }));
@@ -625,11 +683,12 @@
         visible.dispatchEvent(new Event('input',  { bubbles: true }));
         visible.dispatchEvent(new Event('change', { bubbles: true }));
       }
+      return !!(hidden || visible);
     }
   }
 
   // ── Apply button ──────────────────────────────────────────────────────────
-  elApplyBtn.addEventListener('click', () => {
+  elApplyBtn.addEventListener('click', async () => {
     if (!currentRow) return;
 
     const applied = parseInt(elApplyInp.value, 10);
@@ -643,7 +702,19 @@
       return;
     }
 
-    applyPriceToRow(currentRow, applied);
+    elApplyBtn.disabled = true;
+    elApplyBtn.textContent = 'Applying…';
+    currentRow = await ensureMobilePriceInputs(currentRow);
+    const appliedToTorn = applyPriceToRow(currentRow, applied);
+    elApplyBtn.textContent = 'Apply to bazaar';
+    if (!appliedToTorn) {
+      elSelHint.textContent = 'Could not open Torn’s mobile price input. Tap Manage, then try again.';
+      elSelHint.style.color = '#f87171';
+      elSelHint.style.display = '';
+      elSelDetail.style.display = 'none';
+      elApplyBtn.disabled = false;
+      return;
+    }
 
     pricedItems.set(currentItemId, Date.now());
     savePricedItems();
@@ -654,7 +725,10 @@
     if (isAddPage()) applyAddFilter();
     else applyFilterToRow(currentRow);
 
+    const populatedRow = currentRow;
+    const populatedItemId = currentItemId;
     closeModal();
+    closeMobilePricePanel(populatedRow, populatedItemId);
   });
 
   // ── Priced-item filter ────────────────────────────────────────────────────
@@ -788,9 +862,26 @@
     btn.textContent = pricedItems.has(match[1]) ? '✓' : '📈';
     btn.title       = 'Show price chart';
     btn.type        = 'button';
-    btn.addEventListener('click', e => { e.stopPropagation(); openModal(li); });
-    // CSS makes div.price flex so btn sits inline with the price input
-    priceDiv.appendChild(btn);
+    // Torn's mobile item row listens before the eventual synthetic click.
+    // Contain every input phase so tapping this control cannot open item details.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend']
+      .forEach(type => btn.addEventListener(type, e => e.stopPropagation()));
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openModal(li);
+    });
+    const nameWrap = li.querySelector('.name-wrap');
+    const mobileLayout = window.innerWidth <= 600 || window.screen.width <= 600 ||
+      window.matchMedia('(pointer: coarse)').matches;
+    if (mobileLayout && nameWrap) {
+      nameWrap.classList.add('bp-add-name-with-chart');
+      btn.classList.add('bp-add-name-chart');
+      nameWrap.appendChild(btn);
+    } else {
+      // Desktop: keep the button inline with the price input.
+      priceDiv.appendChild(btn);
+    }
   }
 
   function scanAddRows() {
@@ -876,8 +967,7 @@
 
   // ── Inject chart button into a bazaar row ─────────────────────────────────
   function injectRow(row) {
-    if (row.dataset.bpInjected) return;
-    row.dataset.bpInjected = '1';
+    if (row.querySelector('.bp-chart-btn')) return;
 
     const img = row.querySelector('img[src*="/images/items/"]');
     if (!img) return;
@@ -889,15 +979,22 @@
     row.dataset.bpName = nameEl ? nameEl.textContent.trim() : `Item #${match[1]}`;
 
     const priceWrap = row.querySelector('.price___WxxqO');
-    if (!priceWrap) return;
+    const mobileActions = row.querySelector('.mobileContainer___IP3uc .menuActivators___I7505');
+    if (!priceWrap && !mobileActions) return;
 
     const btn = document.createElement('button');
-    btn.className   = 'bp-chart-btn';
+    btn.className   = `bp-chart-btn${mobileActions ? ' bp-chart-btn-mobile' : ''}`;
     btn.textContent = pricedItems.has(match[1]) ? '✓' : '📈';
     btn.title       = 'Show price chart';
     btn.type        = 'button';
     btn.addEventListener('click', e => { e.stopPropagation(); openModal(row); });
-    priceWrap.insertAdjacentElement('afterend', btn);
+    if (mobileActions) {
+      const manageBtn = mobileActions.querySelector('button[aria-label="Manage"]');
+      mobileActions.insertBefore(btn, manageBtn || null);
+    } else {
+      priceWrap.insertAdjacentElement('afterend', btn);
+    }
+    row.dataset.bpInjected = '1';
 
     applyFilterToRow(row); // apply filter state to newly injected row
   }

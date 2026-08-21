@@ -182,6 +182,20 @@ Your **Bazaar** is a separate stock location from your person inventory:
   bazaar: the item leaves your bazaar stock and you receive money (`cost_total`).
 - **Removing** (log 1211/1223 "Bazaar remove") takes items off your bazaar and **back into
   your inventory**.
+- On narrow/mobile layouts, Bazaar manage rows initially expose item identity plus
+  **Info** / **Manage** actions; price controls are kept out of the collapsed row. Desktop
+  manage rows expose the price control directly. Bazaar UI helpers must therefore attach
+  item-level actions to the mobile action group rather than assuming a visible price cell,
+  and must expand **Manage** before writing a new per-unit price. The Bazaar Pricer helper
+  collapses that temporary mobile Manage panel again after populating Torn's pending
+  per-unit value; **SAVE CHANGES** remains a separate user action.
+- On the mobile Bazaar **Add Items** view, limited horizontal space is concentrated in the
+  item-name cell. Item-level helper actions can share that cell when the name is allowed to
+  truncate with an ellipsis; desktop helpers remain beside the price input. Real mobile
+  detection cannot rely only on viewport width because Torn may retain a desktop-sized
+  layout viewport; coarse-pointer and physical-screen checks are also needed. Controls
+  inserted into the mobile name cell must contain pointer, touch, mouse, and click events
+  because the surrounding Torn item row also opens item details.
 - **Bazaar buy** (1220/1225) is the *opposite* direction — *you* buying from another
   player's bazaar → items go to **your inventory** (this is a regular "Buy" flow, not a
   bazaar-stock flow).
