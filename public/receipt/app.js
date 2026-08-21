@@ -44,8 +44,8 @@
     document.getElementById('receiptContent').classList.remove('hidden');
 
     document.getElementById('receiptTradeId').textContent = `#${r.trade_id}`;
-    document.getElementById('buyerName').textContent  = r.buyer_name  || `Player #${r.buyer_id}`  || '—';
-    document.getElementById('sellerName').textContent = r.seller_name || `Player #${r.seller_id}` || '—';
+    document.getElementById('buyerName').textContent  = r.seller_name || `Player #${r.seller_id}` || '—';
+    document.getElementById('sellerName').textContent = r.buyer_name  || `Player #${r.buyer_id}`  || '—';
     document.getElementById('createdAt').textContent  = fmtDate(r.created_at);
 
     // Status
