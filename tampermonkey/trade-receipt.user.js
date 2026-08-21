@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      2.9
+// @version      3.0
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -212,7 +212,7 @@
         GM_setValue(`receipt_${tradeId}`, result.short_id || result.id);
 
         // Auto-fill comment box (max 155 chars)
-        const commentText = `[RECEIPT](${APP_URL}${result.url}) | Total: ${fmt(result.total)}`;
+        const commentText = `Receipt: ${APP_URL}${result.url} | Total: ${fmt(result.total)}`;
         const textarea = document.getElementById('postTradeMessage');
         if (textarea) {
           textarea.value = commentText.slice(0, 155);
