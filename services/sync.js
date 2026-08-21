@@ -39,7 +39,7 @@ async function syncItem(item) {
     await db.query(
       `UPDATE monitored_items
        SET name = $1, last_sync = NOW(), retry_count = 0, last_error = NULL, last_error_date = NULL,
-           is_active = TRUE
+           is_active = TRUE, record_count = record_count + 1
        WHERE id = $2`,
       [data.name, id]
     );

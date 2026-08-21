@@ -87,8 +87,7 @@ router.get('/api/items', requireAuth, async (req, res) => {
         mi.*,
         latest.price       AS latest_price,
         latest.created_at  AS price_at,
-        latest.type        AS item_type,
-        COALESCE(cnt.record_count, 0) AS record_count
+        latest.type        AS item_type
       FROM monitored_items mi
       LEFT JOIN LATERAL (
         SELECT price, created_at, type
@@ -97,11 +96,6 @@ router.get('/api/items', requireAuth, async (req, res) => {
         ORDER BY created_at DESC
         LIMIT 1
       ) latest ON TRUE
-      LEFT JOIN (
-        SELECT item_id, COUNT(*) AS record_count
-        FROM item_market
-        GROUP BY item_id
-      ) cnt ON cnt.item_id = mi.torn_item_id
       ORDER BY mi.created_at DESC
     `);
     res.json(rows);

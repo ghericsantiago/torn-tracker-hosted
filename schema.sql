@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS monitored_items (
   api_key         TEXT NOT NULL,
   is_active       BOOLEAN DEFAULT TRUE,
   retry_count     INTEGER DEFAULT 0,
+  record_count    INTEGER DEFAULT 0,
   last_sync       TIMESTAMPTZ,
   last_error      TEXT,
   last_error_date TIMESTAMPTZ,
@@ -25,8 +26,9 @@ CREATE TABLE IF NOT EXISTS item_market (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_item_market_item_id ON item_market(item_id);
-CREATE INDEX IF NOT EXISTS idx_item_market_created  ON item_market(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_item_market_item_id      ON item_market(item_id);
+CREATE INDEX IF NOT EXISTS idx_item_market_created       ON item_market(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_item_market_item_created  ON item_market(item_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
