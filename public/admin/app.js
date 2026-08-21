@@ -568,6 +568,80 @@
     await Promise.all([loadStats(), loadItems()]);
   }
 
+  // ── Records history chart ──
+  let recordsChart = null;
+
+  document.getElementById('viewRecordsChartBtn').addEventListener('click', async () => {
+    document.getElementById('settingsModal').classList.add('hidden');
+    document.getElementById('recordsChartModal').classList.remove('hidden');
+    await loadRecordsChart();
+  });
+
+  document.getElementById('closeRecordsChart').addEventListener('click', () => {
+    document.getElementById('recordsChartModal').classList.add('hidden');
+  });
+  document.getElementById('recordsChartOverlay').addEventListener('click', () => {
+    document.getElementById('recordsChartModal').classList.add('hidden');
+  });
+
+  async function loadRecordsChart() {
+    const meta = document.getElementById('recordsChartMeta');
+    meta.textContent = 'Loading…';
+    const res = await api('/admin/api/stats/records-history');
+    if (!res || !res.ok) { meta.textContent = 'Failed to load data.'; return; }
+    const { rows, days } = await res.json();
+
+    const labels = rows.map(r => r.day);
+    const data   = rows.map(r => Number(r.count));
+    const total  = data.reduce((s, v) => s + v, 0);
+    meta.textContent = `${total.toLocaleString()} total records over ${days ? `last ${days} days` : 'all time'} · ${rows.length} days with data`;
+
+    const ctx = document.getElementById('recordsChartCanvas').getContext('2d');
+    if (recordsChart) {
+      recordsChart.data.labels   = labels;
+      recordsChart.data.datasets[0].data = data;
+      recordsChart.update('none');
+      return;
+    }
+    recordsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Records added',
+          data,
+          backgroundColor: 'rgba(110,231,247,0.25)',
+          borderColor:     '#6ee7f7',
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${Number(ctx.parsed.y).toLocaleString()} records`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 14, maxRotation: 45 },
+            grid:  { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            ticks: { color: '#64748b', callback: v => Number(v).toLocaleString() },
+            grid:  { color: 'rgba(255,255,255,0.06)' },
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+  }
+
   // Auto-refresh every 30s
   loadSettings();
   refresh();

@@ -203,6 +203,29 @@
           </div>
           <span class="sync-time" id="cleanupTime"></span>
         </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Records History</div>
+          <p class="settings-desc">Daily records added over the retention window.</p>
+          <button id="viewRecordsChartBtn" class="btn btn-ghost btn-sm">View Chart</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Records history chart modal -->
+    <div id="recordsChartModal" class="modal hidden">
+      <div class="modal-overlay" id="recordsChartOverlay"></div>
+      <div class="glass-card modal-card" style="max-width:660px;width:96vw">
+        <div class="modal-header">
+          <h3>Daily Records Added</h3>
+          <button class="btn-close" id="closeRecordsChart">&times;</button>
+        </div>
+        <div style="position:relative;height:280px;margin-top:.5rem">
+          <canvas id="recordsChartCanvas"></canvas>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:.75rem" id="recordsChartMeta"></p>
       </div>
     </div>
 
@@ -220,6 +243,7 @@
 
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
   <script>
     // Burger menu

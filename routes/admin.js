@@ -310,6 +310,27 @@ router.get('/api/torn-items', requireAuth, async (req, res) => {
   }
 });
 
+// Daily records history (grouped by UTC day, limited to retention window)
+router.get('/api/stats/records-history', requireAuth, async (req, res) => {
+  try {
+    const { rows: sRows } = await db.query(
+      `SELECT value FROM settings WHERE key = 'retention_days'`
+    );
+    const days = parseInt(sRows[0]?.value) || 30;
+    const interval = days > 0 ? `${days} days` : '90 days';
+    const { rows } = await db.query(
+      `SELECT DATE(created_at) AS day, COUNT(*) AS count
+       FROM item_market
+       WHERE created_at >= NOW() - INTERVAL '${interval}'
+       GROUP BY day
+       ORDER BY day ASC`
+    );
+    res.json({ rows, days: days > 0 ? days : null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Stats
 router.get('/api/stats', requireAuth, async (req, res) => {
   try {
