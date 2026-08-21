@@ -84,6 +84,18 @@ body {
 .btn-icon:hover { color: var(--text); background: var(--glass-hover); }
 .btn-icon.danger:hover { color: var(--error); }
 
+.priority-select {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.priority-select:focus { outline: 1px solid var(--accent); }
+
 /* ── Form fields ── */
 .field {
   display: flex;

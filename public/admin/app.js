@@ -165,7 +165,7 @@
   let statusFilter = null; // null | 'inactive' | 'error'
   let tablePage   = 0;
   const PAGE_SIZE = 20;
-  const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count']);
+  const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count', 'priority']);
   const selectedIds = new Set();
 
   const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
@@ -265,6 +265,9 @@
     return `<span class="mono" style="font-size:0.75rem">${new Date(t).toLocaleString()}</span>`;
   }
 
+  const PRIORITY_LABELS = ['', 'P1 · 1m', 'P2 · 5m', 'P3 · 15m', 'P4 · 30m', 'P5 · 1h', 'P6 · 1d'];
+  function priorityLabel(p) { return PRIORITY_LABELS[p] || `P${p}`; }
+
   function renderTablePage(page, total, totalPages) {
     const tbody = document.getElementById('itemsBody');
     tbody.innerHTML = page.length
@@ -275,6 +278,11 @@
             <td>${item.name || '<span style="color:var(--text-muted)">Pending…</span>'}</td>
             <td style="color:var(--text-dim);font-size:11px">${item.item_type || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${badge(item)}</td>
+            <td>
+              <select class="priority-select" data-id="${item.id}" title="Sync frequency">
+                ${[1,2,3,4,5,6].map(p => `<option value="${p}" ${(item.priority||4)===p?'selected':''}>${priorityLabel(p)}</option>`).join('')}
+              </select>
+            </td>
             <td>${fmtPrice(item.latest_price)}</td>
             <td>${fmtTime(item.last_sync)}</td>
             <td class="mono" style="color:${item.retry_count > 3 ? 'var(--error)' : 'var(--text-dim)'}">${item.retry_count}</td>
@@ -291,7 +299,7 @@
               </div>
             </td>
           </tr>`).join('')
-      : `<tr><td colspan="10" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+      : `<tr><td colspan="11" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
 
     // wire row checkboxes after render
     tbody.querySelectorAll('.row-check').forEach(cb => {
@@ -299,6 +307,16 @@
         const id = Number(cb.dataset.id);
         if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
         updateBulkBar();
+      });
+    });
+
+    // wire priority selects after render
+    tbody.querySelectorAll('.priority-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        await api(`/admin/api/items/${sel.dataset.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ priority: Number(sel.value) }),
+        });
       });
     });
 

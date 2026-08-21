@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS monitored_items (
   name            VARCHAR(255),
   api_key         TEXT NOT NULL,
   is_active       BOOLEAN DEFAULT TRUE,
+  priority        INTEGER DEFAULT 4,
   retry_count     INTEGER DEFAULT 0,
   record_count    INTEGER DEFAULT 0,
   last_sync       TIMESTAMPTZ,

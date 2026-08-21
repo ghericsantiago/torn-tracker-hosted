@@ -88,8 +88,21 @@ async function syncAllItems() {
   try {
     const { rows } = await db.query(
       `SELECT * FROM monitored_items
-       WHERE is_active = TRUE
-          OR (last_error IS NOT NULL AND last_error_date < NOW() - INTERVAL '1 hour')
+       WHERE (
+         is_active = TRUE
+         AND (
+           last_sync IS NULL OR
+           last_sync < NOW() - (CASE priority
+             WHEN 1 THEN INTERVAL '1 minute'
+             WHEN 2 THEN INTERVAL '5 minutes'
+             WHEN 3 THEN INTERVAL '15 minutes'
+             WHEN 4 THEN INTERVAL '30 minutes'
+             WHEN 5 THEN INTERVAL '1 hour'
+             WHEN 6 THEN INTERVAL '1 day'
+             ELSE           INTERVAL '30 minutes'
+           END)
+         )
+       ) OR (last_error IS NOT NULL AND last_error_date < NOW() - INTERVAL '1 hour')
        ORDER BY last_sync ASC NULLS FIRST`
     );
 

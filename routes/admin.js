@@ -125,12 +125,13 @@ router.post('/api/items', requireAuth, async (req, res) => {
 // Update item (toggle active, change api_key)
 router.put('/api/items/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { is_active, api_key } = req.body;
+  const { is_active, api_key, priority } = req.body;
   try {
     const updates = [];
     const params = [];
     if (is_active !== undefined) { params.push(is_active); updates.push(`is_active = $${params.length}`); }
     if (api_key)                 { params.push(api_key.trim()); updates.push(`api_key = $${params.length}`); }
+    if (priority !== undefined)  { params.push(Math.min(6, Math.max(1, parseInt(priority)))); updates.push(`priority = $${params.length}`); }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     params.push(id);
     const { rows } = await db.query(
