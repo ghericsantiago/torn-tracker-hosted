@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Torn Bazaar Pricer
 // @namespace    https://itrade.devs.surf
-// @version      1.3
-// @description  Price chart button per item on the Torn manage bazaar page
+// @version      1.4
+// @description  Price chart button on Torn bazaar manage and add-item pages
 // @match        https://www.torn.com/bazaar.php*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
@@ -39,6 +39,8 @@
     if (type === 'pct') return Math.max(0, Math.floor(lowest * (1 - amount / 100)));
     return Math.max(0, lowest - Math.floor(amount));
   }
+
+  function isAddPage() { return location.hash.startsWith('#/add'); }
 
   function fetchJSON(url) {
     return new Promise((resolve, reject) => {
@@ -179,6 +181,29 @@
       cursor: pointer; transition: all 0.12s; user-select: none;
     }
     #bp-reset-btn:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: #f87171; }
+
+    #bp-add-filter-wrap {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin: 6px 4px 4px; vertical-align: middle;
+    }
+    .bp-filter-btn-add {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 5px;
+      background: rgba(110,231,247,0.07); border: 1px solid rgba(110,231,247,0.2);
+      color: #6ee7f7; font-size: 11px; font-family: Arial, sans-serif;
+      cursor: pointer; transition: all 0.12s; user-select: none;
+    }
+    .bp-filter-btn-add:hover { background: rgba(110,231,247,0.15); }
+    .bp-filter-btn-add.active { background: rgba(110,231,247,0.18); border-color: rgba(110,231,247,0.45); }
+    .bp-filter-btn-add:disabled { opacity: 0.35; cursor: default; }
+    .bp-filter-count { background: rgba(110,231,247,0.2); border-radius: 10px; padding: 0 6px; font-size: 10px; font-weight: 700; }
+    .bp-reset-btn-add {
+      padding: 4px 9px; border-radius: 5px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      color: #94a3b8; font-size: 11px; font-family: Arial, sans-serif;
+      cursor: pointer; transition: all 0.12s; user-select: none;
+    }
+    .bp-reset-btn-add:hover { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: #f87171; }
   `);
 
   // ── Modal DOM (created once) ───────────────────────────────────────────────
@@ -242,6 +267,9 @@
   let viewDate       = null;
   let bazaarList     = null;
   let listObserver   = null;
+  let addObserver    = null;
+  let addFilterBtn   = null;
+  let addFilterActive = false;
   const pricedItems  = loadPricedItems();
   let filterActive   = false;
   let filterBtn      = null;
@@ -511,9 +539,19 @@
 
   // ── Open modal ────────────────────────────────────────────────────────────
   function getCurrentPrice(row) {
+    // Manage page: React hidden input
     const hidden = row.querySelector('.price___WxxqO input[type="hidden"]');
-    const val = parseInt(hidden?.value, 10);
-    return isNaN(val) || val <= 0 ? null : val;
+    if (hidden) {
+      const val = parseInt(hidden.value, 10);
+      return isNaN(val) || val <= 0 ? null : val;
+    }
+    // Add page: tornInputMoney text input (value is raw number, no commas)
+    const moneyInp = row.querySelector('div.price input.input-money');
+    if (moneyInp) {
+      const val = parseInt(moneyInp.value.replace(/,/g, ''), 10);
+      return isNaN(val) || val <= 0 ? null : val;
+    }
+    return null;
   }
 
   function openModal(row) {
@@ -541,7 +579,37 @@
     fetchChartData(++loadToken);
   }
 
-  // ── Apply price to React input ────────────────────────────────────────────
+  // ── Apply price: handles both manage page (React inputs) and add page (tornInputMoney)
+  function applyPriceToRow(row, applied) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    if (row.tagName === 'LI') {
+      // Add page: plain text input managed by tornInputMoney jQuery plugin
+      const inp = row.querySelector('div.price input.input-money');
+      if (!inp) return;
+      setter.call(inp, String(applied));
+      inp.dispatchEvent(new Event('input',  { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+      if (window.jQuery) window.jQuery(inp).trigger('change').trigger('input');
+    } else {
+      // Manage page: React hidden + visible inputs
+      const wrap = row.querySelector('.price___WxxqO');
+      if (!wrap) return;
+      const hidden  = wrap.querySelector('input[type="hidden"]');
+      const visible = wrap.querySelector('input:not([type="hidden"])');
+      if (hidden) {
+        setter.call(hidden, String(applied));
+        hidden.dispatchEvent(new Event('input',  { bubbles: true }));
+        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (visible) {
+        setter.call(visible, String(applied));
+        visible.dispatchEvent(new Event('input',  { bubbles: true }));
+        visible.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  }
+
+  // ── Apply button ──────────────────────────────────────────────────────────
   elApplyBtn.addEventListener('click', () => {
     if (!currentRow) return;
 
@@ -556,31 +624,16 @@
       return;
     }
 
-    const wrap   = currentRow.querySelector('.price___WxxqO');
-    if (!wrap) return;
+    applyPriceToRow(currentRow, applied);
 
-    const hidden  = wrap.querySelector('input[type="hidden"]');
-    const visible = wrap.querySelector('input:not([type="hidden"])');
-    const setter  = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-
-    if (hidden) {
-      setter.call(hidden, String(applied));
-      hidden.dispatchEvent(new Event('input',  { bubbles: true }));
-      hidden.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    if (visible) {
-      setter.call(visible, String(applied));
-      visible.dispatchEvent(new Event('input',  { bubbles: true }));
-      visible.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    // Mark as recently priced. It will automatically expire after 30 minutes.
     pricedItems.set(currentItemId, Date.now());
     savePricedItems();
     updateFilterBtn();
+    updateAddFilterBtn();
     const chartBtn = currentRow.querySelector('.bp-chart-btn');
     if (chartBtn) chartBtn.textContent = '✓';
-    applyFilterToRow(currentRow);
+    if (isAddPage()) applyAddFilter();
+    else applyFilterToRow(currentRow);
 
     closeModal();
   });
@@ -670,16 +723,132 @@
   function refreshExpiredPricedItems() {
     if (!pruneExpiredPricedItems()) return;
     updateFilterBtn();
+    updateAddFilterBtn();
     if (bazaarList) {
       bazaarList.querySelectorAll('div.row___mbuuh[data-testid="sortable-item"]').forEach(row => {
         const btn = row.querySelector('.bp-chart-btn');
         if (btn) btn.textContent = pricedItems.has(row.dataset.bpId) ? '✓' : '📈';
       });
+      applyFilter();
     }
-    applyFilter();
+    if (isAddPage()) {
+      document.querySelectorAll('li.clearfix[data-reactid]').forEach(li => {
+        if (!li.dataset.bpId) return;
+        const btn = li.querySelector('.bp-chart-btn');
+        if (btn) btn.textContent = pricedItems.has(li.dataset.bpId) ? '✓' : '📈';
+      });
+      applyAddFilter();
+    }
   }
 
   setInterval(refreshExpiredPricedItems, 30 * 1000);
+
+  // ── Add page: inject chart button into li row ─────────────────────────────
+  function injectAddRow(li) {
+    if (li.dataset.bpInjected) return;
+    li.dataset.bpInjected = '1';
+
+    const img = li.querySelector('img[src*="/images/items/"]');
+    if (!img) return;
+    const match = img.getAttribute('src').match(/\/images\/items\/(\d+)\//);
+    if (!match) return;
+
+    const nameEl = li.querySelector('.name-wrap .t-overflow');
+    li.dataset.bpId   = match[1];
+    li.dataset.bpName = nameEl ? nameEl.textContent.trim() : `Item #${match[1]}`;
+
+    const priceDiv = li.querySelector('div.price');
+    if (!priceDiv) return;
+
+    const btn = document.createElement('button');
+    btn.className   = 'bp-chart-btn';
+    btn.textContent = pricedItems.has(match[1]) ? '✓' : '📈';
+    btn.title       = 'Show price chart';
+    btn.type        = 'button';
+    btn.addEventListener('click', e => { e.stopPropagation(); openModal(li); });
+    priceDiv.appendChild(btn);
+  }
+
+  function scanAddRows() {
+    document.querySelectorAll('li.clearfix[data-reactid]').forEach(li => {
+      if (li.querySelector('div.price input.input-money')) injectAddRow(li);
+    });
+  }
+
+  // ── Add page filter ───────────────────────────────────────────────────────
+  function updateAddFilterBtn() {
+    if (!addFilterBtn) return;
+    pruneExpiredPricedItems();
+    const n = pricedItems.size;
+    if (n === 0) addFilterActive = false;
+    addFilterBtn.disabled = n === 0;
+    addFilterBtn.classList.toggle('active', addFilterActive);
+    addFilterBtn.querySelector('.bp-filter-count').textContent = n;
+    addFilterBtn.title = addFilterActive ? 'Click to show all items' : 'Hide items priced in the last 30 minutes';
+  }
+
+  function applyAddFilter() {
+    document.querySelectorAll('li.clearfix[data-reactid]').forEach(li => {
+      if (!li.dataset.bpId) return;
+      li.style.display = (addFilterActive && pricedItems.has(li.dataset.bpId)) ? 'none' : '';
+    });
+  }
+
+  function injectAddFilterBtn(container) {
+    if (document.getElementById('bp-add-filter-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'bp-add-filter-wrap';
+
+    addFilterBtn = document.createElement('button');
+    addFilterBtn.id        = 'bp-add-filter-btn';
+    addFilterBtn.type      = 'button';
+    addFilterBtn.innerHTML = `Hide recent <span class="bp-filter-count">0</span>`;
+    addFilterBtn.classList.add('bp-filter-btn-add');
+    addFilterBtn.disabled  = true;
+    addFilterBtn.addEventListener('click', () => {
+      if (pricedItems.size === 0) return;
+      addFilterActive = !addFilterActive;
+      updateAddFilterBtn();
+      applyAddFilter();
+    });
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type        = 'button';
+    resetBtn.textContent = 'Reset';
+    resetBtn.classList.add('bp-reset-btn-add');
+    resetBtn.title       = 'Clear all priced items';
+    resetBtn.addEventListener('click', () => {
+      pricedItems.clear();
+      savePricedItems();
+      addFilterActive = false;
+      updateAddFilterBtn();
+      applyAddFilter();
+      document.querySelectorAll('li.clearfix[data-reactid] .bp-chart-btn').forEach(b => { b.textContent = '📈'; });
+    });
+
+    wrap.appendChild(addFilterBtn);
+    wrap.appendChild(resetBtn);
+    container.insertAdjacentElement('beforebegin', wrap);
+    updateAddFilterBtn();
+  }
+
+  // ── Add page observer ─────────────────────────────────────────────────────
+  function startAddObserver() {
+    if (addObserver) { addObserver.disconnect(); addObserver = null; }
+    const bazaarRoot = document.getElementById('bazaarRoot') || document.body;
+
+    function tryInject() {
+      scanAddRows();
+      const firstUl = bazaarRoot.querySelector('ul.items-cont');
+      if (firstUl && firstUl.parentElement && !document.getElementById('bp-add-filter-wrap')) {
+        injectAddFilterBtn(firstUl.parentElement);
+      }
+    }
+
+    tryInject();
+    addObserver = new MutationObserver(tryInject);
+    addObserver.observe(bazaarRoot, { childList: true, subtree: true });
+  }
 
   // ── Inject chart button into a bazaar row ─────────────────────────────────
   function injectRow(row) {
@@ -734,18 +903,27 @@
     listObserver.observe(list, { childList: true, subtree: true });
   }
 
-  startObserver();
+  // ── Init: route to the right observer based on hash ──────────────────────
+  function init() {
+    if (isAddPage()) {
+      if (listObserver) { listObserver.disconnect(); listObserver = null; bazaarList = null; }
+      setTimeout(startAddObserver, 600);
+    } else {
+      if (addObserver) { addObserver.disconnect(); addObserver = null; }
+      startObserver();
+    }
+  }
 
-  // Torn can replace the entire virtualized list during a React refresh.
-  // Reattach our controls and row observer without touching Torn's layout state.
+  window.addEventListener('hashchange', init);
+  init();
+
+  // Reattach if Torn replaces the manage list during a React refresh
   let rebindQueued = false;
   new MutationObserver(() => {
+    if (isAddPage()) return;
     if (bazaarList?.isConnected && document.getElementById('bp-filter-btn')) return;
     if (rebindQueued) return;
     rebindQueued = true;
-    requestAnimationFrame(() => {
-      rebindQueued = false;
-      startObserver();
-    });
+    requestAnimationFrame(() => { rebindQueued = false; startObserver(); });
   }).observe(document.body, { childList: true, subtree: true });
 })();
