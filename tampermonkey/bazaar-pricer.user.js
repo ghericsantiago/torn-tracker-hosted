@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name         Torn Bazaar Pricer
+// @name         Torn Bazaar & Item Market Pricer
 // @namespace    https://itrade.devs.surf
-// @version      3.2
-// @description  Price chart button on Torn bazaar manage and add-item pages
+// @version      3.3
+// @description  Price chart buttons for Torn Bazaar and Item Market listing pages
 // @match        https://www.torn.com/bazaar.php*
+// @match        https://www.torn.com/page.php*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -40,7 +41,15 @@
     return Math.max(0, lowest - Math.floor(amount));
   }
 
-  function isAddPage() { return location.hash.startsWith('#/add'); }
+  function isBazaarPage() { return location.pathname.endsWith('/bazaar.php'); }
+
+  function isAddPage() { return isBazaarPage() && location.hash.startsWith('#/add'); }
+
+  function isItemMarketAddPage() {
+    return location.pathname.endsWith('/page.php') &&
+      new URLSearchParams(location.search).get('sid') === 'ItemMarket' &&
+      location.hash.startsWith('#/addListing');
+  }
 
   function fetchJSON(url) {
     return new Promise((resolve, reject) => {
@@ -225,6 +234,14 @@
     li.clearfix[data-group] .name-wrap .bp-chart-btn.bp-add-name-chart {
       width: 30px; min-width: 30px; height: 24px; padding: 0; margin: 0 2px 0 0;
       flex: 0 0 30px;
+    }
+    .bp-market-price-wrap {
+      display: flex !important; align-items: center; gap: 4px;
+    }
+    .bp-market-price-wrap > .input-money-group { flex: 1 1 auto; min-width: 0; }
+    .bp-market-price-wrap > .bp-chart-btn {
+      width: 32px; min-width: 32px; height: 28px; padding: 0; margin: 0;
+      flex: 0 0 32px;
     }
   `);
 
@@ -561,6 +578,11 @@
 
   // ── Open modal ────────────────────────────────────────────────────────────
   function getCurrentPrice(row) {
+    if (row.dataset.bpMarketAdd) {
+      const priceInput = row.querySelector('input[aria-label$=" price"]');
+      const val = parseInt((priceInput?.value || '').replace(/,/g, ''), 10);
+      return isNaN(val) || val <= 0 ? null : val;
+    }
     // Manage page: React hidden input
     const hidden = row.querySelector('.price___WxxqO input[type="hidden"]');
     if (hidden) {
@@ -647,7 +669,26 @@
   // ── Apply price: handles both manage page (React inputs) and add page (tornInputMoney)
   function applyPriceToRow(row, applied) {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    if (row.tagName === 'LI') {
+    if (row.dataset.bpMarketAdd) {
+      const priceInputs = [...row.querySelectorAll('input[aria-label$=" price"], input[placeholder="Price"]')];
+      const amountInputs = [...row.querySelectorAll('input[aria-label$=" amount"], input[placeholder="Qty"]')]
+        .filter(input => input.type !== 'button');
+      const maxQty = amountInputs.find(input => input.dataset.money)?.dataset.money;
+
+      priceInputs.forEach(input => {
+        setter.call(input, String(applied));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      if (maxQty && maxQty !== 'Infinity') {
+        amountInputs.forEach(input => {
+          setter.call(input, maxQty);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
+      return priceInputs.length > 0;
+    } else if (row.tagName === 'LI') {
       // Add page: price — plain text input managed by tornInputMoney jQuery plugin
       const inp = row.querySelector('div.price input.input-money');
       if (inp) {
@@ -722,7 +763,9 @@
     updateAddFilterBtn();
     const chartBtn = currentRow.querySelector('.bp-chart-btn');
     if (chartBtn) chartBtn.textContent = '✓';
-    if (isAddPage()) applyAddFilter();
+    if (currentRow.dataset.bpMarketAdd) {
+      // Item Market has no recently-priced row filter.
+    } else if (isAddPage()) applyAddFilter();
     else applyFilterToRow(currentRow);
 
     const populatedRow = currentRow;
@@ -890,6 +933,52 @@
     });
   }
 
+  // ── Item Market add-listing page ──────────────────────────────────────────
+  function injectMarketAddRow(row) {
+    if (row.querySelector('.bp-chart-btn')) return;
+    const img = row.querySelector('img[src*="/images/items/"]');
+    const match = img?.getAttribute('src')?.match(/\/images\/items\/(\d+)\//);
+    const priceWrap = row.querySelector('[class*="priceInputWrapper___"]');
+    if (!match || !priceWrap) return;
+
+    const name = img.alt?.trim() ||
+      row.querySelector('[class*="name___"]')?.textContent.trim() || `Item #${match[1]}`;
+    row.dataset.bpId = match[1];
+    row.dataset.bpName = name;
+    row.dataset.bpMarketAdd = '1';
+    priceWrap.classList.add('bp-market-price-wrap');
+
+    const btn = document.createElement('button');
+    btn.className = 'bp-chart-btn';
+    btn.textContent = pricedItems.has(match[1]) ? '✓' : '📈';
+    btn.title = 'Show price chart';
+    btn.type = 'button';
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend']
+      .forEach(type => btn.addEventListener(type, event => event.stopPropagation()));
+    btn.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openModal(row);
+    });
+    priceWrap.appendChild(btn);
+  }
+
+  function scanMarketAddRows(root = document) {
+    root.querySelectorAll('[class*="itemRowWrapper___"]').forEach(injectMarketAddRow);
+  }
+
+  function startMarketAddObserver() {
+    const root = document.getElementById('item-market-root');
+    if (!root) {
+      setTimeout(startMarketAddObserver, 500);
+      return;
+    }
+    scanMarketAddRows(root);
+    if (addObserver) addObserver.disconnect();
+    addObserver = new MutationObserver(() => scanMarketAddRows(root));
+    addObserver.observe(root, { childList: true, subtree: true });
+  }
+
   // ── Add page filter ───────────────────────────────────────────────────────
   function updateAddFilterBtn() {
     if (!addFilterBtn) return;
@@ -1026,12 +1115,18 @@
 
   // ── Init: route to the right observer based on hash ──────────────────────
   function init() {
-    if (isAddPage()) {
+    if (isItemMarketAddPage()) {
+      if (listObserver) { listObserver.disconnect(); listObserver = null; bazaarList = null; }
+      startMarketAddObserver();
+    } else if (isAddPage()) {
       if (listObserver) { listObserver.disconnect(); listObserver = null; bazaarList = null; }
       setTimeout(startAddObserver, 600);
-    } else {
+    } else if (isBazaarPage()) {
       if (addObserver) { addObserver.disconnect(); addObserver = null; }
       startObserver();
+    } else {
+      if (addObserver) { addObserver.disconnect(); addObserver = null; }
+      if (listObserver) { listObserver.disconnect(); listObserver = null; bazaarList = null; }
     }
   }
 
@@ -1041,7 +1136,7 @@
   // Reattach if Torn replaces the manage list during a React refresh
   let rebindQueued = false;
   new MutationObserver(() => {
-    if (isAddPage()) return;
+    if (!isBazaarPage() || isAddPage() || isItemMarketAddPage()) return;
     if (bazaarList?.isConnected && document.getElementById('bp-filter-btn')) return;
     if (rebindQueued) return;
     rebindQueued = true;

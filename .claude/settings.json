@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh ubuntu@140.245.47.60 \"cd ~/torn-tracker && git pull && pm2 restart all 2>&1 | tail -6\")",
+      "Bash(git commit -m ' *)",
+      "Bash(ssh -i \"C:\\\\Users\\\\My PC\\\\.ssh\\\\id_ed25519\" -o StrictHostKeyChecking=no ubuntu@140.245.47.60 \"cd torn-tracker && git pull && pm2 restart torn-tracker --update-env && pm2 logs torn-tracker --lines 5 --nostream\")"
+    ]
+  }
+}
