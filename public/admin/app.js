@@ -591,7 +591,7 @@
     if (!res || !res.ok) { meta.textContent = 'Failed to load data.'; return; }
     const { rows, days } = await res.json();
 
-    const labels = rows.map(r => r.day);
+    const labels = rows.map(r => new Date(r.day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
     const data   = rows.map(r => Number(r.count));
     const total  = data.reduce((s, v) => s + v, 0);
     meta.textContent = `${total.toLocaleString()} total records over ${days ? `last ${days} days` : 'all time'} · ${rows.length} days with data`;
