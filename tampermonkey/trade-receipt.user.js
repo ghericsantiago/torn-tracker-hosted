@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      3.0
+// @version      3.1
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -15,7 +15,7 @@
 
   // ── CONFIG ───────────────────────────────────────────────────────────────────
   // RECEIPT_TOKEN: go to your Admin Dashboard → Settings → "Receipt Token" → Copy
-  const APP_URL       = 'https://torn-imarket-tracker.gvsantiago.com';
+  const APP_URL       = 'https://itrade.devs.surf';
   const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   // ─────────────────────────────────────────────────────────────────────────────
 
