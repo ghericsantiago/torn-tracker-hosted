@@ -44,8 +44,12 @@
     document.getElementById('receiptContent').classList.remove('hidden');
 
     document.getElementById('receiptTradeId').textContent = `#${r.trade_id}`;
-    document.getElementById('buyerName').textContent  = r.seller_name || `Player #${r.seller_id}` || '—';
-    document.getElementById('sellerName').textContent = r.buyer_name  || `Player #${r.buyer_id}`  || '—';
+    // PoorMe is always the buyer — detect which DB field they landed in
+    const poorMeIsSeller = r.seller_name === 'PoorMe';
+    const buyerDisplay  = poorMeIsSeller ? (r.seller_name || `Player #${r.seller_id}`) : (r.buyer_name  || `Player #${r.buyer_id}`);
+    const sellerDisplay = poorMeIsSeller ? (r.buyer_name  || `Player #${r.buyer_id}`)  : (r.seller_name || `Player #${r.seller_id}`);
+    document.getElementById('buyerName').textContent  = buyerDisplay  || '—';
+    document.getElementById('sellerName').textContent = sellerDisplay || '—';
     document.getElementById('createdAt').textContent  = fmtDate(r.created_at);
 
     // Status
