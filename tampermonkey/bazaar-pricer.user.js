@@ -495,7 +495,7 @@
 
   // ── Prev / Next day ───────────────────────────────────────────────────────
   elPrevDay.addEventListener('click', () => {
-    resetSelectedUI();
+    selectedPrice = null;
     viewDate = new Date(viewDate.getTime() - 86400000);
     updateDateNav();
     fetchChartData(++loadToken);
@@ -503,7 +503,7 @@
 
   elNextDay.addEventListener('click', () => {
     if (isToday(viewDate)) return;
-    resetSelectedUI();
+    selectedPrice = null;
     viewDate = new Date(viewDate.getTime() + 86400000);
     updateDateNav();
     fetchChartData(++loadToken);

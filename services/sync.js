@@ -65,6 +65,19 @@ async function syncItem(item) {
   }
 }
 
+async function syncGroup(items) {
+  let inserted = 0, skipped = 0, errors = 0, rateLimited = 0;
+  for (let i = 0; i < items.length; i++) {
+    const result = await syncItem(items[i]);
+    if (result.inserted)         inserted++;
+    else if (result.skipped)     skipped++;
+    else if (result.rateLimited) rateLimited++;
+    else                         errors++;
+    if (i < items.length - 1) await sleep(PACE_MS);
+  }
+  return { inserted, skipped, errors, rateLimited };
+}
+
 async function syncAllItems() {
   if (syncRunning) {
     console.warn('[sync] Previous run still in progress — skipping this tick');
@@ -80,22 +93,25 @@ async function syncAllItems() {
        ORDER BY last_sync ASC NULLS FIRST`
     );
 
-    let inserted = 0, skipped = 0, errors = 0, rateLimited = 0;
-    for (let i = 0; i < rows.length; i++) {
-      const result = await syncItem(rows[i]);
-      if (result.inserted)    inserted++;
-      else if (result.skipped)     skipped++;
-      else if (result.rateLimited) rateLimited++;
-      else                         errors++;
-
-      // Pace requests — skip delay after the last item
-      if (i < rows.length - 1) await sleep(PACE_MS);
+    // Group by api_key — each key's items run sequentially (700ms paced),
+    // but different keys run in parallel
+    const groups = new Map();
+    for (const row of rows) {
+      if (!groups.has(row.api_key)) groups.set(row.api_key, []);
+      groups.get(row.api_key).push(row);
     }
 
+    const results = await Promise.all([...groups.values()].map(syncGroup));
+
     if (rows.length > 0) {
-      const parts = [`+${inserted} inserted`, `${skipped} skipped`, `${errors} errors`];
-      if (rateLimited) parts.push(`${rateLimited} rate-limited`);
-      console.log(`[sync] ${new Date().toISOString()} — ${rows.length} items: ${parts.join(', ')}`);
+      const t = results.reduce(
+        (a, r) => ({ inserted: a.inserted + r.inserted, skipped: a.skipped + r.skipped,
+                     errors: a.errors + r.errors, rateLimited: a.rateLimited + r.rateLimited }),
+        { inserted: 0, skipped: 0, errors: 0, rateLimited: 0 }
+      );
+      const parts = [`+${t.inserted} inserted`, `${t.skipped} skipped`, `${t.errors} errors`];
+      if (t.rateLimited) parts.push(`${t.rateLimited} rate-limited`);
+      console.log(`[sync] ${new Date().toISOString()} — ${rows.length} items / ${groups.size} key(s): ${parts.join(', ')}`);
     }
   } finally {
     syncRunning = false;
