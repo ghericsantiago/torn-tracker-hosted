@@ -38,6 +38,21 @@ app.use('/api/portfolio',   require('./routes/portfolio'));
 app.use('/admin/torn',  require('./routes/torn'));
 app.use('/torn',       require('./routes/torn'));
 
+// Tampermonkey REST sync endpoints — GM_xmlhttpRequest bypasses Torn's CSP
+// GET  /api/sync        → returns full syncStore as JSON
+// PUT  /api/sync        → merges body into syncStore, returns updated store
+app.get('/api/sync', (req, res) => {
+  res.json(syncStore);
+});
+app.put('/api/sync', (req, res) => {
+  const sections = req.body;
+  if (sections && typeof sections === 'object' && !Array.isArray(sections)) {
+    Object.assign(syncStore, sections);
+    console.log(`[sync] REST PUT sections: ${Object.keys(sections).join(', ')}`);
+  }
+  res.json(syncStore);
+});
+
 // Start server
 const server = http.createServer(app);
 

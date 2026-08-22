@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Torn Property Vault Auto Withdraw/Deposit
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  Maintain a target cash-on-hand value by auto depositing or withdrawing from the property vault. Mobile floating panel supported.
 // @author       GitHub Copilot
 // @match        https://www.torn.com/properties.php*
@@ -10,7 +10,6 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @connect      140.245.47.60
-// @require      https://cdn.socket.io/4.8.1/socket.io.min.js
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -73,8 +72,8 @@
   const STORAGE_KEY = "tornVaultAutoSettings";
   const api = new TornAPI(GM_getValue('tornApiKey', ''));
 
-  // =================== SOCKET.IO SYNC ===================
-  const SOCKET_URL = "http://140.245.47.60:3001";
+  // =================== REST SYNC ===================
+  const SYNC_URL = "http://140.245.47.60:3001/api/sync";
 
   const loadSettings = (defaults) => {
     try {
@@ -96,12 +95,33 @@
     scheduleCloudSave("vault", CONFIG);
   };
 
-  // =================== SOCKET.IO SYNC HELPERS ===================
+  // =================== REST SYNC HELPERS ===================
   const CONTROLLER_ONLY_KEY = "tmAutoFlyControllerOnly";
   function isControllerOnly() { return localStorage.getItem(CONTROLLER_ONLY_KEY) === "true"; }
-  let _socket = null;
   let _cloudSavePending = {};
   let _cloudSaveTimer = null;
+  let _pollInterval = null;
+
+  function gmSyncGet(cb) {
+    GM_xmlhttpRequest({
+      method: "GET", url: SYNC_URL, timeout: 10000,
+      onload: (r) => {
+        if (r.status >= 200 && r.status < 300) {
+          try { cb(JSON.parse(r.responseText)); } catch(e) {}
+        }
+      },
+      onerror: () => {}, ontimeout: () => {},
+    });
+  }
+
+  function gmSyncSet(sections) {
+    GM_xmlhttpRequest({
+      method: "PUT", url: SYNC_URL, timeout: 10000,
+      headers: { "Content-Type": "application/json" },
+      data: JSON.stringify(sections),
+      onload: () => {}, onerror: () => {}, ontimeout: () => {},
+    });
+  }
 
   let _cloudStatusClearTimer = null;
   function setCloudSaveStatus(state) {
@@ -135,14 +155,9 @@
       _cloudSavePending = {};
       _cloudSaveTimer = null;
       setCloudSaveStatus("saving");
-      if (_socket && _socket.connected) {
-        _socket.emit("sync:set", pending);
-        setCloudSaveStatus("saved");
-        console.log("[Vault] Sync saved via socket. Sections:", Object.keys(pending).join(", "));
-      } else {
-        setCloudSaveStatus("error");
-        console.warn("[Vault] Socket not connected — sync save dropped");
-      }
+      gmSyncSet(pending);
+      setCloudSaveStatus("saved");
+      console.log("[Vault] Sync saved. Sections:", Object.keys(pending).join(", "));
     }, 1500);
   }
 
@@ -162,41 +177,20 @@
     try { updateMaintainInfo(getVaultValues()); } catch(e) {}
   }
 
-  function initSocketSync() {
-    _socket = io(SOCKET_URL, { transports: ["websocket", "polling"] });
-
-    _socket.on("connect", () => {
-      console.log("[Vault] Socket connected:", _socket.id);
-      _socket.emit("sync:get", (store) => {
-        if (store) {
-          applyCloudSettings(store);
-          console.log("[Vault] Settings loaded from socket store");
-        }
-      });
-    });
-
-    _socket.on("sync:update", (sections) => {
-      applyCloudSettings(sections);
-      console.log("[Vault] Settings updated via socket:", Object.keys(sections).join(", "));
-    });
-
-    _socket.on("disconnect", () => {
-      console.warn("[Vault] Socket disconnected");
-    });
-
-    _socket.on("connect_error", (err) => {
-      console.warn("[Vault] Socket connection error:", err.message);
-    });
-  }
-
   const CLOUD_POLL_KEY = "tmCloudSyncPoll";
   function isCloudPollEnabled() {
     const v = localStorage.getItem(CLOUD_POLL_KEY);
     return v === null ? true : v === "true";
   }
-  function startCloudPoll() { if (isCloudPollEnabled()) initSocketSync(); }
+  function startCloudPoll() {
+    if (!isCloudPollEnabled()) return;
+    gmSyncGet((store) => { if (store) applyCloudSettings(store); });
+    _pollInterval = setInterval(() => {
+      gmSyncGet((store) => { if (store) applyCloudSettings(store); });
+    }, 15000);
+  }
   function stopCloudPoll() {
-    if (_socket) { _socket.disconnect(); _socket = null; }
+    if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
     const el = document.getElementById("tm-vault-cloud-next");
     if (el) el.textContent = "";
   }
