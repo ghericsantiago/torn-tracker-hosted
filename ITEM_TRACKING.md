@@ -405,14 +405,15 @@ comment supports
 `{url}`, `{total}`, and `{tradeId}` placeholders; Torn comments remain limited
 to 155 characters. Incoming-trade discovery watches the reactive global status
 icon whose `/trade.php` link has an `aria-label` beginning with `Trade pending:`.
-The userscript therefore runs on all Torn pages. A newly appearing alert opens
-the trade page; if it appears while an already-open trade list is stale, that
-list is refreshed exactly once. The alert label is persisted as a latch so the
-same notification cannot create a reload loop. No background trade-list
-requests are made. Movement between the list, selected-trade, and add-money
-views uses Torn's hash routes only. A missing alert must remain absent for five
-seconds before the latch resets, covering transient header rebuilds; selected
-trade and add-money routes are never refreshed by the alert listener.
+The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
+the status panel, and all automation operate only while a trade page is open.
+If a pending alert appears while an already-open trade list is stale, that list
+is refreshed exactly once. The alert label is persisted as a latch so the same
+notification cannot create a reload loop. No background trade-list requests
+are made. Movement between the list, selected-trade, and add-money views uses
+Torn's hash routes only. A missing alert must remain absent for five seconds
+before the latch resets, covering transient header rebuilds; selected trade and
+add-money routes are never refreshed by the alert listener.
 As an optional discovery source, the userscript polls Torn API v2
 `GET /user/trades?cat=ongoing` while enabled and idle. It requires a
 limited-access Torn API key configured in Settings, defaults to a 30-second
@@ -421,6 +422,8 @@ interval (minimum 15 seconds), and selects the ongoing trade with the earliest
 does not cache returned trade ids. Every poll includes a Unix-millisecond `_`
 query parameter so browsers and intermediary caches see a unique request URL;
 this does not override caching intentionally enforced by Torn's API servers.
+Polling stops when no Torn trade page is open because the userscript is not
+loaded on other pages.
 The Settings dialog also provides **Reset Automation**. After confirmation it
 restores the default timeout and messages, disables automation, and clears the
 active job, completed-trade history, pending-alert/navigation latches, and

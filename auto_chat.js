@@ -98,11 +98,29 @@
     // SEND MESSAGE
     // =========================================================
 
+    function openTradeChat() {
+        const btn = document.getElementById('channel_panel_button:public_trade');
+        if (btn) btn.click();
+        return !!btn;
+    }
+
+    function closeTradeChat() {
+        const btn = document.getElementById('channel_panel_button:public_trade');
+        if (btn) btn.click();
+    }
+
     async function sendMessage() {
+        let chatWasOpened = false;
 
         if (!isTradeOpen()) {
-            console.log('⏸️ Trade chat is not open. Message skipped.');
-            return;
+            const found = openTradeChat();
+            if (!found) {
+                console.log('⏸️ Trade chat closed and open button not found. Skipped.');
+                return;
+            }
+            chatWasOpened = true;
+            console.log('📂 Opened Trade chat, waiting for it to load...');
+            await sleep(1000);
         }
 
         const tradeChat = getTradeChat();
@@ -218,6 +236,12 @@
         console.log(
             `✅ Trade message sent at ${new Date().toLocaleTimeString()}`
         );
+
+        if (chatWasOpened) {
+            await sleep(500);
+            closeTradeChat();
+            console.log('📪 Trade chat closed.');
+        }
     }
 
     // =========================================================
@@ -294,14 +318,6 @@
 
             remaining = SEND_INTERVAL;
             updateButton();
-
-            if (!isTradeOpen()) {
-                console.log(
-                    '⏸️ 70 seconds reached, but Trade is closed. Skipping.'
-                );
-
-                return;
-            }
 
             await sendMessage();
 

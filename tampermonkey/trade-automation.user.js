@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.0.0
+// @version      2.0.1
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
-// @match        https://www.torn.com/*
+// @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
