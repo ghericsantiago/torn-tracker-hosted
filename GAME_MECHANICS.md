@@ -142,6 +142,14 @@ Example: exchanging **2 × Plushie Set** deducts `2× Sheep Plushie, 2× Teddy B
   the player to perform each acceptance action. It must not bypass the timer or
   generate the acceptance requests automatically.
 
+### Live-trade API
+
+Torn API v2 exposes ongoing trades through `GET /user/trades?cat=ongoing` using
+a limited-access key. Each summary includes the trade id, participants, and
+`expires_at` / `modified_at` timestamps; detailed contents are available from
+`GET /user/{tradeId}/trade`. API polling is the supported background mechanism
+for detecting changes to open trades.
+
 Torn logs a completed trade as a **set of sub-logs** sharing one trade id
 (`parsed_trade_id`), split by side and content type:
 

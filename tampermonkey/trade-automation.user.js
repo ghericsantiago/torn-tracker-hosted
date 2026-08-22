@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      1.5.0
+// @version      2.0.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
+// @connect      api.torn.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -18,15 +20,20 @@
   const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   const SETTINGS_KEY = 'tta_settings_v1';
   const JOB_KEY = 'tta_active_job_v1';
-  const DONE_KEY = 'tta_completed_trades_v1';
+  const DONE_KEY = 'tta_completed_trades_v2';
+  const LOCKED_KEY = 'tta_locked_trades_v1';
   const NAV_KEY = 'tta_navigation_guard_v1';
   const TRADE_ALERT_KEY = 'tta_pending_trade_alert_v1';
   const MAX_COMMENT = 155;
   const TICK_MS = 1000;
   const NAV_GUARD_MS = 60000;
+  const ITEM_SETTLE_MS = 10000;
 
   const DEFAULTS = {
     enabled: false,
+    apiPolling: true,
+    apiKey: '',
+    apiPollSeconds: 30,
     waitSeconds: 60,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
@@ -34,7 +41,7 @@
   };
 
   let busy = false;
-  const skippedThisPage = new Set();
+  let lastApiPoll = 0;
 
   function readJson(key, fallback) {
     try {
@@ -65,9 +72,9 @@
     saveSettings({ ...DEFAULTS });
     GM_setValue(JOB_KEY, '');
     writeJson(DONE_KEY, {});
+    writeJson(LOCKED_KEY, {});
     GM_setValue(NAV_KEY, '');
     GM_setValue(TRADE_ALERT_KEY, '');
-    skippedThisPage.clear();
   }
 
   function getJob() {
@@ -80,21 +87,43 @@
   }
 
   function clearJob(tradeId) {
-    const completed = readJson(DONE_KEY, {});
-    completed[String(tradeId)] = Date.now();
-    const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    Object.keys(completed).forEach(id => {
-      if (completed[id] < cutoff) delete completed[id];
-    });
-    writeJson(DONE_KEY, completed);
     GM_setValue(JOB_KEY, '');
     renderStatus();
   }
 
-  function abandonJob(tradeId) {
-    skippedThisPage.add(String(tradeId));
-    GM_setValue(JOB_KEY, '');
-    renderStatus();
+  function completeJob(tradeId) {
+    const completed = readJson(DONE_KEY, {});
+    const now = Date.now();
+    const cutoff = now - (30 * 24 * 60 * 60 * 1000);
+    completed[String(tradeId)] = now;
+    Object.keys(completed).forEach(id => {
+      if (Number(completed[id]) < cutoff) delete completed[id];
+    });
+    writeJson(DONE_KEY, completed);
+    clearJob(tradeId);
+  }
+
+  function activeLockedTrades() {
+    const locked = readJson(LOCKED_KEY, {});
+    const now = Date.now();
+    let changed = false;
+    Object.keys(locked).forEach(id => {
+      if (Number(locked[id]) <= now) { delete locked[id]; changed = true; }
+    });
+    if (changed) writeJson(LOCKED_KEY, locked);
+    return locked;
+  }
+
+  function deferLockedTrade(tradeId) {
+    const locked = activeLockedTrades();
+    locked[String(tradeId)] = Date.now() + (5 * 60 * 1000);
+    writeJson(LOCKED_KEY, locked);
+    clearJob(tradeId);
+  }
+
+  function pageShowsLockedTrade() {
+    const pageText = normalize(document.body.textContent);
+    return pageText.includes('this trade is currently locked') && pageText.includes('please wait');
   }
 
   function parseHash() {
@@ -175,11 +204,87 @@
     });
   }
 
+  function gmGet(url) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: 'GET', url, timeout: 20000,
+        onload: response => {
+          try {
+            const body = JSON.parse(response.responseText);
+            if (body.error) reject(new Error(body.error.error || body.error.code || 'Torn API error'));
+            else if (response.status < 200 || response.status >= 300) reject(new Error(`Torn API returned ${response.status}`));
+            else resolve(body);
+          } catch (_) {
+            reject(new Error(`Invalid Torn API response (${response.status})`));
+          }
+        },
+        onerror: () => reject(new Error('Torn API network error')),
+        ontimeout: () => reject(new Error('Torn API request timed out')),
+      });
+    });
+  }
+
+  async function pollOldestOpenTrade(settings) {
+    if (!settings.apiPolling || !settings.apiKey) return null;
+    const interval = Math.max(15, Number(settings.apiPollSeconds) || 30) * 1000;
+    if (Date.now() - lastApiPoll < interval) return null;
+    lastApiPoll = Date.now();
+    const url = `https://api.torn.com/v2/user/trades?cat=ongoing&key=${encodeURIComponent(settings.apiKey)}&_=${Date.now()}`;
+    const data = await gmGet(url);
+    const completed = readJson(DONE_KEY, {});
+    const locked = activeLockedTrades();
+    return (Array.isArray(data.trades) ? data.trades : [])
+      .filter(trade => trade?.id && !completed[String(trade.id)] && !locked[String(trade.id)])
+      .sort((a, b) => Number(a.expires_at || Infinity) - Number(b.expires_at || Infinity))[0] || null;
+  }
+
+  function currentUserId() {
+    try {
+      return String(JSON.parse(document.getElementById('torn-user')?.value || '{}').id || '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function tradeLogHasComment(message) {
+    const expected = normalize(message);
+    const selfId = currentUserId();
+    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')].some(element => {
+      if (!/\bsays:\s*/i.test(element.textContent)) return false;
+      const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
+        .match(/[?&]XID=(\d+)/i)?.[1] || '';
+      if (selfId && authorId && authorId !== selfId) return false;
+      const body = normalize(element.textContent.replace(/^.*?\bsays:\s*/i, ''));
+      return body === expected;
+    });
+  }
+
+  function counterpartItemSignature() {
+    const selfId = currentUserId();
+    const sideItems = [...document.querySelectorAll('.trade-cont .user.right > ul.cont > li.color2 .name:not(.inactive)')]
+      .map(element => normalize(element.textContent))
+      .filter(text => text && !/^no items? in trade$/.test(text));
+    const additions = [...document.querySelectorAll('.log .msg, .trade-log .msg')]
+      .filter(element => /\badded\s+\d+x\s+.+\s+to the trade\b/i.test(element.textContent))
+      .filter(element => {
+        const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
+          .match(/[?&]XID=(\d+)/i)?.[1] || '';
+        return !(selfId && authorId && authorId === selfId);
+      })
+      .map(element => normalize(element.textContent));
+    return [...sideItems, ...additions].sort().join('|');
+  }
+
   function submitComment(text, nextJob) {
+    const comment = String(text).slice(0, MAX_COMMENT);
+    if (tradeLogHasComment(comment)) {
+      saveJob(nextJob);
+      return true;
+    }
     const control = findCommentControl();
     const form = control?.closest('form');
     if (!control || !form) return false;
-    setNativeValue(control, String(text).slice(0, MAX_COMMENT));
+    setNativeValue(control, comment);
     const submit = form.querySelector('input[type="submit"], button[type="submit"]');
     if (!submit) return false;
     submit.disabled = false;
@@ -200,7 +305,8 @@
   }
 
   function findOldestTrade(root = document) {
-    const done = readJson(DONE_KEY, {});
+    const completed = readJson(DONE_KEY, {});
+    const locked = activeLockedTrades();
     const currentHeading = [...root.querySelectorAll('.title-black')]
       .find(element => /^current\s+trades?$/i.test(element.textContent.trim()));
     const currentList = currentHeading?.nextElementSibling?.matches('ul.trades-cont.current')
@@ -211,7 +317,7 @@
       .map(row => {
         const link = row.querySelector('a[href*="step=view"][href*="ID="]');
         const id = link?.href.match(/[?&#]ID=(\d+)/i)?.[1];
-        return id && !done[id] && !skippedThisPage.has(String(id))
+        return id && !completed[String(id)] && !locked[String(id)]
           ? { row, link, id, expires: expirySeconds(row) }
           : null;
       })
@@ -299,13 +405,25 @@
       return;
     }
 
+    if (pageShowsLockedTrade() && ['opening', 'waiting', 'waiting_for_items', 'pricing', 'receipt_posted', 'add_money'].includes(job.stage)) {
+      deferLockedTrade(job.tradeId);
+      navigateTrade();
+      return;
+    }
+
     if (job.stage === 'opening') {
       if (!findCommentControl()) return;
+      const now = Date.now();
+      const itemSignature = counterpartItemSignature();
+      const defaultDeadline = now + (settings.waitSeconds * 1000);
       const next = {
         ...job,
         stage: 'waiting',
-        askedAt: Date.now(),
-        deadline: Date.now() + (settings.waitSeconds * 1000),
+        askedAt: now,
+        defaultDeadline,
+        deadline: itemSignature ? Math.min(defaultDeadline, now + ITEM_SETTLE_MS) : defaultDeadline,
+        itemSignature,
+        itemDetected: Boolean(itemSignature),
         error: '',
       };
       if (!submitComment(settings.requestMessage, next)) throw new Error('Comment form not found');
@@ -313,9 +431,39 @@
     }
 
     if (job.stage === 'waiting') {
+      const now = Date.now();
+      const defaultDeadline = Number(job.defaultDeadline) || Number(job.deadline) || (now + settings.waitSeconds * 1000);
+      const itemSignature = counterpartItemSignature();
+      if (itemSignature && itemSignature !== job.itemSignature) {
+        saveJob({
+          ...job,
+          defaultDeadline,
+          deadline: Math.min(defaultDeadline, now + ITEM_SETTLE_MS),
+          itemSignature,
+          itemDetected: true,
+          error: '',
+        });
+        return;
+      }
       if (Date.now() < job.deadline) return;
       saveJob({ ...job, stage: 'pricing', error: '' });
       job = getJob();
+    }
+
+    if (job.stage === 'waiting_for_items') {
+      const itemSignature = counterpartItemSignature();
+      if (!itemSignature) return;
+      const now = Date.now();
+      saveJob({
+        ...job,
+        stage: 'waiting',
+        defaultDeadline: now + ITEM_SETTLE_MS,
+        deadline: now + ITEM_SETTLE_MS,
+        itemSignature,
+        itemDetected: true,
+        error: '',
+      });
+      return;
     }
 
     if (job.stage === 'pricing') {
@@ -324,8 +472,12 @@
       if (!findCommentControl()) return;
       const receipt = await createReceipt(job);
       if (!receipt) {
-        abandonJob(job.tradeId);
-        navigateTrade();
+        saveJob({
+          ...job,
+          stage: 'waiting_for_items',
+          itemSignature: counterpartItemSignature(),
+          error: '',
+        });
         return;
       }
       const receiptUrl = `${APP_URL}${receipt.url}`;
@@ -384,7 +536,7 @@
     }
 
     if (job.stage === 'complete') {
-      clearJob(job.tradeId);
+      completeJob(job.tradeId);
       navigateTrade();
     }
   }
@@ -420,7 +572,7 @@
         } catch (_) {}
       }
       saveJob({ ...job, stage: 'complete', error: '' });
-      clearJob(job.tradeId);
+      completeJob(job.tradeId);
       navigateTrade();
       return;
     }
@@ -460,12 +612,25 @@
     if (guard?.target === location.hash.replace(/^#\/?/, '')) GM_setValue(NAV_KEY, '');
     renderStatus();
     if (!settings.enabled || busy) return;
-    if (handlePendingTradeAlert()) return;
-    if (location.pathname.toLowerCase() !== '/trade.php') return;
-    const job = getJob();
-    if (job?.retryAt && Date.now() < job.retryAt) return;
     busy = true;
     try {
+      let job = getJob();
+      if (!job) {
+        const apiTrade = await pollOldestOpenTrade(settings);
+        if (apiTrade) {
+          job = { tradeId: String(apiTrade.id), stage: 'opening', startedAt: Date.now() };
+          saveJob(job);
+          if (location.pathname.toLowerCase() !== '/trade.php') {
+            location.assign(`${location.origin}/trade.php#step=view&ID=${encodeURIComponent(apiTrade.id)}`);
+          } else {
+            navigateTrade('view', apiTrade.id);
+          }
+          return;
+        }
+      }
+      if (handlePendingTradeAlert()) return;
+      if (location.pathname.toLowerCase() !== '/trade.php') return;
+      if (job?.retryAt && Date.now() < job.retryAt) return;
       const route = parseHash();
       if (route.step === 'view' && route.id) await handleView(settings, job, route.id);
       else if (route.step === 'addmoney' && route.id) await handleAddMoney(job, route.id);
@@ -487,6 +652,13 @@
       <div class="tta-dialog">
         <h3>Trade Automation Settings</h3>
         <label class="tta-check"><input id="tta-enabled" type="checkbox" ${settings.enabled ? 'checked' : ''}> Automation enabled</label>
+        <label class="tta-check"><input id="tta-api-polling" type="checkbox" ${settings.apiPolling ? 'checked' : ''}> Poll Torn API for ongoing trades</label>
+        <label>Torn limited-access API key
+          <input id="tta-api-key" type="password" value="${escapeHtml(settings.apiKey)}" autocomplete="off">
+        </label>
+        <label>API polling interval <small>(seconds, minimum 15)</small>
+          <input id="tta-api-interval" type="number" min="15" max="3600" value="${settings.apiPollSeconds}">
+        </label>
         <label>Wait before continuing <small>(seconds)</small>
           <input id="tta-wait" type="number" min="5" max="3600" value="${settings.waitSeconds}">
         </label>
@@ -513,6 +685,9 @@
     overlay.querySelector('#tta-save').addEventListener('click', () => {
       saveSettings({
         enabled: overlay.querySelector('#tta-enabled').checked,
+        apiPolling: overlay.querySelector('#tta-api-polling').checked,
+        apiKey: overlay.querySelector('#tta-api-key').value.trim(),
+        apiPollSeconds: Math.min(3600, Math.max(15, Number(overlay.querySelector('#tta-api-interval').value) || 30)),
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
@@ -534,7 +709,7 @@
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
@@ -550,6 +725,12 @@
       saveJob({ ...job, deadline: Date.now(), error: '' });
       tick();
     });
+    panel.querySelector('#tta-skip').addEventListener('click', () => {
+      const job = getJob();
+      if (!job) return;
+      deferLockedTrade(job.tradeId);
+      navigateTrade();
+    });
   }
 
   function renderStatus() {
@@ -559,16 +740,19 @@
     const toggle = document.getElementById('tta-toggle');
     const state = document.getElementById('tta-state');
     const priceNow = document.getElementById('tta-price-now');
-    if (!toggle || !state || !priceNow) return;
+    const skip = document.getElementById('tta-skip');
+    if (!toggle || !state || !priceNow || !skip) return;
     toggle.textContent = settings.enabled ? 'Automation: ON' : 'Automation: OFF';
     toggle.classList.toggle('on', settings.enabled);
     let label = job ? `#${job.tradeId}: ${String(job.stage).replace('_', ' ')}` : 'Idle';
     if (job?.stage === 'waiting') label += ` (${Math.max(0, Math.ceil((job.deadline - Date.now()) / 1000))}s)`;
+    if (job?.stage === 'waiting_for_items') label += ' - waiting for items';
     if (job?.stage === 'awaiting_accept') label += ' - click both Torn ACCEPT buttons';
     if (job?.error) label += ` - ${job.error}`;
     state.textContent = label;
     state.title = label;
     priceNow.style.display = settings.enabled && job?.stage === 'waiting' ? '' : 'none';
+    skip.style.display = settings.enabled && job ? '' : 'none';
   }
 
   GM_registerMenuCommand('Trade Automation Settings', openSettings);
@@ -578,22 +762,26 @@
     GM_setValue(TRADE_ALERT_KEY, '');
     renderStatus();
   });
-  GM_registerMenuCommand('Clear Processed Trade History', () => {
+  GM_registerMenuCommand('Clear Completed Trade History', () => {
     writeJson(DONE_KEY, {});
-    skippedThisPage.clear();
     renderStatus();
     tick();
   });
-
+  GM_registerMenuCommand('Clear Locked Trade Cooldowns', () => {
+    writeJson(LOCKED_KEY, {});
+    renderStatus();
+    tick();
+  });
   const style = document.createElement('style');
   style.textContent = `
     #tta-panel{position:fixed;right:12px;top:12px;z-index:2147483638;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 24px));padding:8px;border:1px solid #52606d;border-radius:8px;background:#15191dcc;color:#ddd;font:12px Arial,sans-serif;box-shadow:0 3px 16px #0008;backdrop-filter:blur(5px)}
     #tta-panel button{border:1px solid #66717c;border-radius:5px;background:#30363d;color:#eee;padding:5px 8px;cursor:pointer}#tta-panel #tta-toggle.on{border-color:#2e9d59;background:#176b39}#tta-state{min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tta-accept-ready{position:relative!important;z-index:2!important;outline:3px solid #ffd43b!important;box-shadow:0 0 0 5px #ffca2844,0 0 18px 8px #ffd43b99!important;animation:ttaAcceptPulse 1s ease-in-out infinite alternate!important}@keyframes ttaAcceptPulse{from{filter:brightness(1)}to{filter:brightness(1.65)}}
-    #tta-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#000a;font:13px Arial,sans-serif}.tta-dialog{width:min(520px,calc(100vw - 30px));padding:18px;border:1px solid #59636e;border-radius:9px;background:#20252a;color:#eee;box-shadow:0 10px 40px #000}.tta-dialog h3{margin:0 0 14px}.tta-dialog label{display:block;margin:10px 0 4px}.tta-dialog small{color:#aab2ba}.tta-dialog textarea,.tta-dialog input[type=number]{box-sizing:border-box;width:100%;margin-top:5px;padding:7px;border:1px solid #606b76;border-radius:4px;background:#11161a;color:#eee}.tta-dialog textarea{min-height:58px;resize:vertical}.tta-dialog .tta-check{display:flex;gap:7px;align-items:center}.tta-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:16px}.tta-action-spacer{flex:1}.tta-actions button{padding:7px 14px;border:1px solid #64707b;border-radius:5px;background:#343b42;color:#fff;cursor:pointer}.tta-actions #tta-reset{border-color:#a85252;background:#6f2929}.tta-actions #tta-save{border-color:#3d9660;background:#247044}
+    #tta-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#000a;font:13px Arial,sans-serif}.tta-dialog{width:min(520px,calc(100vw - 30px));max-height:calc(100vh - 30px);overflow:auto;padding:18px;border:1px solid #59636e;border-radius:9px;background:#20252a;color:#eee;box-shadow:0 10px 40px #000}.tta-dialog h3{margin:0 0 14px}.tta-dialog label{display:block;margin:10px 0 4px}.tta-dialog small{color:#aab2ba}.tta-dialog textarea,.tta-dialog input[type=number],.tta-dialog input[type=password]{box-sizing:border-box;width:100%;margin-top:5px;padding:7px;border:1px solid #606b76;border-radius:4px;background:#11161a;color:#eee}.tta-dialog textarea{min-height:58px;resize:vertical}.tta-dialog .tta-check{display:flex;gap:7px;align-items:center}.tta-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:16px}.tta-action-spacer{flex:1}.tta-actions button{padding:7px 14px;border:1px solid #64707b;border-radius:5px;background:#343b42;color:#fff;cursor:pointer}.tta-actions #tta-reset{border-color:#a85252;background:#6f2929}.tta-actions #tta-save{border-color:#3d9660;background:#247044}
   `;
   document.head.appendChild(style);
 
+  GM_deleteValue('tta_completed_trades_v1');
   injectUi();
   setInterval(tick, TICK_MS);
   window.addEventListener('hashchange', () => setTimeout(tick, 500));

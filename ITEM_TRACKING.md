@@ -370,23 +370,35 @@ The racing garage is a "location" for your cars (like bazaar/display/market for 
 receipt tool. It does not infer inventory movements or replace Torn logs as the
 source of truth. When explicitly enabled, it processes the current-trade queue
 oldest-expiring first, tells the counterpart to add their items, and waits for
-the configurable timeout (30 seconds by default). Chat replies
+the configurable timeout (60 seconds by default). Chat replies
 and confirmation keywords do not gate pricing. At the deadline it requests a
 server preview of the current trade contents. If the preview contains one or
 more items, it creates a receipt using the server catalog's effective prices,
 posts the receipt URL and total, adds that total as the local side's trade
 money, posts a thank-you comment after the money form returns, and then returns
 to the current-trade list. If the preview contains no items,
-the trade is skipped for the lifetime of the current page: no receipt is
-created, no total is posted, and no money is added. Empty timed-out trades are
-not written to persistent completion history, so manually refreshing the page
-makes them eligible again.
+the job enters a resumable `waiting_for_items` stage: no receipt is created, no
+total is posted, and no money is added. The selected reactive trade remains
+under observation across refreshes. Once an item appears, the job returns to a
+ten-second quiet-period wait and then retries pricing. **Skip Trade** remains
+available if the operator wants to stop waiting and continue the queue.
+
+The waiting deadline adapts to Torn's reactive item updates. With no detected
+counterpart item, the configured default deadline is retained. When the
+counterpart item area or a counterpart "added Nx ... to the trade" log entry
+first indicates an item, the remaining wait becomes a ten-second quiet period.
+Every subsequent item-signature change restarts that ten-second period, capped
+by the original default deadline. This refreshes the timer only; it does not
+refresh the Torn page.
 
 The active trade and each transition are persisted before comments, form
 submissions, and navigation. This makes page reloads and Torn's hash-based
-redirects resumable and prevents already completed trades from immediately
-being selected again. Successfully processed trades remain suppressed for
-seven days; an empty trade uses only the page-local skip described above. All
+redirects resumable. A trade id enters persistent completed history only after
+the second manual acceptance reaches `step=accept2`; those completed ids are
+skipped by both DOM and API discovery on later runs and expire after 30 days.
+Empty, timed-out, interrupted, reset, or partially processed trades never enter
+that history. Only a manual **Skip Trade** uses a five-minute trade-id cooldown
+to prevent immediate reselection loops. All
 three outgoing comment templates (item request, receipt, and thank-you) are
 managed in the userscript settings. The receipt
 comment supports
@@ -401,12 +413,30 @@ requests are made. Movement between the list, selected-trade, and add-money
 views uses Torn's hash routes only. A missing alert must remain absent for five
 seconds before the latch resets, covering transient header rebuilds; selected
 trade and add-money routes are never refreshed by the alert listener.
-The Tampermonkey menu includes **Clear Processed Trade History** for retesting a
-trade that an earlier run already persisted as completed.
+As an optional discovery source, the userscript polls Torn API v2
+`GET /user/trades?cat=ongoing` while enabled and idle. It requires a
+limited-access Torn API key configured in Settings, defaults to a 30-second
+interval (minimum 15 seconds), and selects the ongoing trade with the earliest
+`expires_at`. This API poller supplements the status-icon/list discovery and
+does not cache returned trade ids. Every poll includes a Unix-millisecond `_`
+query parameter so browsers and intermediary caches see a unique request URL;
+this does not override caching intentionally enforced by Torn's API servers.
 The Settings dialog also provides **Reset Automation**. After confirmation it
 restores the default timeout and messages, disables automation, and clears the
-active job, processed-trade history, pending-alert/navigation latches, and
-page-local skips.
+active job, completed-trade history, pending-alert/navigation latches, and
+locked-trade cooldowns. The Tampermonkey menu also exposes **Clear Completed
+Trade History** independently for retesting.
+
+Completed-history and lock handling are both keyed by Torn **trade id**, never
+by counterpart user id. If the selected page reports "This trade is currently
+locked. Please wait" before pricing/payment is complete, that trade id receives
+a separate five-minute cooldown. DOM and API discovery ignore it during the
+cooldown, after which it is eligible for retry; it is not marked completed.
+The cooldown can be cleared from the Tampermonkey menu with **Clear Locked Trade
+Cooldowns**. Lock detection scans the selected trade container's complete
+visible text rather than depending on a specific alert class. While any job is
+active, the floating panel also exposes **Skip Trade**, which manually applies
+the same trade-id-specific five-minute cooldown and clears the active job.
 The floating automation status and settings panel is anchored at the top-right
 of the viewport.
 While a trade is in the waiting stage, that panel displays **Price Now**. A
@@ -427,6 +457,12 @@ these route controls asynchronously, DOM-dependent stages wait without error
 until their comment, add-money link, or money form exists. Receipt creation is
 also deferred until the comment form is present, avoiding duplicate receipts
 caused by render-timing retries.
+Before any item-request, receipt, or thank-you comment is submitted, the script
+normalizes the intended 155-character message and compares it with comments in
+the visible trade log. When Torn exposes the current player id, the comparison
+is restricted to that player's comments. An exact existing match advances the
+persisted job stage without filling or clicking ADD again, making comment
+submission idempotent across unexpected page refreshes.
 On the add-money route, the amount is filled first and the intended submission
 time is persisted. The actual Torn Change/Add control is clicked no earlier
 than one second later.
