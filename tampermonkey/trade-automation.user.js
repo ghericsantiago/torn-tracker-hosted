@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.0.1
+// @version      2.0.2
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -10,6 +10,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
 // @connect      api.torn.com
+// @connect      itrade.devs.surf
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -197,8 +198,8 @@
             reject(new Error(`Invalid server response (${response.status})`));
           }
         },
-        onerror: () => reject(new Error('Network error')),
-        ontimeout: () => reject(new Error('Request timed out')),
+        onerror: response => reject(new Error(`Pricing server network error${response?.status ? ` (${response.status})` : ''}`)),
+        ontimeout: () => reject(new Error('Pricing server request timed out')),
         timeout: 20000,
       });
     });

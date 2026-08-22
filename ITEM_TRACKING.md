@@ -424,6 +424,10 @@ query parameter so browsers and intermediary caches see a unique request URL;
 this does not override caching intentionally enforced by Torn's API servers.
 Polling stops when no Torn trade page is open because the userscript is not
 loaded on other pages.
+Tampermonkey metadata explicitly grants cross-origin connections to both
+`api.torn.com` for discovery and `itrade.devs.surf` for receipt preview,
+creation, and completion. Pricing-server network and timeout errors are labeled
+separately in the floating status panel.
 The Settings dialog also provides **Reset Automation**. After confirmation it
 restores the default timeout and messages, disables automation, and clears the
 active job, completed-trade history, pending-alert/navigation latches, and
