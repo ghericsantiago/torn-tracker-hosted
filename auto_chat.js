@@ -16,6 +16,7 @@
 
     const LOCK_KEY = 'tradeSenderActiveTab';
     const ENABLE_KEY = 'tradeSenderEnabled';
+    const PERSIST_KEY = 'tradeSenderPersist';
 
     const TAB_ID =
         Date.now().toString(36) +
@@ -61,8 +62,28 @@
 
     document.body.appendChild(toggleButton);
 
+    const persistButton = document.createElement('button');
+
+    Object.assign(persistButton.style, {
+        position: 'fixed',
+        bottom: '60px',
+        right: '20px',
+        zIndex: '999999',
+        padding: '6px 12px',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        color: '#fff',
+        fontSize: '11px',
+        minWidth: '120px'
+    });
+
+    document.body.appendChild(persistButton);
+
     function updateButton() {
         const enabled = GM_getValue(ENABLE_KEY, false);
+        const persist = GM_getValue(PERSIST_KEY, false);
         const owner = localStorage.getItem(LOCK_KEY);
 
         if (enabled && owner === TAB_ID) {
@@ -72,6 +93,9 @@
             toggleButton.textContent = '🔴 OFF';
             toggleButton.style.background = '#e74c3c';
         }
+
+        persistButton.textContent = persist ? '📌 Persist: ON' : '📌 Persist: OFF';
+        persistButton.style.background = persist ? '#2980b9' : '#7f8c8d';
     }
 
     // =========================================================
@@ -381,8 +405,16 @@
 
         if (localStorage.getItem(LOCK_KEY) === TAB_ID) {
             localStorage.removeItem(LOCK_KEY);
-            GM_setValue(ENABLE_KEY, false);
+            if (!GM_getValue(PERSIST_KEY, false)) {
+                GM_setValue(ENABLE_KEY, false);
+            }
         }
+    });
+
+    persistButton.addEventListener('click', () => {
+        const current = GM_getValue(PERSIST_KEY, false);
+        GM_setValue(PERSIST_KEY, !current);
+        updateButton();
     });
 
     // =========================================================
@@ -390,5 +422,10 @@
     // =========================================================
 
     updateButton();
+
+    // Auto-resume on page load if persist is on and was previously enabled
+    if (GM_getValue(PERSIST_KEY, false) && GM_getValue(ENABLE_KEY, false)) {
+        start();
+    }
 
 })();
