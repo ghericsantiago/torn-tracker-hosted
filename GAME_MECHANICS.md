@@ -127,6 +127,21 @@ Example: exchanging **2 × Plushie Set** deducts `2× Sheep Plushie, 2× Teddy B
 
 ## 3. Trades
 
+### Acceptance and scripting boundary
+
+- Torn's trade flow uses an initial **Accept** followed by a five-second
+  reconfirmation before final acceptance. The official Trade wiki notes that
+  some player scripts remove reconfirmation, but explicitly does not recommend
+  doing so.
+- That UI observation does not authorize unattended acceptance. Torn's January
+  2026 scripting clarification says non-API requests must be directly and
+  manually initiated by the player. Automatically clicking one or both trade
+  acceptance actions as part of a timer-driven workflow is therefore outside
+  the compliant implementation boundary used by this project.
+- A compliant helper may highlight the controls, show status, or pause and ask
+  the player to perform each acceptance action. It must not bypass the timer or
+  generate the acceptance requests automatically.
+
 Torn logs a completed trade as a **set of sub-logs** sharing one trade id
 (`parsed_trade_id`), split by side and content type:
 

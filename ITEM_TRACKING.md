@@ -361,3 +361,81 @@ The racing garage is a "location" for your cars (like bazaar/display/market for 
       `+qty` marker) — irrelevant for the inventory monitor (flows are the model).
 - [x] Machine-readable flow spec — implemented as code in `inventory-monitor/server.js`
       (`logFlows()`), with extraction shapes documented in `INVENTORY_MONITOR.md` §4.
+
+---
+
+## 8. Trade-page pricing automation
+
+`tampermonkey/trade-automation.user.js` is an operational companion to the
+receipt tool. It does not infer inventory movements or replace Torn logs as the
+source of truth. When explicitly enabled, it processes the current-trade queue
+oldest-expiring first, tells the counterpart to add their items, and waits for
+the configurable timeout (30 seconds by default). Chat replies
+and confirmation keywords do not gate pricing. At the deadline it requests a
+server preview of the current trade contents. If the preview contains one or
+more items, it creates a receipt using the server catalog's effective prices,
+posts the receipt URL and total, adds that total as the local side's trade
+money, posts a thank-you comment after the money form returns, and then returns
+to the current-trade list. If the preview contains no items,
+the trade is skipped for the lifetime of the current page: no receipt is
+created, no total is posted, and no money is added. Empty timed-out trades are
+not written to persistent completion history, so manually refreshing the page
+makes them eligible again.
+
+The active trade and each transition are persisted before comments, form
+submissions, and navigation. This makes page reloads and Torn's hash-based
+redirects resumable and prevents already completed trades from immediately
+being selected again. Successfully processed trades remain suppressed for
+seven days; an empty trade uses only the page-local skip described above. All
+three outgoing comment templates (item request, receipt, and thank-you) are
+managed in the userscript settings. The receipt
+comment supports
+`{url}`, `{total}`, and `{tradeId}` placeholders; Torn comments remain limited
+to 155 characters. Incoming-trade discovery watches the reactive global status
+icon whose `/trade.php` link has an `aria-label` beginning with `Trade pending:`.
+The userscript therefore runs on all Torn pages. A newly appearing alert opens
+the trade page; if it appears while an already-open trade list is stale, that
+list is refreshed exactly once. The alert label is persisted as a latch so the
+same notification cannot create a reload loop. No background trade-list
+requests are made. Movement between the list, selected-trade, and add-money
+views uses Torn's hash routes only. A missing alert must remain absent for five
+seconds before the latch resets, covering transient header rebuilds; selected
+trade and add-money routes are never refreshed by the alert listener.
+The Tampermonkey menu includes **Clear Processed Trade History** for retesting a
+trade that an earlier run already persisted as completed.
+The Settings dialog also provides **Reset Automation**. After confirmation it
+restores the default timeout and messages, disables automation, and clears the
+active job, processed-trade history, pending-alert/navigation latches, and
+page-local skips.
+The floating automation status and settings panel is anchored at the top-right
+of the viewport.
+While a trade is in the waiting stage, that panel displays **Price Now**. A
+manual click moves the stored deadline to the current time, causing the next
+tick to check for items and advance immediately instead of waiting for the
+remaining countdown.
+The intended hash target is persisted before navigation and guarded for 60
+seconds, preventing a document startup from repeatedly issuing the same route
+transition if Torn rebuilds or reloads the page.
+Comment submission accepts Torn's historical `#postTradeMessage` field as well
+as current `name="post"`, inserter-form, and comment-panel input/textarea
+variants. Native value setters and bubbled input/change events are applied for
+the actual control type before the form is submitted. The comment submit
+control has its disabled property, attribute, and disabled styling removed,
+then the actual Torn `ADD` control is clicked (rather than using the browser's
+`requestSubmit()` shortcut). Because Torn renders
+these route controls asynchronously, DOM-dependent stages wait without error
+until their comment, add-money link, or money form exists. Receipt creation is
+also deferred until the comment form is present, avoiding duplicate receipts
+caused by render-timing retries.
+On the add-money route, the amount is filled first and the intended submission
+time is persisted. The actual Torn Change/Add control is clicked no earlier
+than one second later.
+After Torn returns to the selected trade, the persisted `returning` stage waits
+for the asynchronously rendered comment form, posts the editable thank-you
+message, and records `thank_posted`. It then enters `awaiting_accept`, visibly
+highlights Torn's acceptance control, and pauses for the player's manual input.
+The first manual ACCEPT moves Torn into reconfirmation; when its legitimate
+second ACCEPT becomes enabled, that control is highlighted for a second manual
+click. The script neither removes the countdown nor clicks either control.
+After Torn reaches `step=accept2`, the receipt is marked complete and the
+automation returns to the queue.
