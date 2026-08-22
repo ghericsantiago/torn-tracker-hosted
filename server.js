@@ -3,6 +3,8 @@ const express  = require('express');
 const session  = require('express-session');
 const bcrypt   = require('bcryptjs');
 const path     = require('path');
+const http     = require('http');
+const { Server: SocketIO } = require('socket.io');
 
 const app       = express();
 const PORT      = process.env.PORT || 3001;
@@ -37,7 +39,44 @@ app.use('/admin/torn',  require('./routes/torn'));
 app.use('/torn',       require('./routes/torn'));
 
 // Start server
-const server = app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// ── Socket.IO sync store ──────────────────────────────────────────────────────
+// In-memory key-value store shared across all connected tampermonkey scripts.
+// Each section (e.g. "autofly_opts", "vault", "itemmarket") is a top-level key.
+const syncStore = {};
+
+const io = new SocketIO(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+  transports: ['websocket', 'polling'],
+});
+
+io.on('connection', (socket) => {
+  console.log(`[sync] client connected: ${socket.id}`);
+
+  // Client requests the current full store
+  socket.on('sync:get', (cb) => {
+    if (typeof cb === 'function') cb(syncStore);
+  });
+
+  // Client saves one or more sections: { section1: data, section2: data, ... }
+  socket.on('sync:set', (sections) => {
+    if (!sections || typeof sections !== 'object') return;
+    Object.assign(syncStore, sections);
+    // Broadcast to all OTHER clients so they receive real-time updates
+    socket.broadcast.emit('sync:update', sections);
+    console.log(`[sync] saved sections: ${Object.keys(sections).join(', ')}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[sync] client disconnected: ${socket.id}`);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Torn Tracker running at http://localhost:${PORT}`);
 });
 
