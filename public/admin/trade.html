@@ -417,7 +417,7 @@ function resolvePrice(item) {
   const s = selections.get(item.id);
 
   // L3 explicit item override
-  if (s.override) {
+  if (s?.override) {
     const o = s.override;
     if (o.price_mode === 'fixed') {
       const eff = o.fixed_price;
