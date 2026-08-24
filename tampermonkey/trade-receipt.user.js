@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      3.3
+// @version      3.4
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -56,9 +56,29 @@
       item._editValue = item._editMode === 'market_pct' && item.resolved_pct != null
         ? Number((Number(item.resolved_pct) * 100).toFixed(2))
         : Number(item.effective_price) || 0;
+      item._manualAdjusted = false;
     });
 
-    const rowsHtml = itemsCopy.map((item, idx) => `
+    const rowsHtml = itemsCopy.map((item, idx) => {
+      const drop = item.market_drop_pct != null ? Number(item.market_drop_pct).toFixed(1).replace(/\.0$/, '') + '%' : 'below market';
+      const support = item.protection_lowest_price ?? item.market_reference_price;
+      const trackedDate = item.market_reference_date ? String(item.market_reference_date).slice(0, 10) : 'latest tracked day';
+      const samples = item.market_reference_samples ? `, observed ${item.market_reference_samples} time${Number(item.market_reference_samples) === 1 ? '' : 's'}` : '';
+      const protectionHelp = `Protection applied: frequent support ${fmt(support)} (${drop} below market ${fmt(item.market_price)}) was selected from ${trackedDate}${samples}. The normal ${(Number(item.resolved_pct || 0) * 100).toFixed(0)}% buy rate changed the unit offer from ${fmt(item.unprotected_price)} to ${fmt(item.effective_price)}.`;
+      const protectionBadge = item.market_protection_applied ? `
+        <span class="tt-protection" data-idx="${idx}" title="${protectionHelp}" tabindex="0" aria-label="${protectionHelp}"
+          style="display:inline-flex;width:17px;height:17px;align-items:center;justify-content:center;border-radius:50%;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.38);color:#f87171;cursor:help">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:11px;height:11px;fill:rgba(248,113,113,.16);stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 2.5 20 6v5.3c0 5.1-3.2 8.6-8 10.2-4.8-1.6-8-5.1-8-10.2V6l8-3.5Z"/><path d="m8.7 12 2.1 2.1 4.6-4.7"/></svg>
+        </span>` : '';
+      const protectionDetail = item.market_protection_applied
+        ? `<div class="tt-protection-detail" data-idx="${idx}" style="font:9px monospace;color:#f87171;margin-top:2px">support ${fmt(support)} · −${drop} · was ${fmt(item.unprotected_price)}</div>`
+        : '';
+      const rateNote = item.price_mode === 'fixed'
+        ? ' · fixed item price'
+        : item.resolved_pct != null
+          ? ` · ${(Number(item.resolved_pct) * 100).toFixed(0)}% mkt`
+          : !item.in_catalog ? ' · global rate applied' : '';
+      return `
       <tr data-idx="${idx}" style="border-bottom:1px solid rgba(255,255,255,.04);${!item.in_catalog ? 'background:rgba(251,191,36,.04);box-shadow:inset 3px 0 0 #f59e0b;' : ''}">
         <td style="padding:8px 12px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -69,8 +89,10 @@
               <div style="display:flex;align-items:center;gap:6px">
                 <span style="font-size:13px;color:#e2e8f0">${item.item_name}</span>
                 ${!item.in_catalog ? '<span style="font-size:9px;font-family:monospace;background:rgba(251,191,36,.15);color:#f59e0b;border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:1px 5px;letter-spacing:.06em">UNLISTED</span>' : ''}
+                ${protectionBadge}
               </div>
-              <div style="font-size:10px;color:#64748b">qty: ${item.quantity}${item.in_catalog ? (item.resolved_pct ? ' · ' + (item.resolved_pct * 100).toFixed(0) + '% mkt' : '') : ' · global rate applied'}</div>
+              <div style="font-size:10px;color:#64748b">qty: ${item.quantity}${rateNote}</div>
+              ${protectionDetail}
             </div>
           </div>
         </td>
@@ -93,7 +115,8 @@
         <td class="tt-sub" style="padding:8px 12px;text-align:right;font-family:monospace;color:#6ee7f7;font-size:13px">
           ${fmt((item.effective_price ?? 0) * item.quantity)}
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     const initTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
 
@@ -168,8 +191,16 @@
         const original = Number(input.dataset.original) || 0;
         itemsCopy[idx]._editMode = mode;
         itemsCopy[idx]._editValue = entered;
+        itemsCopy[idx]._manualAdjusted = true;
         itemsCopy[idx].effective_price = unit;
         const row = overlay.querySelector(`tr[data-idx="${idx}"]`);
+        const protectionBadge = row.querySelector('.tt-protection');
+        const protectionDetail = row.querySelector('.tt-protection-detail');
+        if (protectionBadge) {
+          protectionBadge.style.opacity = '.4';
+          protectionBadge.title = 'Manual offer adjustment will replace automatic market protection.';
+        }
+        if (protectionDetail) protectionDetail.textContent = 'manual adjustment replaces protection';
         row.querySelector('.tt-sub').textContent = fmt(unit * itemsCopy[idx].quantity);
         const newTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
         document.getElementById('tt-total').textContent = fmt(newTotal);
@@ -248,6 +279,12 @@
         unit_price:   i.effective_price ?? 0,
         override_price_mode: i._editMode,
         override_market_pct: i._editMode === 'market_pct' ? (Number(i._editValue) || 0) / 100 : null,
+        market_protection_applied: i.market_protection_applied === true && !i._manualAdjusted,
+        market_drop_pct: i.market_drop_pct ?? null,
+        market_protection_threshold_pct: i.market_protection_threshold_pct ?? null,
+        unprotected_price: i.unprotected_price ?? null,
+        protection_lowest_price: i.protection_lowest_price ?? i.market_reference_price ?? null,
+        protection_market_value: i.protection_market_value ?? i.market_price ?? null,
       }));
 
       try {

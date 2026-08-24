@@ -441,6 +441,11 @@ unprotected pricing rules are summarized as small percentage/fixed-price chips.
 The calculation-row shield has a detailed hover/keyboard tooltip containing the
 selected tracking date, frequency sample count when available, market-value drop,
 buy rate, and original-versus-protected unit offer.
+The standalone `tampermonkey/trade-receipt.user.js` preview also marks protected
+rows with a red shield and a compact support/drop/original-offer line. Its native
+hover/keyboard help contains the same audit context. Confirming an untouched row
+passes the protection audit fields into receipt creation; manually editing its
+fixed/% offer dims the shield and intentionally replaces automatic protection.
 Trade Automation also switches to an editable protected-price
 comment containing the receipt URL and adjusted total, warning the counterpart
 to review the lower offer and inviting negotiation. Separate editable templates
