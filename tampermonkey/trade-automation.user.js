@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.1.1
+// @version      2.2.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -38,6 +38,7 @@
     waitSeconds: 60,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
+    unlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted items got lower offers. Please review before accepting; happy to negotiate.',
     insufficientCashMessage: 'Sorry, I only have {cash}. Could you adjust the items to fit that amount?',
     thankYouMessage: 'Thank you for trading with me!',
   };
@@ -560,9 +561,14 @@
       const receipt = await createReceipt(job, preview);
       const receiptUrl = `${APP_URL}${receipt.url}`;
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
-      const message = settings.receiptMessage
+      const unlistedItems = preview.items.filter(item => item.in_catalog === false);
+      const messageTemplate = unlistedItems.length
+        ? settings.unlistedItemsMessage
+        : settings.receiptMessage;
+      const message = messageTemplate
         .replaceAll('{url}', receiptUrl)
         .replaceAll('{total}', money(receipt.total))
+        .replaceAll('{unlistedCount}', String(unlistedItems.length))
         .replaceAll('{tradeId}', String(job.tradeId));
       const next = {
         ...job,
@@ -571,6 +577,7 @@
         total: Math.round(Number(receipt.total) || 0),
         receiptId: receipt.short_id || receipt.id,
         receiptUrl,
+        unlistedItemCount: unlistedItems.length,
         pricedItemSignature: counterpartItemSignature() || job.itemSignature || '',
         acceptanceInvalidated: false,
         error: '',
@@ -752,6 +759,9 @@
         <label>Receipt comment <small>variables: {url}, {total}, {tradeId}</small>
           <textarea id="tta-receipt" maxlength="${MAX_COMMENT}">${escapeHtml(settings.receiptMessage)}</textarea>
         </label>
+        <label>Receipt comment with unlisted items <small>variables: {url}, {total}, {unlistedCount}, {tradeId}</small>
+          <textarea id="tta-unlisted-items" maxlength="${MAX_COMMENT}">${escapeHtml(settings.unlistedItemsMessage)}</textarea>
+        </label>
         <label>Insufficient-cash comment <small>variables: {cash}, {total}, {shortfall}, {tradeId}</small>
           <textarea id="tta-insufficient-cash" maxlength="${MAX_COMMENT}">${escapeHtml(settings.insufficientCashMessage)}</textarea>
         </label>
@@ -778,6 +788,7 @@
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
+        unlistedItemsMessage: overlay.querySelector('#tta-unlisted-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.unlistedItemsMessage,
         insufficientCashMessage: overlay.querySelector('#tta-insufficient-cash').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.insufficientCashMessage,
         thankYouMessage: overlay.querySelector('#tta-thanks').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.thankYouMessage,
       });

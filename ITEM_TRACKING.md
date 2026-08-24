@@ -414,11 +414,15 @@ skipped by both DOM and API discovery on later runs and expire after 30 days.
 Empty, timed-out, interrupted, reset, or partially processed trades never enter
 that history. Only a manual **Skip Trade** uses a five-minute trade-id cooldown
 to prevent immediate reselection loops. All
-four outgoing comment templates (item request, receipt, insufficient cash, and thank-you) are
-managed in the userscript settings. The receipt
-comment supports
-`{url}`, `{total}`, and `{tradeId}` placeholders; Torn comments remain limited
-to 155 characters. Incoming-trade discovery watches the reactive global status
+five outgoing comment templates (item request, standard receipt, receipt with
+unlisted items, insufficient cash, and thank-you) are managed in the
+userscript settings. The standard receipt comment supports `{url}`, `{total}`,
+and `{tradeId}` placeholders. When any server-preview item has
+`in_catalog: false`, the automation uses the separate configurable unlisted-item
+receipt comment instead. Its short default warns that unlisted items received
+lower offers, asks the counterpart to review before accepting, and invites
+negotiation; it supports `{url}`, `{total}`, `{unlistedCount}`, and `{tradeId}`.
+Torn comments remain limited to 155 characters. Incoming-trade discovery watches the reactive global status
 icon whose `/trade.php` link has an `aria-label` beginning with `Trade pending:`.
 The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
 the status panel, and all automation operate only while a trade page is open.
