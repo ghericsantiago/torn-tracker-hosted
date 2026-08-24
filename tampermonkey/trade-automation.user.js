@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.0.2
+// @version      2.1.1
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -38,6 +38,7 @@
     waitSeconds: 60,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
+    insufficientCashMessage: 'Sorry, I only have {cash}. Could you adjust the items to fit that amount?',
     thankYouMessage: 'Thank you for trading with me!',
   };
 
@@ -148,6 +149,21 @@
 
   function money(value) {
     return '$' + Math.round(Number(value) || 0).toLocaleString();
+  }
+
+  function parseAmount(value) {
+    const normalized = String(value || '').toLowerCase().replace(/[$,\s]/g, '');
+    const match = normalized.match(/^(\d+(?:\.\d+)?)(k|m|b)?$/);
+    if (!match) return null;
+    const multiplier = { k: 1e3, m: 1e6, b: 1e9 }[match[2]] || 1;
+    const amount = Number(match[1]) * multiplier;
+    return Number.isFinite(amount) ? Math.round(amount) : null;
+  }
+
+  function cashOnHand() {
+    const element = document.getElementById('user-money');
+    if (!element) return null;
+    return parseAmount(element.dataset.money || element.textContent);
   }
 
   function normalize(value) {
@@ -276,6 +292,24 @@
     return [...sideItems, ...additions].sort().join('|');
   }
 
+  function restartPricingIfItemsChanged(job) {
+    if (!job?.pricedItemSignature) return false;
+    const itemSignature = counterpartItemSignature();
+    if (!itemSignature || itemSignature === job.pricedItemSignature) return false;
+    const now = Date.now();
+    saveJob({
+      ...job,
+      stage: 'waiting',
+      defaultDeadline: now + ITEM_SETTLE_MS,
+      deadline: now + ITEM_SETTLE_MS,
+      itemSignature,
+      itemDetected: true,
+      acceptanceInvalidated: true,
+      error: '',
+    });
+    return true;
+  }
+
   function submitComment(text, nextJob) {
     const comment = String(text).slice(0, MAX_COMMENT);
     if (tradeLogHasComment(comment)) {
@@ -366,14 +400,18 @@
     return false;
   }
 
-  async function createReceipt(job) {
+  async function previewReceipt(job) {
     const preview = await gmPost(`${APP_URL}/api/receipt/preview`, { trade_id: Number(job.tradeId) });
     if (preview.error) throw new Error(preview.error);
     const items = Array.isArray(preview.items) ? preview.items : [];
     if (items.length === 0) return null;
+    return { ...preview, items };
+  }
+
+  async function createReceipt(job, preview) {
     const result = await gmPost(`${APP_URL}/api/receipt/create`, {
       trade_id: Number(job.tradeId),
-      items_override: items.map(item => ({
+      items_override: preview.items.map(item => ({
         torn_item_id: item.torn_item_id,
         unit_price: item.effective_price ?? 0,
       })),
@@ -406,11 +444,14 @@
       return;
     }
 
-    if (pageShowsLockedTrade() && ['opening', 'waiting', 'waiting_for_items', 'pricing', 'receipt_posted', 'add_money'].includes(job.stage)) {
+    if (pageShowsLockedTrade() && ['opening', 'waiting', 'waiting_for_items', 'waiting_for_adjustment', 'pricing', 'receipt_posted', 'add_money'].includes(job.stage)) {
       deferLockedTrade(job.tradeId);
       navigateTrade();
       return;
     }
+
+    if (['receipt_posted', 'add_money', 'returning', 'thank_posted', 'awaiting_accept'].includes(job.stage)
+      && restartPricingIfItemsChanged(job)) return;
 
     if (job.stage === 'opening') {
       if (!findCommentControl()) return;
@@ -467,12 +508,28 @@
       return;
     }
 
+    if (job.stage === 'waiting_for_adjustment') {
+      const itemSignature = counterpartItemSignature();
+      if (!itemSignature || itemSignature === job.itemSignature) return;
+      const now = Date.now();
+      saveJob({
+        ...job,
+        stage: 'waiting',
+        defaultDeadline: now + ITEM_SETTLE_MS,
+        deadline: now + ITEM_SETTLE_MS,
+        itemSignature,
+        itemDetected: true,
+        error: '',
+      });
+      return;
+    }
+
     if (job.stage === 'pricing') {
       // Wait for Torn's asynchronously rendered comment form before creating
       // anything server-side, otherwise a retry could create two receipts.
       if (!findCommentControl()) return;
-      const receipt = await createReceipt(job);
-      if (!receipt) {
+      const preview = await previewReceipt(job);
+      if (!preview) {
         saveJob({
           ...job,
           stage: 'waiting_for_items',
@@ -481,6 +538,26 @@
         });
         return;
       }
+      const total = Math.round(Number(preview.total) || 0);
+      const cash = cashOnHand();
+      if (cash != null && total > cash) {
+        const message = settings.insufficientCashMessage
+          .replaceAll('{cash}', money(cash))
+          .replaceAll('{total}', money(total))
+          .replaceAll('{shortfall}', money(total - cash))
+          .replaceAll('{tradeId}', String(job.tradeId));
+        const next = {
+          ...job,
+          stage: 'waiting_for_adjustment',
+          itemSignature: counterpartItemSignature(),
+          quotedTotal: total,
+          availableCash: cash,
+          error: '',
+        };
+        if (!submitComment(message, next)) throw new Error('Comment form not found');
+        return;
+      }
+      const receipt = await createReceipt(job, preview);
       const receiptUrl = `${APP_URL}${receipt.url}`;
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
       const message = settings.receiptMessage
@@ -494,6 +571,8 @@
         total: Math.round(Number(receipt.total) || 0),
         receiptId: receipt.short_id || receipt.id,
         receiptUrl,
+        pricedItemSignature: counterpartItemSignature() || job.itemSignature || '',
+        acceptanceInvalidated: false,
         error: '',
       };
       if (!submitComment(message, next)) throw new Error('Comment form not found');
@@ -566,6 +645,10 @@
 
   async function handleAcceptRoute(job, route) {
     if (!job || String(job.tradeId) !== String(route.id) || job.stage !== 'awaiting_accept') return;
+    if (restartPricingIfItemsChanged(job)) {
+      navigateTrade('view', job.tradeId);
+      return;
+    }
     if (route.step === 'accept2') {
       if (job.receiptId) {
         try {
@@ -669,6 +752,9 @@
         <label>Receipt comment <small>variables: {url}, {total}, {tradeId}</small>
           <textarea id="tta-receipt" maxlength="${MAX_COMMENT}">${escapeHtml(settings.receiptMessage)}</textarea>
         </label>
+        <label>Insufficient-cash comment <small>variables: {cash}, {total}, {shortfall}, {tradeId}</small>
+          <textarea id="tta-insufficient-cash" maxlength="${MAX_COMMENT}">${escapeHtml(settings.insufficientCashMessage)}</textarea>
+        </label>
         <label>Thank-you comment <small>(${MAX_COMMENT} characters maximum)</small>
           <textarea id="tta-thanks" maxlength="${MAX_COMMENT}">${escapeHtml(settings.thankYouMessage)}</textarea>
         </label>
@@ -692,6 +778,7 @@
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
+        insufficientCashMessage: overlay.querySelector('#tta-insufficient-cash').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.insufficientCashMessage,
         thankYouMessage: overlay.querySelector('#tta-thanks').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.thankYouMessage,
       });
       overlay.remove();
@@ -722,8 +809,10 @@
     panel.querySelector('#tta-settings').addEventListener('click', openSettings);
     panel.querySelector('#tta-price-now').addEventListener('click', () => {
       const job = getJob();
-      if (!job || job.stage !== 'waiting') return;
-      saveJob({ ...job, deadline: Date.now(), error: '' });
+      if (!job || !['waiting', 'waiting_for_adjustment'].includes(job.stage)) return;
+      saveJob(job.stage === 'waiting_for_adjustment'
+        ? { ...job, stage: 'pricing', error: '' }
+        : { ...job, deadline: Date.now(), error: '' });
       tick();
     });
     panel.querySelector('#tta-skip').addEventListener('click', () => {
@@ -748,11 +837,12 @@
     let label = job ? `#${job.tradeId}: ${String(job.stage).replace('_', ' ')}` : 'Idle';
     if (job?.stage === 'waiting') label += ` (${Math.max(0, Math.ceil((job.deadline - Date.now()) / 1000))}s)`;
     if (job?.stage === 'waiting_for_items') label += ' - waiting for items';
+    if (job?.stage === 'waiting_for_adjustment') label += ` - only ${money(job.availableCash)} available; waiting for adjusted items`;
     if (job?.stage === 'awaiting_accept') label += ' - click both Torn ACCEPT buttons';
     if (job?.error) label += ` - ${job.error}`;
     state.textContent = label;
     state.title = label;
-    priceNow.style.display = settings.enabled && job?.stage === 'waiting' ? '' : 'none';
+    priceNow.style.display = settings.enabled && ['waiting', 'waiting_for_adjustment'].includes(job?.stage) ? '' : 'none';
     skip.style.display = settings.enabled && job ? '' : 'none';
   }
 

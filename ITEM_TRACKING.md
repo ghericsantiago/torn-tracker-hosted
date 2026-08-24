@@ -373,15 +373,30 @@ oldest-expiring first, tells the counterpart to add their items, and waits for
 the configurable timeout (60 seconds by default). Chat replies
 and confirmation keywords do not gate pricing. At the deadline it requests a
 server preview of the current trade contents. If the preview contains one or
-more items, it creates a receipt using the server catalog's effective prices,
-posts the receipt URL and total, adds that total as the local side's trade
-money, posts a thank-you comment after the money form returns, and then returns
-to the current-trade list. If the preview contains no items,
+more items and the quoted total does not exceed cash on hand, it creates a
+receipt using the server catalog's effective prices, posts the receipt URL and
+total, adds that total as the local side's trade money, posts a thank-you
+comment after the money form returns, and then returns to the current-trade
+list. If the preview contains no items,
 the job enters a resumable `waiting_for_items` stage: no receipt is created, no
 total is posted, and no money is added. The selected reactive trade remains
 under observation across refreshes. Once an item appears, the job returns to a
 ten-second quiet-period wait and then retries pricing. **Skip Trade** remains
 available if the operator wants to stop waiting and continue the queue.
+
+After preview pricing and before receipt creation, the automation compares the
+quoted total with the player's current cash-on-hand value from Torn's
+`#user-money` header element (`data-money`, falling back to its displayed text).
+If the total exceeds available cash, it creates no receipt and adds no money.
+Instead it posts the configurable insufficient-cash comment and enters
+`waiting_for_adjustment`. The default comment tells the counterpart how much
+cash is available and asks them to adjust the items. Its supported placeholders
+are `{cash}`, `{total}`, `{shortfall}`, and `{tradeId}`. When the counterpart's
+item signature changes, the normal ten-second quiet period runs and the trade
+is preview-priced again. **Price Now** is also available in this stage for a
+manual retry (for example, after cash on hand changes without an item change).
+If Torn's cash element is temporarily unavailable, the cash gate is skipped so
+the existing pricing flow is not blocked by incomplete page rendering.
 
 The waiting deadline adapts to Torn's reactive item updates. With no detected
 counterpart item, the configured default deadline is retained. When the
@@ -399,7 +414,7 @@ skipped by both DOM and API discovery on later runs and expire after 30 days.
 Empty, timed-out, interrupted, reset, or partially processed trades never enter
 that history. Only a manual **Skip Trade** uses a five-minute trade-id cooldown
 to prevent immediate reselection loops. All
-three outgoing comment templates (item request, receipt, and thank-you) are
+four outgoing comment templates (item request, receipt, insufficient cash, and thank-you) are
 managed in the userscript settings. The receipt
 comment supports
 `{url}`, `{total}`, and `{tradeId}` placeholders; Torn comments remain limited
@@ -477,6 +492,15 @@ After Torn returns to the selected trade, the persisted `returning` stage waits
 for the asynchronously rendered comment form, posts the editable thank-you
 message, and records `thank_posted`. It then enters `awaiting_accept`, visibly
 highlights Torn's acceptance control, and pauses for the player's manual input.
+The item signature used for the latest server quote remains stored throughout
+the receipt, money, thank-you, and acceptance stages. If the counterpart changes
+their items after pricing—including after the local player has performed the
+first ACCEPT—the changed signature invalidates the pending acceptance and sends
+the job back through a ten-second quiet period and server preview. The receipt
+is updated, a new receipt/total comment is processed, and the add/change-money
+route replaces the local trade amount with the new total before acceptance is
+offered again. The same guard runs on both the selected-trade and acceptance
+routes, before a trade can be recorded complete.
 The first manual ACCEPT moves Torn into reconfirmation; when its legitimate
 second ACCEPT becomes enabled, that control is highlighted for a second manual
 click. The script neither removes the countdown nor clicks either control.
