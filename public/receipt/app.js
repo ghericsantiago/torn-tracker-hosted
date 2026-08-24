@@ -80,8 +80,10 @@
       const notInCatalog = !item.in_catalog && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
 
-      let adjustBadge = '';
-      if (item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
+      let adjustBadge = item.market_protection_applied
+        ? '<span class="adjust-badge markup">low-market protected</span>'
+        : '';
+      if (!item.market_protection_applied && item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
         const delta = item.effective_price - item.catalog_price;
         const deltaPct = Math.abs((delta / item.catalog_price) * 100).toFixed(1);
         if (delta > 0) {
@@ -142,6 +144,20 @@
     }
 
     const lines = [];
+    const protectedItems = items.filter(item => item.market_protection_applied);
+    for (const item of protectedItems) {
+      const rate = pct(item.resolved_pct) || 'configured rate';
+      const drop = item.market_drop_pct != null
+        ? Number(item.market_drop_pct).toFixed(1).replace(/\.0$/, '') + '%'
+        : 'the configured threshold';
+      const protectedLowest = item.protection_lowest_price ?? item.latest_lowest_price;
+      const protectedMarketValue = item.protection_market_value ?? item.market_price;
+      lines.push(
+        `<li><strong>Low-market protection — ${item.item_name}</strong>: newest lowest offer ${fmt(protectedLowest)} ` +
+        `is ${drop} below market value ${fmt(protectedMarketValue)}; ${rate} × ${fmt(protectedLowest)} = ` +
+        `<strong>${fmt(item.effective_price)}</strong> per item instead of ${fmt(item.unprotected_price)}.</li>`
+      );
+    }
     for (const [, g] of Object.entries(modeGroups)) {
       const allNames = [...g.items, ...g.unlisted];
       if (!allNames.length) continue;

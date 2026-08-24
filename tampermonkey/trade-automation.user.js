@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.2.0
+// @version      2.4.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -36,9 +36,12 @@
     apiKey: '',
     apiPollSeconds: 30,
     waitSeconds: 60,
+    marketDropProtectionPct: 30,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
     unlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted items got lower offers. Please review before accepting; happy to negotiate.',
+    protectedItemsMessage: 'Receipt: {url} | {total}. Low-market protection adjusted {protectedCount} item(s). Please review; happy to negotiate.',
+    protectedUnlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted/low-market items got lower offers. Please review; happy to negotiate.',
     insufficientCashMessage: 'Sorry, I only have {cash}. Could you adjust the items to fit that amount?',
     thankYouMessage: 'Thank you for trading with me!',
   };
@@ -415,10 +418,46 @@
       items_override: preview.items.map(item => ({
         torn_item_id: item.torn_item_id,
         unit_price: item.effective_price ?? 0,
+        market_protection_applied: item.market_protection_applied === true,
+        market_drop_pct: item.market_drop_pct ?? null,
+        market_protection_threshold_pct: item.market_protection_threshold_pct ?? null,
+        unprotected_price: item.unprotected_price ?? null,
+        protection_lowest_price: item.market_protection_applied ? item.latest_lowest_price : null,
+        protection_market_value: item.market_protection_applied ? item.market_price : null,
       })),
     });
     if (result.error) throw new Error(result.error);
     return result;
+  }
+
+  function applyMarketDropProtection(preview, settings) {
+    const threshold = Math.min(100, Math.max(0, Number(settings.marketDropProtectionPct) || 0));
+    if (threshold <= 0) return preview;
+
+    const items = preview.items.map(item => {
+      const marketValue = Number(item.market_price) || 0;
+      const lowestOffer = Number(item.latest_lowest_price) || 0;
+      const buyRate = Number(item.resolved_pct) || 0;
+      const currentOffer = Number(item.effective_price) || 0;
+      if (item.price_mode !== 'market_pct' || marketValue <= 0 || lowestOffer <= 0 || buyRate <= 0) return item;
+
+      const dropPct = ((marketValue - lowestOffer) / marketValue) * 100;
+      if (dropPct < threshold) return item;
+
+      const protectedOffer = Math.round(lowestOffer * buyRate);
+      if (protectedOffer >= currentOffer) return item;
+      return {
+        ...item,
+        effective_price: protectedOffer,
+        effective_total: protectedOffer * item.quantity,
+        market_protection_applied: true,
+        market_drop_pct: dropPct,
+        market_protection_threshold_pct: threshold,
+        unprotected_price: currentOffer,
+      };
+    });
+    const total = items.reduce((sum, item) => sum + (Number(item.effective_price) || 0) * (Number(item.quantity) || 0), 0);
+    return { ...preview, items, total };
   }
 
   function showError(message) {
@@ -529,7 +568,7 @@
       // Wait for Torn's asynchronously rendered comment form before creating
       // anything server-side, otherwise a retry could create two receipts.
       if (!findCommentControl()) return;
-      const preview = await previewReceipt(job);
+      let preview = await previewReceipt(job);
       if (!preview) {
         saveJob({
           ...job,
@@ -539,6 +578,7 @@
         });
         return;
       }
+      preview = applyMarketDropProtection(preview, settings);
       const total = Math.round(Number(preview.total) || 0);
       const cash = cashOnHand();
       if (cash != null && total > cash) {
@@ -562,13 +602,19 @@
       const receiptUrl = `${APP_URL}${receipt.url}`;
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
       const unlistedItems = preview.items.filter(item => item.in_catalog === false);
-      const messageTemplate = unlistedItems.length
-        ? settings.unlistedItemsMessage
-        : settings.receiptMessage;
+      const protectedItems = preview.items.filter(item => item.market_protection_applied === true);
+      const messageTemplate = protectedItems.length && unlistedItems.length
+        ? settings.protectedUnlistedItemsMessage
+        : protectedItems.length
+          ? settings.protectedItemsMessage
+          : unlistedItems.length
+            ? settings.unlistedItemsMessage
+            : settings.receiptMessage;
       const message = messageTemplate
         .replaceAll('{url}', receiptUrl)
         .replaceAll('{total}', money(receipt.total))
         .replaceAll('{unlistedCount}', String(unlistedItems.length))
+        .replaceAll('{protectedCount}', String(protectedItems.length))
         .replaceAll('{tradeId}', String(job.tradeId));
       const next = {
         ...job,
@@ -578,6 +624,7 @@
         receiptId: receipt.short_id || receipt.id,
         receiptUrl,
         unlistedItemCount: unlistedItems.length,
+        protectedItemCount: protectedItems.length,
         pricedItemSignature: counterpartItemSignature() || job.itemSignature || '',
         acceptanceInvalidated: false,
         error: '',
@@ -753,6 +800,9 @@
         <label>Wait before continuing <small>(seconds)</small>
           <input id="tta-wait" type="number" min="5" max="3600" value="${settings.waitSeconds}">
         </label>
+        <label>Low-market protection trigger <small>(% below market value; 0 disables)</small>
+          <input id="tta-market-drop" type="number" min="0" max="100" step="0.1" value="${settings.marketDropProtectionPct}">
+        </label>
         <label>Initial comment <small>(${MAX_COMMENT} characters maximum)</small>
           <textarea id="tta-request" maxlength="${MAX_COMMENT}">${escapeHtml(settings.requestMessage)}</textarea>
         </label>
@@ -761,6 +811,12 @@
         </label>
         <label>Receipt comment with unlisted items <small>variables: {url}, {total}, {unlistedCount}, {tradeId}</small>
           <textarea id="tta-unlisted-items" maxlength="${MAX_COMMENT}">${escapeHtml(settings.unlistedItemsMessage)}</textarea>
+        </label>
+        <label>Receipt comment with protected prices <small>variables: {url}, {total}, {protectedCount}, {tradeId}</small>
+          <textarea id="tta-protected-items" maxlength="${MAX_COMMENT}">${escapeHtml(settings.protectedItemsMessage)}</textarea>
+        </label>
+        <label>Receipt comment with protected and unlisted items <small>variables: {url}, {total}, {protectedCount}, {unlistedCount}, {tradeId}</small>
+          <textarea id="tta-protected-unlisted" maxlength="${MAX_COMMENT}">${escapeHtml(settings.protectedUnlistedItemsMessage)}</textarea>
         </label>
         <label>Insufficient-cash comment <small>variables: {cash}, {total}, {shortfall}, {tradeId}</small>
           <textarea id="tta-insufficient-cash" maxlength="${MAX_COMMENT}">${escapeHtml(settings.insufficientCashMessage)}</textarea>
@@ -786,9 +842,12 @@
         apiKey: overlay.querySelector('#tta-api-key').value.trim(),
         apiPollSeconds: Math.min(3600, Math.max(15, Number(overlay.querySelector('#tta-api-interval').value) || 30)),
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
+        marketDropProtectionPct: Math.min(100, Math.max(0, Number(overlay.querySelector('#tta-market-drop').value) || 0)),
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
         unlistedItemsMessage: overlay.querySelector('#tta-unlisted-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.unlistedItemsMessage,
+        protectedItemsMessage: overlay.querySelector('#tta-protected-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.protectedItemsMessage,
+        protectedUnlistedItemsMessage: overlay.querySelector('#tta-protected-unlisted').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.protectedUnlistedItemsMessage,
         insufficientCashMessage: overlay.querySelector('#tta-insufficient-cash').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.insufficientCashMessage,
         thankYouMessage: overlay.querySelector('#tta-thanks').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.thankYouMessage,
       });

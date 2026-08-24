@@ -398,6 +398,32 @@ manual retry (for example, after cash on hand changes without an item change).
 If Torn's cash element is temporarily unavailable, the cash gate is skipped so
 the existing pricing flow is not blocked by incomplete page rendering.
 
+Receipt previews also include the newest recorded item-market lowest offer and
+its observation time from `item_market` for each item when that history exists.
+Before the cash check and receipt creation, the userscript applies adjustable
+low-market protection (30% below Torn market value by default; 0 disables it).
+For a percentage-priced item whose newest lowest offer is at least that far
+below its Torn market value, the same resolved buy percentage is applied to the
+lowest offer instead of market value, and only when this reduces the quote. For
+example, an 80% buy rate with market value $100 and newest lowest offer $70
+quotes $56 rather than $80. Explicit fixed-price listings are never changed.
+Items without stored lowest-offer history continue through the existing price
+cascade. The adjusted item prices are sent as receipt overrides, so the receipt,
+cash sufficiency check, posted total, and added trade money all use the protected
+amount. The threshold is editable in Trade Automation Settings.
+
+When protection applies, its audit fields are carried in `items_override` and
+stored with the receipt item: the unprotected offer, newest lowest offer,
+observed market drop, configured trigger, resolved buy percentage, and final
+protected unit price. The public receipt labels the affected row as
+**low-market protected** and its calculation section shows the full comparison
+and formula. Trade Automation also switches to an editable protected-price
+comment containing the receipt URL and adjusted total, warning the counterpart
+to review the lower offer and inviting negotiation. Separate editable templates
+cover protection alone and the combined protected-plus-unlisted case so the
+unlisted warning is not lost. They support `{url}`, `{total}`,
+`{protectedCount}`, `{unlistedCount}`, and `{tradeId}` as applicable.
+
 The waiting deadline adapts to Torn's reactive item updates. With no detected
 counterpart item, the configured default deadline is retained. When the
 counterpart item area or a counterpart "added Nx ... to the trade" log entry

@@ -79,20 +79,42 @@ async function buildPricedItems(tornData, itemsOverride) {
   const priceMap = {}, itemMap = {};
   let globalPct = null;
   if (itemIds.length) {
-    const [priceRes, itemRes, profileRes] = await Promise.all([
+    const [priceRes, itemRes, latestMarketRes, profileRes] = await Promise.all([
       db.query(PRICE_LOOKUP, [itemIds]),
       db.query('SELECT id, name, market_price FROM torn_items WHERE id = ANY($1::int[])', [itemIds]),
+      db.query(
+        `SELECT DISTINCT ON (item_id) item_id, price, created_at
+         FROM item_market
+         WHERE item_id = ANY($1::int[])
+         ORDER BY item_id, created_at DESC`,
+        [itemIds]
+      ),
       db.query('SELECT default_market_pct FROM trade_profiles WHERE id = 1'),
     ]);
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
     for (const r of itemRes.rows)  itemMap[r.id] = r;
+    const latestMarketMap = Object.fromEntries(latestMarketRes.rows.map(r => [r.item_id, r]));
     globalPct = profileRes.rows[0]?.default_market_pct ?? null;
+
+    for (const id of itemIds) {
+      if (itemMap[id]) itemMap[id].latest_market = latestMarketMap[id] || null;
+    }
   }
 
   // Override map: { torn_item_id → unit_price }
   const overrideMap = {};
   if (Array.isArray(itemsOverride)) {
-    for (const ov of itemsOverride) overrideMap[ov.torn_item_id] = Number(ov.unit_price);
+    for (const ov of itemsOverride) {
+      overrideMap[ov.torn_item_id] = {
+        unitPrice: Number(ov.unit_price),
+        marketProtectionApplied: ov.market_protection_applied === true,
+        marketDropPct: Number(ov.market_drop_pct) || null,
+        marketProtectionThresholdPct: Number(ov.market_protection_threshold_pct) || null,
+        unprotectedPrice: Number(ov.unprotected_price) || null,
+        protectionLowestPrice: Number(ov.protection_lowest_price) || null,
+        protectionMarketValue: Number(ov.protection_market_value) || null,
+      };
+    }
   }
 
   let totalValue = 0;
@@ -101,14 +123,16 @@ async function buildPricedItems(tornData, itemsOverride) {
     const qty     = ti.details?.amount || 1;
     const listing = priceMap[id];
     const baseItem = itemMap[id];
+    const latestMarket = baseItem?.latest_market || null;
 
     let catalogPrice = listing ? (Number(listing.effective_price) || null) : null;
     if (!listing && baseItem?.market_price && globalPct) {
       catalogPrice = Math.round(Number(baseItem.market_price) * Number(globalPct));
     }
 
+    const override = overrideMap[id];
     let effectiveUnit = catalogPrice;
-    if (overrideMap[id] != null) effectiveUnit = overrideMap[id];
+    if (override && Number.isFinite(override.unitPrice)) effectiveUnit = override.unitPrice;
 
     const marketPrice = listing ? Number(listing.market_price) : (baseItem?.market_price ? Number(baseItem.market_price) : null);
     const effectiveTotal = effectiveUnit != null ? effectiveUnit * qty : null;
@@ -120,12 +144,20 @@ async function buildPricedItems(tornData, itemsOverride) {
       item_type:       listing?.item_type || null,
       quantity:        qty,
       market_price:    marketPrice,
+      latest_lowest_price: latestMarket?.price != null ? Number(latestMarket.price) : null,
+      latest_lowest_at: latestMarket?.created_at || null,
       price_mode:      listing?.price_mode || (catalogPrice != null && !listing ? 'market_pct' : null),
       resolved_pct:    listing ? Number(listing.resolved_pct) : (!listing && globalPct ? Number(globalPct) : null),
       catalog_price:   catalogPrice,
       effective_price: effectiveUnit,
       effective_total: effectiveTotal,
       in_catalog:      !!listing,
+      market_protection_applied: override?.marketProtectionApplied || false,
+      market_drop_pct: override?.marketProtectionApplied ? override.marketDropPct : null,
+      market_protection_threshold_pct: override?.marketProtectionApplied ? override.marketProtectionThresholdPct : null,
+      unprotected_price: override?.marketProtectionApplied ? override.unprotectedPrice : null,
+      protection_lowest_price: override?.marketProtectionApplied ? override.protectionLowestPrice : null,
+      protection_market_value: override?.marketProtectionApplied ? override.protectionMarketValue : null,
     };
   });
 
