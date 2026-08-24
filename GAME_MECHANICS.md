@@ -277,6 +277,12 @@ The **Item Market** is a fourth stock location — items you list for sale to ot
   market → items go to **your inventory** (a regular "Buy" flow, not a listing-stock flow).
 - Logs 1102/1115/1116 (price / anonymity edits) don't change stock.
 
+The first (lowest) market listing can be a short-lived outlier. Repeated polling
+allows a time-supported reference: the lowest price observed most frequently on
+a calendar day. This measures persistence over time, not listing depth or the
+quantity available at higher price levels, so those concepts must not be treated
+as equivalent.
+
 ## 8. Torn Points
 
 Torn Points are both a currency and a stock: you earn them, hold them, and spend them.

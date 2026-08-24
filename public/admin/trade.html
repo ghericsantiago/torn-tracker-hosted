@@ -321,6 +321,7 @@
         <div style="display:flex;gap:.5rem;align-items:center">
           <input id="receiptTokenInput" type="text" readonly style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:6px;padding:.3rem .6rem;color:var(--text);font-family:var(--mono);font-size:.78rem;outline:none" value="Loading…" />
           <button class="btn btn-ghost btn-sm" id="copyTokenBtn">Copy</button>
+          <button class="btn btn-ghost btn-sm" id="regenerateTokenBtn">Regenerate</button>
         </div>
       </div>
     </div>
@@ -899,7 +900,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 /* ── Receipt token ────────────────────────────────────────────────────── */
 async function loadReceiptToken() {
   try {
-    const s = await api('/admin/api/settings');
+    const s = await api('/api/receipt/token');
     document.getElementById('receiptTokenInput').value = s.receipt_token || '(not set)';
   } catch (e) { document.getElementById('receiptTokenInput').value = 'Error loading'; }
 }
@@ -910,6 +911,14 @@ document.getElementById('copyTokenBtn').addEventListener('click', () => {
     document.execCommand('copy');
     toast('Token copied!');
   });
+});
+document.getElementById('regenerateTokenBtn').addEventListener('click', async () => {
+  if (!window.confirm('Generate a new receipt token? The previous token will stop working immediately.')) return;
+  try {
+    const s = await api('/api/receipt/token/regenerate', { method: 'POST' });
+    document.getElementById('receiptTokenInput').value = s.receipt_token;
+    toast('New receipt token generated');
+  } catch (e) { toast('Token generation failed: ' + e.message, true); }
 });
 
 /* ── Init ─────────────────────────────────────────────────────────────── */

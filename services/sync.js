@@ -15,21 +15,8 @@ async function syncItem(item) {
       ? await fetchPointsMarket(api_key)
       : await fetchItemMarket(torn_item_id, api_key);
 
-    // Deduplicate: skip if price unchanged since last record
-    const latest = await db.query(
-      'SELECT price FROM item_market WHERE item_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [torn_item_id]
-    );
-    if (latest.rows.length && Number(latest.rows[0].price) === Number(data.price)) {
-      await db.query(
-        `UPDATE monitored_items
-         SET last_sync = NOW(), retry_count = 0, last_error = NULL, last_error_date = NULL
-         WHERE id = $1`,
-        [id]
-      );
-      return { skipped: true };
-    }
-
+    // Keep every successful sample, including unchanged prices. Receipt pricing
+    // uses these observations to find the most frequent market support each day.
     await db.query(
       `INSERT INTO item_market (item_id, name, type, price, average_price, quantity)
        VALUES ($1, $2, $3, $4, $5, $6)`,

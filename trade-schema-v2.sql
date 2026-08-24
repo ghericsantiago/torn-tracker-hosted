@@ -3,6 +3,7 @@
 
 -- Global default price on the profile
 ALTER TABLE trade_profiles ADD COLUMN IF NOT EXISTS default_market_pct DECIMAL(5,4);
+ALTER TABLE trade_profiles ADD COLUMN IF NOT EXISTS category_order JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Per-category price overrides
 CREATE TABLE IF NOT EXISTS trade_category_configs (

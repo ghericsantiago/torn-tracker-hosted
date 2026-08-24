@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.4.0
+// @version      2.5.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -11,13 +11,15 @@
 // @grant        GM_registerMenuCommand
 // @connect      api.torn.com
 // @connect      itrade.devs.surf
+// @connect      localhost
+// @connect      127.0.0.1
 // @run-at       document-idle
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const APP_URL = 'https://itrade.devs.surf';
+  const DEFAULT_APP_URL = 'https://itrade.devs.surf';
   const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   const SETTINGS_KEY = 'tta_settings_v1';
   const JOB_KEY = 'tta_active_job_v1';
@@ -36,7 +38,7 @@
     apiKey: '',
     apiPollSeconds: 30,
     waitSeconds: 60,
-    marketDropProtectionPct: 30,
+    pricingServerUrl: DEFAULT_APP_URL,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
     unlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted items got lower offers. Please review before accepting; happy to negotiate.',
@@ -72,6 +74,10 @@
 
   function saveSettings(value) {
     writeJson(SETTINGS_KEY, value);
+  }
+
+  function pricingServer(settings = getSettings()) {
+    return String(settings.pricingServerUrl || DEFAULT_APP_URL).trim().replace(/\/+$/, '');
   }
 
   function resetAutomation() {
@@ -404,16 +410,18 @@
     return false;
   }
 
-  async function previewReceipt(job) {
-    const preview = await gmPost(`${APP_URL}/api/receipt/preview`, { trade_id: Number(job.tradeId) });
+  async function previewReceipt(job, settings) {
+    const preview = await gmPost(`${pricingServer(settings)}/api/receipt/preview`, {
+      trade_id: Number(job.tradeId),
+    });
     if (preview.error) throw new Error(preview.error);
     const items = Array.isArray(preview.items) ? preview.items : [];
     if (items.length === 0) return null;
     return { ...preview, items };
   }
 
-  async function createReceipt(job, preview) {
-    const result = await gmPost(`${APP_URL}/api/receipt/create`, {
+  async function createReceipt(job, preview, settings) {
+    const result = await gmPost(`${pricingServer(settings)}/api/receipt/create`, {
       trade_id: Number(job.tradeId),
       items_override: preview.items.map(item => ({
         torn_item_id: item.torn_item_id,
@@ -422,42 +430,12 @@
         market_drop_pct: item.market_drop_pct ?? null,
         market_protection_threshold_pct: item.market_protection_threshold_pct ?? null,
         unprotected_price: item.unprotected_price ?? null,
-        protection_lowest_price: item.market_protection_applied ? item.latest_lowest_price : null,
+        protection_lowest_price: item.market_protection_applied ? item.market_reference_price : null,
         protection_market_value: item.market_protection_applied ? item.market_price : null,
       })),
     });
     if (result.error) throw new Error(result.error);
     return result;
-  }
-
-  function applyMarketDropProtection(preview, settings) {
-    const threshold = Math.min(100, Math.max(0, Number(settings.marketDropProtectionPct) || 0));
-    if (threshold <= 0) return preview;
-
-    const items = preview.items.map(item => {
-      const marketValue = Number(item.market_price) || 0;
-      const lowestOffer = Number(item.latest_lowest_price) || 0;
-      const buyRate = Number(item.resolved_pct) || 0;
-      const currentOffer = Number(item.effective_price) || 0;
-      if (item.price_mode !== 'market_pct' || marketValue <= 0 || lowestOffer <= 0 || buyRate <= 0) return item;
-
-      const dropPct = ((marketValue - lowestOffer) / marketValue) * 100;
-      if (dropPct < threshold) return item;
-
-      const protectedOffer = Math.round(lowestOffer * buyRate);
-      if (protectedOffer >= currentOffer) return item;
-      return {
-        ...item,
-        effective_price: protectedOffer,
-        effective_total: protectedOffer * item.quantity,
-        market_protection_applied: true,
-        market_drop_pct: dropPct,
-        market_protection_threshold_pct: threshold,
-        unprotected_price: currentOffer,
-      };
-    });
-    const total = items.reduce((sum, item) => sum + (Number(item.effective_price) || 0) * (Number(item.quantity) || 0), 0);
-    return { ...preview, items, total };
   }
 
   function showError(message) {
@@ -568,7 +546,7 @@
       // Wait for Torn's asynchronously rendered comment form before creating
       // anything server-side, otherwise a retry could create two receipts.
       if (!findCommentControl()) return;
-      let preview = await previewReceipt(job);
+      let preview = await previewReceipt(job, settings);
       if (!preview) {
         saveJob({
           ...job,
@@ -578,7 +556,6 @@
         });
         return;
       }
-      preview = applyMarketDropProtection(preview, settings);
       const total = Math.round(Number(preview.total) || 0);
       const cash = cashOnHand();
       if (cash != null && total > cash) {
@@ -598,8 +575,9 @@
         if (!submitComment(message, next)) throw new Error('Comment form not found');
         return;
       }
-      const receipt = await createReceipt(job, preview);
-      const receiptUrl = `${APP_URL}${receipt.url}`;
+      const receipt = await createReceipt(job, preview, settings);
+      const receiptServerUrl = pricingServer(settings);
+      const receiptUrl = `${receiptServerUrl}${receipt.url}`;
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
       const unlistedItems = preview.items.filter(item => item.in_catalog === false);
       const protectedItems = preview.items.filter(item => item.market_protection_applied === true);
@@ -623,6 +601,7 @@
         total: Math.round(Number(receipt.total) || 0),
         receiptId: receipt.short_id || receipt.id,
         receiptUrl,
+        receiptServerUrl,
         unlistedItemCount: unlistedItems.length,
         protectedItemCount: protectedItems.length,
         pricedItemSignature: counterpartItemSignature() || job.itemSignature || '',
@@ -706,7 +685,7 @@
     if (route.step === 'accept2') {
       if (job.receiptId) {
         try {
-          await gmPost(`${APP_URL}/api/receipt/${job.receiptId}/complete`, {});
+          await gmPost(`${job.receiptServerUrl || pricingServer()}/api/receipt/${job.receiptId}/complete`, {});
         } catch (_) {}
       }
       saveJob({ ...job, stage: 'complete', error: '' });
@@ -800,8 +779,8 @@
         <label>Wait before continuing <small>(seconds)</small>
           <input id="tta-wait" type="number" min="5" max="3600" value="${settings.waitSeconds}">
         </label>
-        <label>Low-market protection trigger <small>(% below market value; 0 disables)</small>
-          <input id="tta-market-drop" type="number" min="0" max="100" step="0.1" value="${settings.marketDropProtectionPct}">
+        <label>Pricing server URL <small>(use http://localhost:3001 for local testing)</small>
+          <input id="tta-server-url" type="url" value="${escapeHtml(settings.pricingServerUrl)}">
         </label>
         <label>Initial comment <small>(${MAX_COMMENT} characters maximum)</small>
           <textarea id="tta-request" maxlength="${MAX_COMMENT}">${escapeHtml(settings.requestMessage)}</textarea>
@@ -842,7 +821,7 @@
         apiKey: overlay.querySelector('#tta-api-key').value.trim(),
         apiPollSeconds: Math.min(3600, Math.max(15, Number(overlay.querySelector('#tta-api-interval').value) || 30)),
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
-        marketDropProtectionPct: Math.min(100, Math.max(0, Number(overlay.querySelector('#tta-market-drop').value) || 0)),
+        pricingServerUrl: overlay.querySelector('#tta-server-url').value.trim().replace(/\/+$/, '') || DEFAULT_APP_URL,
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
         unlistedItemsMessage: overlay.querySelector('#tta-unlisted-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.unlistedItemsMessage,

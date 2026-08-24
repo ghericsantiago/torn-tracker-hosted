@@ -3,6 +3,56 @@
   if (!id) return showError('No receipt ID in URL.');
 
   let pollTimer = null;
+  const helpTooltip = document.createElement('div');
+  helpTooltip.className = 'receipt-help-tooltip hidden';
+  helpTooltip.setAttribute('role', 'tooltip');
+  document.body.appendChild(helpTooltip);
+
+  function showHelpTooltip(target) {
+    helpTooltip.textContent = target.dataset.help || '';
+    helpTooltip.classList.remove('hidden');
+
+    const anchor = target.getBoundingClientRect();
+    const tip = helpTooltip.getBoundingClientRect();
+    const gap = 8;
+    const margin = 8;
+    const left = Math.min(
+      window.innerWidth - tip.width - margin,
+      Math.max(margin, anchor.left + anchor.width / 2 - tip.width / 2)
+    );
+    const fitsAbove = anchor.top >= tip.height + gap + margin;
+    const top = fitsAbove
+      ? anchor.top - tip.height - gap
+      : anchor.bottom + gap;
+
+    helpTooltip.style.left = `${left}px`;
+    helpTooltip.style.top = `${Math.min(
+      window.innerHeight - tip.height - margin,
+      Math.max(margin, top)
+    )}px`;
+  }
+
+  function hideHelpTooltip() {
+    helpTooltip.classList.add('hidden');
+  }
+
+  document.addEventListener('mouseover', event => {
+    const target = event.target.closest('.protection-help');
+    if (target && !target.contains(event.relatedTarget)) showHelpTooltip(target);
+  });
+  document.addEventListener('mouseout', event => {
+    const target = event.target.closest('.protection-help');
+    if (target && !target.contains(event.relatedTarget)) hideHelpTooltip();
+  });
+  document.addEventListener('focusin', event => {
+    const target = event.target.closest('.protection-help');
+    if (target) showHelpTooltip(target);
+  });
+  document.addEventListener('focusout', event => {
+    if (event.target.closest('.protection-help')) hideHelpTooltip();
+  });
+  window.addEventListener('scroll', hideHelpTooltip, true);
+  window.addEventListener('resize', hideHelpTooltip);
 
   async function load() {
     try {
@@ -81,7 +131,14 @@
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
 
       let adjustBadge = item.market_protection_applied
-        ? '<span class="adjust-badge markup">low-market protected</span>'
+        ? `<span class="protection-help" tabindex="0" role="img"
+            aria-label="Market price protection applied"
+            data-help="The day's most frequently observed lowest-market price is unusually below market value, so this offer was calculated from that supported price.">
+            <svg class="protection-shield" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.5 20 6v5.3c0 5.1-3.2 8.6-8 10.2-4.8-1.6-8-5.1-8-10.2V6l8-3.5Z" />
+              <path d="m8.7 12 2.1 2.1 4.6-4.7" />
+            </svg>
+          </span>`
         : '';
       if (!item.market_protection_applied && item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
         const delta = item.effective_price - item.catalog_price;
@@ -135,6 +192,7 @@
 
     const modeGroups = {};
     for (const item of items) {
+      if (item.market_protection_applied) continue;
       const key = item.price_mode === 'fixed'
         ? 'fixed'
         : item.resolved_pct != null ? pct(item.resolved_pct) + '_market' : 'unknown';
@@ -143,34 +201,53 @@
       else                 modeGroups[key].unlisted.push(item.item_name);
     }
 
-    const lines = [];
+    const protectionRows = [];
     const protectedItems = items.filter(item => item.market_protection_applied);
     for (const item of protectedItems) {
       const rate = pct(item.resolved_pct) || 'configured rate';
       const drop = item.market_drop_pct != null
         ? Number(item.market_drop_pct).toFixed(1).replace(/\.0$/, '') + '%'
-        : 'the configured threshold';
-      const protectedLowest = item.protection_lowest_price ?? item.latest_lowest_price;
+        : 'below market value';
+      const protectedLowest = item.protection_lowest_price ?? item.market_reference_price ?? item.latest_lowest_price;
       const protectedMarketValue = item.protection_market_value ?? item.market_price;
-      lines.push(
-        `<li><strong>Low-market protection — ${item.item_name}</strong>: newest lowest offer ${fmt(protectedLowest)} ` +
-        `is ${drop} below market value ${fmt(protectedMarketValue)}; ${rate} × ${fmt(protectedLowest)} = ` +
-        `<strong>${fmt(item.effective_price)}</strong> per item instead of ${fmt(item.unprotected_price)}.</li>`
+      const referenceDate = item.market_reference_date
+        ? String(item.market_reference_date).slice(0, 10)
+        : 'the most recent tracked day';
+      const sampleText = item.market_reference_samples
+        ? ` It was recorded ${item.market_reference_samples} time${Number(item.market_reference_samples) === 1 ? '' : 's'} on ${referenceDate}.`
+        : ` It came from ${referenceDate}.`;
+      const protectionHelp = `Frequent support is the lowest-market price observed most often during the selected tracking day.${sampleText} ` +
+        `Because ${fmt(protectedLowest)} was ${drop} below Torn market value ${fmt(protectedMarketValue)}, the ${rate} buy rate was applied to support instead of market value. ` +
+        `That changed the unit offer from ${fmt(item.unprotected_price)} to ${fmt(item.effective_price)}.`;
+      protectionRows.push(
+        `<div class="calc-row">
+          <span class="protection-help calc-help" tabindex="0" role="img" aria-label="Detailed market protection explanation" data-help="${protectionHelp}">
+            <svg class="calc-shield" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20 6v5.3c0 5.1-3.2 8.6-8 10.2-4.8-1.6-8-5.1-8-10.2V6l8-3.5Z"/><path d="m8.7 12 2.1 2.1 4.6-4.7"/></svg>
+          </span>
+          <strong class="calc-item">${item.item_name}</strong>
+          <span class="calc-step"><small>Market</small>${fmt(protectedMarketValue)}</span>
+          <span class="calc-arrow">→</span>
+          <span class="calc-step support"><small>Support · −${drop}</small>${fmt(protectedLowest)}</span>
+          <span class="calc-arrow">→</span>
+          <span class="calc-step offer"><small>${rate} offer</small>${fmt(item.effective_price)}</span>
+          <span class="calc-was">was ${fmt(item.unprotected_price)}</span>
+        </div>`
       );
     }
+    const ruleChips = [];
     for (const [, g] of Object.entries(modeGroups)) {
       const allNames = [...g.items, ...g.unlisted];
       if (!allNames.length) continue;
       if (g.mode === 'fixed') {
-        lines.push(`<li><strong>Fixed price</strong>: ${allNames.join(', ')}</li>`);
+        ruleChips.push(`<span class="rule-chip"><strong>Fixed</strong>${allNames.join(', ')}</span>`);
       } else if (g.pct != null) {
-        lines.push(`<li><strong>${pct(g.pct)} of current market price</strong>: ${allNames.join(', ')}</li>`);
+        ruleChips.push(`<span class="rule-chip"><strong>${pct(g.pct)}</strong>${allNames.join(', ')}</span>`);
       } else {
-        lines.push(`<li class="muted"><strong>No price data</strong>: ${allNames.join(', ')}</li>`);
+        ruleChips.push(`<span class="rule-chip muted"><strong>No price</strong>${allNames.join(', ')}</span>`);
       }
     }
 
-    body.innerHTML = `<ul>${lines.join('')}</ul>`;
+    body.innerHTML = `${protectionRows.length ? `<div class="calc-list">${protectionRows.join('')}</div>` : ''}${ruleChips.length ? `<div class="rule-chips">${ruleChips.join('')}</div>` : ''}`;
   }
 
   function showError(msg) {

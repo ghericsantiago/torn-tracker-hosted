@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      3.2
+// @version      3.3
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -51,6 +51,12 @@
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483640;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-family:\'Space Grotesk\',sans-serif';
 
     const itemsCopy = JSON.parse(JSON.stringify(data.items));
+    itemsCopy.forEach(item => {
+      item._editMode = item.price_mode === 'market_pct' && Number(item.market_price) > 0 ? 'market_pct' : 'fixed';
+      item._editValue = item._editMode === 'market_pct' && item.resolved_pct != null
+        ? Number((Number(item.resolved_pct) * 100).toFixed(2))
+        : Number(item.effective_price) || 0;
+    });
 
     const rowsHtml = itemsCopy.map((item, idx) => `
       <tr data-idx="${idx}" style="border-bottom:1px solid rgba(255,255,255,.04);${!item.in_catalog ? 'background:rgba(251,191,36,.04);box-shadow:inset 3px 0 0 #f59e0b;' : ''}">
@@ -70,11 +76,18 @@
         </td>
         <td style="padding:8px 12px;text-align:right;font-family:monospace;color:#94a3b8;font-size:12px">${fmt(item.market_price)}</td>
         <td style="padding:8px 12px;text-align:right">
-          <input type="number" class="tt-unit" data-idx="${idx}" data-original="${item.effective_price ?? 0}"
-            value="${item.effective_price ?? 0}"
-            style="width:110px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+          <div style="display:flex;justify-content:flex-end;gap:5px">
+            <select class="tt-mode" data-idx="${idx}" style="width:72px;background:#151a2d;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px;color:#cbd5e1;font-size:11px;outline:none">
+              <option value="fixed" ${item._editMode === 'fixed' ? 'selected' : ''}>Fixed</option>
+              <option value="market_pct" ${item._editMode === 'market_pct' ? 'selected' : ''} ${Number(item.market_price) > 0 ? '' : 'disabled'}>Market %</option>
+            </select>
+            <input type="number" class="tt-price-value" data-idx="${idx}" data-original="${item.effective_price ?? 0}"
+              value="${item._editValue}" min="0" step="${item._editMode === 'market_pct' ? '0.1' : '1'}"
+              style="width:88px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
                    border-radius:6px;padding:4px 8px;color:#6ee7f7;font-family:monospace;font-size:12px;
                    text-align:right;outline:none">
+            <span id="tt-suffix-${idx}" style="width:12px;color:#64748b;font:11px monospace;align-self:center">${item._editMode === 'market_pct' ? '%' : '$'}</span>
+          </div>
           <div id="tt-delta-${idx}" style="font-size:10px;font-family:monospace;min-height:14px;text-align:right;margin-top:2px"></div>
         </td>
         <td class="tt-sub" style="padding:8px 12px;text-align:right;font-family:monospace;color:#6ee7f7;font-size:13px">
@@ -145,12 +158,16 @@
       });
     });
 
-    // Live recalculate on price input change
-    overlay.querySelectorAll('.tt-unit').forEach(input => {
-      input.addEventListener('input', () => {
-        const idx      = Number(input.dataset.idx);
-        const unit     = Number(input.value) || 0;
+    // Live recalculate for either an exact fixed unit price or a percentage of market value.
+    function recalculateItem(idx) {
+        const input = overlay.querySelector(`.tt-price-value[data-idx="${idx}"]`);
+        const mode = overlay.querySelector(`.tt-mode[data-idx="${idx}"]`).value;
+        const entered = Math.max(0, Number(input.value) || 0);
+        const market = Number(itemsCopy[idx].market_price) || 0;
+        const unit = mode === 'market_pct' ? Math.round(market * entered / 100) : Math.round(entered);
         const original = Number(input.dataset.original) || 0;
+        itemsCopy[idx]._editMode = mode;
+        itemsCopy[idx]._editValue = entered;
         itemsCopy[idx].effective_price = unit;
         const row = overlay.querySelector(`tr[data-idx="${idx}"]`);
         row.querySelector('.tt-sub').textContent = fmt(unit * itemsCopy[idx].quantity);
@@ -170,6 +187,27 @@
         } else if (deltaEl) {
           deltaEl.textContent = '';
         }
+    }
+
+    overlay.querySelectorAll('.tt-price-value').forEach(input => {
+      input.addEventListener('input', () => recalculateItem(Number(input.dataset.idx)));
+    });
+    overlay.querySelectorAll('.tt-mode').forEach(select => {
+      select.addEventListener('change', () => {
+        const idx = Number(select.dataset.idx);
+        const input = overlay.querySelector(`.tt-price-value[data-idx="${idx}"]`);
+        const currentUnit = Number(itemsCopy[idx].effective_price) || 0;
+        if (select.value === 'market_pct') {
+          const market = Number(itemsCopy[idx].market_price) || 0;
+          input.value = market > 0 ? Number((currentUnit / market * 100).toFixed(2)) : 0;
+          input.step = '0.1';
+          document.getElementById(`tt-suffix-${idx}`).textContent = '%';
+        } else {
+          input.value = currentUnit;
+          input.step = '1';
+          document.getElementById(`tt-suffix-${idx}`).textContent = '$';
+        }
+        recalculateItem(idx);
       });
     });
 
@@ -208,6 +246,8 @@
       const overrides = itemsCopy.map(i => ({
         torn_item_id: i.torn_item_id,
         unit_price:   i.effective_price ?? 0,
+        override_price_mode: i._editMode,
+        override_market_pct: i._editMode === 'market_pct' ? (Number(i._editValue) || 0) / 100 : null,
       }));
 
       try {

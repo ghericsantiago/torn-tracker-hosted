@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS monitored_items (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Upgrade databases created before per-item sync priorities were introduced.
+ALTER TABLE monitored_items ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 4;
+
 CREATE TABLE IF NOT EXISTS item_market (
   id            SERIAL PRIMARY KEY,
   item_id       INTEGER NOT NULL,

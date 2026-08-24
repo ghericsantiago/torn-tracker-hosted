@@ -398,31 +398,120 @@ manual retry (for example, after cash on hand changes without an item change).
 If Torn's cash element is temporarily unavailable, the cash gate is skipped so
 the existing pricing flow is not blocked by incomplete page rendering.
 
-Receipt previews also include the newest recorded item-market lowest offer and
-its observation time from `item_market` for each item when that history exists.
-Before the cash check and receipt creation, the userscript applies adjustable
-low-market protection (30% below Torn market value by default; 0 disables it).
-For a percentage-priced item whose newest lowest offer is at least that far
-below its Torn market value, the same resolved buy percentage is applied to the
-lowest offer instead of market value, and only when this reduces the quote. For
-example, an 80% buy rate with market value $100 and newest lowest offer $70
+Receipt previews include both the newest recorded item-market lowest offer and
+the daily frequent-support reference selected from `item_market` history.
+Before the cash check and receipt creation, the preview endpoint automatically
+applies low-market protection whenever the daily frequent-support price is below
+Torn market value; there is no configurable drop trigger.
+For an affected percentage-priced item, the same resolved buy percentage is applied to
+that supported price instead of market value, and only when this reduces the
+quote. For example, an 80% buy rate with market value $100 and frequent support $70
 quotes $56 rather than $80. Explicit fixed-price listings are never changed.
 Items without stored lowest-offer history continue through the existing price
 cascade. The adjusted item prices are sent as receipt overrides, so the receipt,
 cash sufficiency check, posted total, and added trade money all use the protected
-amount. The threshold is editable in Trade Automation Settings.
+amount.
+
+The market sync retains every successful lowest-price poll, including unchanged
+prices, so daily frequency is meaningful. Receipt protection uses the most
+frequently observed lowest price on the current Asia/Manila calendar day. If an
+item has no observation today, it uses the mode from the most recent day on which
+that item was tracked. If two prices have equal sample counts, the price observed
+most recently on that day wins (then the lower price as a deterministic final
+tie-break). The raw newest observation remains available separately for audit.
 
 When protection applies, its audit fields are carried in `items_override` and
-stored with the receipt item: the unprotected offer, newest lowest offer,
-observed market drop, configured trigger, resolved buy percentage, and final
-protected unit price. The public receipt labels the affected row as
-**low-market protected** and its calculation section shows the full comparison
-and formula. Trade Automation also switches to an editable protected-price
+stored with the receipt item: the unprotected offer, frequent-support price,
+observed market drop, resolved buy percentage, and final
+protected unit price. The public receipt marks the affected price with a shield
+icon. Hovering the icon, or focusing it with a keyboard, shows short help text
+explaining that the day's frequent market support was unusually below market value;
+the page-level tooltip dynamically opens above or below the shield so table
+overflow cannot clip it. The compact calculation section shows each protected
+item as a Market → Support → Offer flow with the original offer struck through;
+unprotected pricing rules are summarized as small percentage/fixed-price chips.
+The calculation-row shield has a detailed hover/keyboard tooltip containing the
+selected tracking date, frequency sample count when available, market-value drop,
+buy rate, and original-versus-protected unit offer.
+Trade Automation also switches to an editable protected-price
 comment containing the receipt URL and adjusted total, warning the counterpart
 to review the lower offer and inviting negotiation. Separate editable templates
 cover protection alone and the combined protected-plus-unlisted case so the
 unlisted warning is not lost. They support `{url}`, `{total}`,
 `{protectedCount}`, `{unlistedCount}`, and `{tradeId}` as applicable.
+
+### Local receipt fixture mode
+
+Receipt preview/create can be tested locally without a real Torn trade by
+setting `RECEIPT_FIXTURE_MODE=true` outside production. The reserved trade id
+defaults to `99999999` (`RECEIPT_FIXTURE_TRADE_ID` can change it), and the
+default fixture is `tests/fixtures/receipt-trade.json`
+(`RECEIPT_FIXTURE_FILE` can select another file). Fixture loading is ignored
+whenever `NODE_ENV=production`, and receipt endpoints still require the normal
+`X-Receipt-Token`; arbitrary request bodies cannot inject trade contents. The
+fixture must use Torn's `trade.user`, `trade.trader`, and `trade.items[]` shape.
+Its item ids are resolved and priced through the real local catalog, listing,
+lowest-offer history, protection, and receipt persistence paths.
+
+The userscript's editable **Pricing server URL** defaults to
+`https://itrade.devs.surf` and may be changed to `http://localhost:3001`; its
+metadata permits `localhost` and `127.0.0.1`. This redirects preview, creation,
+receipt links, and completion consistently. A fake id can exercise the local
+receipt API, but it cannot create a fake Torn trade page or DOM; end-to-end
+comment, money-form, and acceptance automation still requires a real disposable
+Torn trade. The bundled fixture is therefore intended for API/receipt pricing
+tests, including fake `item_market` observations.
+For command-free testing, fixture mode also exposes `/receipt-test`. This local
+client keeps the pasted token only in page memory and can create an exact-id
+fake lowest-offer row, run protected preview pricing, create/open the receipt,
+and delete the fake market row plus fixture receipt. Its helper routes are
+token-protected, return 404 outside fixture mode, and the cleanup receipt route
+refuses any trade id other than the configured reserved fixture id.
+Fixture mode additionally exposes `/trade-simulator`, a local stateful trade
+harness. It can replace the reserved fixture trade's seller items in memory,
+create/remove an exact-id fake lowest offer, run the real protected preview and
+receipt-creation endpoints, simulate the cash gate and outgoing message, and set
+the displayed trade money. After preview, each item offer can keep the server
+price or be adjusted to a fixed unit price or percentage of Torn market value;
+applying adjustments recreates the receipt and total with the corresponding
+override metadata. The simulator can mark the quote accepted and invalidates
+acceptance when items or offer controls change so the revision must be applied
+or repriced. Reset removes the fake
+market row and fixture receipt and restores the file-backed fixture. The page
+and its mutation helpers are unavailable outside fixture mode and require the
+receipt token; the production Torn workflow is never mocked or modified.
+
+For the bundled fake trade, enable the two `.env` values, restart the local
+server, and send an authenticated preview request with the reserved id:
+
+```powershell
+$headers = @{ 'X-Receipt-Token' = 'YOUR_LOCAL_RECEIPT_TOKEN' }
+$body = @{ trade_id = 99999999 } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:3001/api/receipt/preview `
+  -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+The returned items and total already contain any protected calculations. A
+create request may reuse those item prices and protection audit fields as
+`items_override`; unlike preview, creation persists a local receipt row.
+The local `torn_tracker` database must have the trade schemas applied in order:
+`trade-schema.sql`, `trade-schema-v2.sql`, then
+`trade-schema-receipts.sql`. All three are idempotent and include upgrade
+columns required by the current routes (`category_order` and receipt
+`short_id`), so rerunning them does not clear existing listings or receipts.
+The Trade Admin profile drawer reads the token from authenticated
+`GET /api/receipt/token`. Its **Regenerate** control calls
+`POST /api/receipt/token/regenerate`, immediately replacing the UUID; any
+userscript or test command using the previous token must then be updated.
+
+The manual `tampermonkey/trade-receipt.user.js` preview editor supports a
+per-item pricing mode. **Fixed** treats the entered value as the exact unit
+offer; **Market %** treats it as a percentage of that row's Torn market value
+and recalculates the unit offer, subtotal, and receipt total live. Switching
+modes preserves the current offer by converting it to the closest equivalent
+fixed value or percentage. Confirmation sends the selected override mode and
+decimal percentage with the unit price, so the stored receipt's pricing mode,
+percentage badge, and calculation explanation match what the operator chose.
 
 The waiting deadline adapts to Torn's reactive item updates. With no detected
 counterpart item, the configured default deadline is retained. When the
@@ -440,9 +529,10 @@ skipped by both DOM and API discovery on later runs and expire after 30 days.
 Empty, timed-out, interrupted, reset, or partially processed trades never enter
 that history. Only a manual **Skip Trade** uses a five-minute trade-id cooldown
 to prevent immediate reselection loops. All
-five outgoing comment templates (item request, standard receipt, receipt with
-unlisted items, insufficient cash, and thank-you) are managed in the
-userscript settings. The standard receipt comment supports `{url}`, `{total}`,
+seven outgoing comment templates (item request, standard receipt, unlisted
+receipt, protected receipt, combined protected-plus-unlisted receipt,
+insufficient cash, and thank-you) are managed in the userscript settings. The
+standard receipt comment supports `{url}`, `{total}`,
 and `{tradeId}` placeholders. When any server-preview item has
 `in_catalog: false`, the automation uses the separate configurable unlisted-item
 receipt comment instead. Its short default warns that unlisted items received
