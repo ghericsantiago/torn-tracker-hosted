@@ -69,7 +69,7 @@ const PRICE_LOOKUP = `
     tl.torn_item_id,
     COALESCE(tl.item_name, ti.name) AS item_name,
     tl.item_type,
-    tl.price_mode, tl.fixed_price,
+    tl.price_mode, tl.fixed_price, tl.is_active,
     ti.market_price,
     COALESCE(tl.market_pct, tcc.market_pct, tp.default_market_pct) AS resolved_pct,
     CASE
@@ -215,7 +215,8 @@ async function buildPricedItems(tornData, itemsOverride) {
       catalog_price:   catalogPrice,
       effective_price: effectiveUnit,
       effective_total: effectiveTotal,
-      in_catalog:      !!listing,
+      // Inactive rows retain admin-only item pricing but stay unlisted publicly.
+      in_catalog:      listing?.is_active === true,
       market_protection_applied: override?.marketProtectionApplied || false,
       market_drop_pct: override?.marketProtectionApplied ? override.marketDropPct : null,
       market_protection_threshold_pct: override?.marketProtectionApplied ? override.marketProtectionThresholdPct : null,

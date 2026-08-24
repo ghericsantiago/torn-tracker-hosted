@@ -403,6 +403,14 @@ the daily frequent-support reference selected from `item_market` history.
 Before the cash check and receipt creation, the preview endpoint automatically
 applies low-market protection whenever the daily frequent-support price is below
 Torn market value; there is no configurable drop trigger.
+
+Trade Admin stores public visibility separately from explicit item pricing. If an
+item has a fixed-price or custom-percentage override and is then unchecked, its
+`trade_listings` row remains with `is_active=false`: it is hidden from the public
+trade listing but its item-level price still wins over category/global fallback
+for receipt pricing. Receipt preview reports it as `in_catalog=false`, preserving
+the unlisted-item warning and negotiation message. Unchecked items without an
+explicit override are removed as before.
 For an affected percentage-priced item, the same resolved buy percentage is applied to
 that supported price instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and frequent support $70

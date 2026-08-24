@@ -230,17 +230,21 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
         await client.query(
           `INSERT INTO trade_listings
              (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price, market_pct, notes, is_active)
-           VALUES (1,$1,$2,$3,$4,$5,$6,$7,true)
+           VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8)
            ON CONFLICT (profile_id, torn_item_id) DO UPDATE SET
              item_name=$2, item_type=$3, price_mode=$4, fixed_price=$5,
-             market_pct=$6, notes=$7, is_active=true, updated_at=NOW()`,
-          [l.torn_item_id, l.item_name, l.item_type, l.price_mode, fp, mp, l.notes || null]
+             market_pct=$6, notes=$7, is_active=$8, updated_at=NOW()`,
+          [l.torn_item_id, l.item_name, l.item_type, l.price_mode, fp, mp, l.notes || null, l.is_active !== false]
         );
       }
     }
 
     await client.query('COMMIT');
-    res.json({ ok: true, count: listings.length });
+    res.json({
+      ok: true,
+      count: listings.filter(l => l.is_active !== false).length,
+      pricing_count: listings.length,
+    });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });

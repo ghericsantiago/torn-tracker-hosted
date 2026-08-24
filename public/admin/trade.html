@@ -415,7 +415,6 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 /* ── Resolve effective price for display ──────────────────────────────── */
 function resolvePrice(item) {
   const s = selections.get(item.id);
-  if (!s?.checked) return { level: 'none' };
 
   // L3 explicit item override
   if (s.override) {
@@ -429,6 +428,8 @@ function resolvePrice(item) {
       return { level: 'l3', price_mode: 'market_pct', eff, label: fmt(eff), badge: pctFmt(o.market_pct), notes: o.notes };
     }
   }
+
+  if (!s?.checked) return { level: 'none' };
 
   // L2 category default
   const cp = catPcts[item.type];
@@ -629,13 +630,14 @@ function renderItemRow(item, type) {
   const res = resolvePrice(item);
 
   let priceHtml = '';
-  if (!chk) {
+  if (!chk && !s?.override) {
     priceHtml = `<span class="ptag none">not listed</span>`;
   } else if (res.level === 'noPrice') {
     priceHtml = `<span class="ptag none">no price set</span>`;
   } else {
     priceHtml = `<span class="ptag ${res.level}">${res.label}</span>
                  <span class="pbadge ${res.level === 'fixed' ? 'fx' : res.level}">${esc(res.badge)}</span>`;
+    if (!chk) priceHtml += `<span class="pbadge">hidden</span>`;
     if (res.notes) priceHtml += `<span class="notes-tag" title="${esc(res.notes)}">${esc(res.notes)}</span>`;
     if (s?.override) priceHtml += `<button class="clear-ovr" title="Clear item override" onclick="clearOverride(${item.id},event)">×</button>`;
   }
@@ -830,7 +832,8 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
   for (const { type, items } of catalog) {
     for (const item of items) {
       const s = selections.get(item.id);
-      if (!s?.checked) continue;
+      // Preserve an explicit item price even when it is not published.
+      if (!s || (!s.checked && !s.override)) continue;
       const o = s.override;
       listings.push({
         torn_item_id: item.id,
@@ -842,6 +845,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
                         ? o.market_pct / 100 : null,
         fixed_price:  o?.price_mode === 'fixed' ? o.fixed_price : null,
         notes:        o?.notes || null,
+        is_active:    s.checked,
       });
     }
   }
@@ -859,7 +863,8 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
         config: { global_pct: globalPct, categories: configCats, category_order: catOrder },
       }),
     });
-    toast(`Saved — ${r.count} items listed`);
+    const hiddenPricing = Math.max(0, Number(r.pricing_count || 0) - Number(r.count || 0));
+    toast(`Saved — ${r.count} items listed${hiddenPricing ? `, ${hiddenPricing} hidden price${hiddenPricing === 1 ? '' : 's'}` : ''}`);
   } catch (e) { toast('Save failed: ' + e.message, true); }
 
   const n = [...selections.values()].filter(s => s.checked).length;
