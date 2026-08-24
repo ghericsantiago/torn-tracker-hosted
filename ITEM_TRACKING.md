@@ -548,6 +548,13 @@ lower offers, asks the counterpart to review before accepting, and invites
 negotiation; it supports `{url}`, `{total}`, `{unlistedCount}`, and `{tradeId}`.
 Torn comments remain limited to 155 characters. Incoming-trade discovery watches the reactive global status
 icon whose `/trade.php` link has an `aria-label` beginning with `Trade pending:`.
+
+The authenticated receipt-admin page keeps its loaded receipt set in memory and
+supports instant text search across trade/receipt ids, buyer/seller names and ids,
+and status. Inclusive **From**/**To** date inputs filter by receipt creation time
+in the browser's local timezone; search and dates combine, Clear resets all
+filters, and the receipt counts and volume are recalculated from the visible set.
+Status edits update the in-memory record and reapply the active filters.
 The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
 the status panel, and all automation operate only while a trade page is open.
 If a pending alert appears while an already-open trade list is stale, that list

@@ -54,7 +54,7 @@ router.get('/receipts', requireAuth, (req, res) => {
 router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
+      `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
               total_value, created_at, completed_at
        FROM trade_receipts ORDER BY created_at DESC`
     );

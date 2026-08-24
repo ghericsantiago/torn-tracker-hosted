@@ -46,6 +46,14 @@
     .total-val { font-family: var(--mono); font-weight: 600; }
     .date-cell { font-size: 0.75rem; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
     .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.875rem; }
+    .receipt-toolbar { display:flex; align-items:end; gap:.55rem; flex-wrap:wrap; padding:.7rem 1.25rem; border-bottom:1px solid var(--glass-border); }
+    .receipt-filter { display:grid; gap:.2rem; }
+    .receipt-filter span { color:var(--text-muted); font:0.62rem var(--mono); text-transform:uppercase; letter-spacing:.07em; }
+    .receipt-filter input { height:32px; padding:0 .65rem; border:1px solid var(--glass-border); border-radius:6px; background:rgba(255,255,255,.025); color:var(--text); font:0.75rem var(--mono); }
+    .receipt-filter.search { flex:1 1 250px; }
+    .receipt-filter.search input { width:100%; }
+    .filter-count { margin-left:auto; align-self:center; color:var(--text-muted); font:0.7rem var(--mono); white-space:nowrap; }
+    @media (max-width:600px) { .receipt-filter.search { flex-basis:100%; } .receipt-filter.date { flex:1; } .receipt-filter.date input { width:100%; } .filter-count { margin-left:0; } }
   </style>
 </head>
 <body>
@@ -110,6 +118,13 @@
       <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid var(--glass-border)">
         <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">Trade Receipts</span>
       </div>
+      <div class="receipt-toolbar">
+        <label class="receipt-filter search"><span>Search</span><input id="receiptSearch" type="search" placeholder="Trade, receipt, buyer, seller, status…" autocomplete="off"></label>
+        <label class="receipt-filter date"><span>From</span><input id="dateFrom" type="date"></label>
+        <label class="receipt-filter date"><span>To</span><input id="dateTo" type="date"></label>
+        <button id="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
+        <span id="filterCount" class="filter-count"></span>
+      </div>
       <div style="overflow-x:auto">
         <table class="data-table receipts-table" style="min-width:700px">
           <thead>
@@ -133,6 +148,8 @@
   </main>
 
   <script>
+    let allReceipts = [];
+
     function fmt(n) {
       return n == null ? '—' : '$' + Number(n).toLocaleString();
     }
@@ -153,16 +170,41 @@
     async function load() {
       const res = await fetch('/admin/api/receipts');
       if (!res.ok) { document.getElementById('receiptsBody').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load receipts.</td></tr>'; return; }
-      const rows = await res.json();
+      allReceipts = await res.json();
+      applyFilters();
+    }
+
+    function updateStats(rows) {
 
       document.getElementById('statTotal').textContent     = rows.length;
       document.getElementById('statPending').textContent   = rows.filter(r => r.status === 'pending').length;
       document.getElementById('statCompleted').textContent = rows.filter(r => r.status === 'completed').length;
       const vol = rows.reduce((s, r) => s + (Number(r.total_value) || 0), 0);
       document.getElementById('statVolume').textContent    = fmt(vol);
+    }
+
+    function searchableReceipt(r) {
+      return [r.trade_id, r.id, r.short_id, r.status, r.buyer_name, r.buyer_id, r.seller_name, r.seller_id]
+        .filter(v => v != null).join(' ').toLowerCase();
+    }
+
+    function applyFilters() {
+      const query = document.getElementById('receiptSearch').value.trim().toLowerCase();
+      const fromValue = document.getElementById('dateFrom').value;
+      const toValue = document.getElementById('dateTo').value;
+      const from = fromValue ? new Date(`${fromValue}T00:00:00`) : null;
+      const to = toValue ? new Date(`${toValue}T23:59:59.999`) : null;
+      const rows = allReceipts.filter(r => {
+        const created = new Date(r.created_at);
+        return (!query || searchableReceipt(r).includes(query)) &&
+          (!from || created >= from) && (!to || created <= to);
+      });
+
+      updateStats(rows);
+      document.getElementById('filterCount').textContent = `${rows.length} of ${allReceipts.length}`;
 
       const tbody = document.getElementById('receiptsBody');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No receipts yet.</td></tr>'; return; }
+      if (!rows.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${allReceipts.length ? 'No receipts match these filters.' : 'No receipts yet.'}</td></tr>`; return; }
 
       tbody.innerHTML = rows.map(r => `
         <tr data-id="${r.id}">
@@ -177,6 +219,20 @@
           </td>
         </tr>`).join('');
     }
+
+    let searchTimer = null;
+    document.getElementById('receiptSearch').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(applyFilters, 120);
+    });
+    document.getElementById('dateFrom').addEventListener('change', applyFilters);
+    document.getElementById('dateTo').addEventListener('change', applyFilters);
+    document.getElementById('clearFilters').addEventListener('click', () => {
+      document.getElementById('receiptSearch').value = '';
+      document.getElementById('dateFrom').value = '';
+      document.getElementById('dateTo').value = '';
+      applyFilters();
+    });
 
     // --- Floating status menu ---
     const floatMenu = document.getElementById('statusFloatMenu');
@@ -223,24 +279,9 @@
         return;
       }
       const updated = await res.json();
-
-      // Update pill in place
-      const row = document.querySelector(`tr[data-id="${id}"]`);
-      const pillCell = row?.querySelector('.status-pill');
-      if (pillCell) {
-        pillCell.className = `status-pill ${newStatus}`;
-        pillCell.innerHTML = `<span class="status-dot"></span>${statusLabel(newStatus)}`;
-      }
-
-      // Update completed_at cell
-      const cell = document.getElementById(`completed-${id}`);
-      if (cell) cell.textContent = fmtDate(updated.completed_at);
-
-      // Re-tally stats
-      const pills = [...document.querySelectorAll('#receiptsBody .status-pill')];
-      const statuses = pills.map(p => ['pending','completed','cancelled'].find(s => p.classList.contains(s)));
-      document.getElementById('statPending').textContent   = statuses.filter(s => s === 'pending').length;
-      document.getElementById('statCompleted').textContent = statuses.filter(s => s === 'completed').length;
+      const index = allReceipts.findIndex(receipt => String(receipt.id) === String(id));
+      if (index !== -1) allReceipts[index] = { ...allReceipts[index], ...updated };
+      applyFilters();
     });
 
     document.addEventListener('click', e => {
