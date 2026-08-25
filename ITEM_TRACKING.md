@@ -758,6 +758,8 @@ to the existing `cancelled` status. Newly created receipts receive the grace win
 log synchronization cannot cancel a legitimate in-progress trade. Completed and already-cancelled
 receipts are never changed by this reconciliation. It runs hourly in the hosted scheduler and
 also immediately before the authenticated receipt list is returned.
+The receipt-list header also provides **Check Receipts**, which runs the same grace-protected
+reconciliation on demand, reloads the list, and reports how many pending receipts were cancelled.
 The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
 the status panel, and all automation operate only while a trade page is open.
 If a pending alert appears while an already-open trade list is stale, that list

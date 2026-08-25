@@ -117,7 +117,9 @@
     <div class="glass-card" style="padding:0;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid var(--glass-border)">
         <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">Trade Receipts</span>
+        <button id="reconcileReceipts" class="btn btn-ghost btn-sm">Check Receipts</button>
       </div>
+      <div id="reconcileResult" style="display:none;padding:.55rem 1.25rem;border-bottom:1px solid var(--glass-border);color:var(--text-muted);font:.7rem var(--mono)"></div>
       <div class="receipt-toolbar">
         <label class="receipt-filter search"><span>Search</span><input id="receiptSearch" type="search" placeholder="Trade, receipt, buyer, seller, status…" autocomplete="off"></label>
         <label class="receipt-filter date"><span>From</span><input id="dateFrom" type="date"></label>
@@ -232,6 +234,31 @@
       document.getElementById('dateFrom').value = '';
       document.getElementById('dateTo').value = '';
       applyFilters();
+    });
+
+    document.getElementById('reconcileReceipts').addEventListener('click', async () => {
+      const button = document.getElementById('reconcileReceipts');
+      const result = document.getElementById('reconcileResult');
+      button.disabled = true;
+      button.textContent = 'Checking...';
+      result.style.display = 'none';
+      try {
+        const response = await fetch('/admin/api/receipts/reconcile', { method: 'POST' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        await load();
+        result.textContent = data.cancelled
+          ? `${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled.`
+          : 'No eligible unmatched pending receipts found.';
+        result.style.color = data.cancelled ? '#fbbf24' : '#4ade80';
+      } catch (error) {
+        result.textContent = `Receipt check failed: ${error.message}`;
+        result.style.color = '#f87171';
+      } finally {
+        result.style.display = 'block';
+        button.disabled = false;
+        button.textContent = 'Check Receipts';
+      }
     });
 
     // --- Floating status menu ---

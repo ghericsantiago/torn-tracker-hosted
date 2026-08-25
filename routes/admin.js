@@ -68,6 +68,18 @@ router.get('/api/receipts', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.post('/api/receipts/reconcile', requireAuth, async (_req, res) => {
+  try {
+    const cancelled = await cancelUnmatchedPendingReceipts();
+    if (cancelled.length) console.log(`[receipts] Manually cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
+    res.json({
+      ok: true,
+      cancelled: cancelled.length,
+      trade_ids: cancelled.map(row => String(row.trade_id)),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.patch('/api/receipts/:id/status', requireAuth, async (req, res) => {
   const { status } = req.body;
   if (!['pending', 'completed', 'cancelled'].includes(status))
