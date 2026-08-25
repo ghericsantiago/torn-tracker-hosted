@@ -278,6 +278,11 @@ single Reset action restores the default. Date filtering determines which sale e
 to realized revenue/profit, but the cost of those sales must still be matched against acquisition
 lots from before the selected range. Purchases shown for the range and FIFO cost consumed in the
 range are therefore intentionally different measures and must have distinct labels/tooltips.
+Period `Bought` and `Purchase cost` include commercial buy/trade-in events but not inventory
+reconciliation lots. A period sale can therefore consume much older, lower-cost lots: its FIFO
+cost must use those historical costs even when newly bought items in the selected period have a
+substantially higher average price. Current `Remaining` and `Open basis` still come from all
+presently open canonical lots, including reconciliation lots.
 
 Profit should be presented conservatively. `Realized profit` covers sold, FIFO-matched quantity
 only; unsold lots appear under open quantity/cost basis and do not count as profit. If a sale is
