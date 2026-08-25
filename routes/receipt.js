@@ -7,6 +7,7 @@ const path    = require('path');
 const router  = express.Router();
 const db      = require('../db');
 const { selectFrequentMarketSupport } = require('./receipt-market-support');
+const { applyMarketDropProtection } = require('./receipt-protection');
 
 function shortId() {
   return crypto.randomBytes(6).toString('base64url').slice(0, 8);
@@ -71,6 +72,8 @@ const PRICE_LOOKUP = `
     COALESCE(tl.item_name, ti.name) AS item_name,
     tl.item_type,
     tl.price_mode, tl.fixed_price, tl.is_active,
+    COALESCE(tl.market_protection_enabled, tcc.market_protection_enabled,
+             tp.market_protection_enabled, true) AS resolved_protection_enabled,
     ti.market_price,
     COALESCE(tl.market_pct, tcc.market_pct, tp.default_market_pct) AS resolved_pct,
     CASE
@@ -101,10 +104,21 @@ async function buildPricedItems(tornData, itemsOverride) {
   // Catalog price lookup + name/market fallback for uncatalogued items + global pct
   const priceMap = {}, itemMap = {};
   let globalPct = null;
+  let globalProtection = true;
   if (itemIds.length) {
     const [priceRes, itemRes, latestMarketRes, frequentMarketRes, profileRes] = await Promise.all([
       db.query(PRICE_LOOKUP, [itemIds]),
-      db.query('SELECT id, name, market_price FROM torn_items WHERE id = ANY($1::int[])', [itemIds]),
+      db.query(
+        `SELECT ti.id, ti.name, ti.type, ti.market_price,
+                COALESCE(tcc.market_protection_enabled,
+                         tp.market_protection_enabled, true) AS resolved_protection_enabled
+         FROM torn_items ti
+         LEFT JOIN trade_profiles tp ON tp.id = 1
+         LEFT JOIN trade_category_configs tcc
+                ON tcc.profile_id = 1 AND tcc.item_type = ti.type
+         WHERE ti.id = ANY($1::int[])`,
+        [itemIds]
+      ),
       db.query(
         `SELECT DISTINCT ON (item_id) item_id, price, created_at
          FROM item_market
@@ -129,13 +143,14 @@ async function buildPricedItems(tornData, itemsOverride) {
          ORDER BY o.item_id, o.price, o.created_at`,
         [itemIds]
       ),
-      db.query('SELECT default_market_pct FROM trade_profiles WHERE id = 1'),
+      db.query('SELECT default_market_pct, market_protection_enabled FROM trade_profiles WHERE id = 1'),
     ]);
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
     for (const r of itemRes.rows)  itemMap[r.id] = r;
     const latestMarketMap = Object.fromEntries(latestMarketRes.rows.map(r => [r.item_id, r]));
     const frequentMarketMap = Object.fromEntries(selectFrequentMarketSupport(frequentMarketRes.rows));
     globalPct = profileRes.rows[0]?.default_market_pct ?? null;
+    globalProtection = profileRes.rows[0]?.market_protection_enabled !== false;
 
     for (const id of itemIds) {
       if (itemMap[id]) {
@@ -209,6 +224,11 @@ async function buildPricedItems(tornData, itemsOverride) {
       // Inactive rows retain admin-only item pricing but stay unlisted publicly.
       in_catalog:      listing?.is_active === true,
       market_protection_applied: override?.marketProtectionApplied || false,
+      market_protection_enabled: listing
+        ? listing.resolved_protection_enabled !== false
+        : baseItem?.resolved_protection_enabled != null
+          ? baseItem.resolved_protection_enabled !== false
+          : globalProtection,
       market_drop_pct: override?.marketProtectionApplied ? override.marketDropPct : null,
       market_protection_threshold_pct: override?.marketProtectionApplied ? override.marketProtectionThresholdPct : null,
       unprotected_price: override?.marketProtectionApplied ? override.unprotectedPrice : null,
@@ -218,31 +238,6 @@ async function buildPricedItems(tornData, itemsOverride) {
   });
 
   return { buyer, seller, items, totalValue: totalValue || null };
-}
-
-function applyMarketDropProtection(items) {
-  return items.map(item => {
-    const marketValue = Number(item.market_price) || 0;
-    const lowestOffer = Number(item.market_reference_price) || 0;
-    const buyRate = Number(item.resolved_pct) || 0;
-    const currentOffer = Number(item.effective_price) || 0;
-    if (item.price_mode !== 'market_pct' || marketValue <= 0 || lowestOffer <= 0 || buyRate <= 0) return item;
-    const dropPct = ((marketValue - lowestOffer) / marketValue) * 100;
-    if (dropPct <= 0) return item;
-    const protectedOffer = Math.round(lowestOffer * buyRate);
-    if (protectedOffer >= currentOffer) return item;
-    return {
-      ...item,
-      effective_price: protectedOffer,
-      effective_total: protectedOffer * item.quantity,
-      market_protection_applied: true,
-      market_drop_pct: dropPct,
-      market_protection_threshold_pct: null,
-      unprotected_price: currentOffer,
-      protection_lowest_price: lowestOffer,
-      protection_market_value: marketValue,
-    };
-  });
 }
 
 // ── GET /api/receipt/token (admin) — MUST be before /:id ─────────────────────

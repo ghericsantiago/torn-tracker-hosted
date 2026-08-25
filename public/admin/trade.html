@@ -67,6 +67,32 @@
     }
     .pct-input-sm:focus { border-color: rgba(110,231,247,0.4); }
     .pct-suffix { font-family: var(--mono); font-size: 0.72rem; color: var(--text-muted); }
+    .protection-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; padding: 0; flex: 0 0 auto;
+      border: 1px solid rgba(148,163,184,.28); border-radius: 6px;
+      background: rgba(148,163,184,.08); color: #64748b; cursor: pointer;
+      transition: all .15s;
+    }
+    .protection-toggle svg {
+      width: 16px; height: 16px; fill: rgba(148,163,184,.12);
+      stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .protection-toggle.enabled {
+      color: var(--success); border-color: rgba(74,222,128,.42);
+      background: rgba(74,222,128,.12);
+    }
+    .protection-toggle.inherited { border-style: dashed; }
+    .protection-toggle:hover { filter: brightness(1.25); }
+    .protection-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .protection-wrap { display: inline-flex; align-items: center; gap: 2px; }
+    .protection-reset {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 18px; padding: 0; margin-left: -4px;
+      border: 0; background: transparent; color: var(--text-muted);
+      font-size: 12px; cursor: pointer;
+    }
+    .protection-reset:hover { color: var(--error); }
     .cascade-hint { font-family: var(--mono); font-size: 0.6rem; color: rgba(255,255,255,0.2); margin-left: auto; }
 
     /* Toolbar */
@@ -351,6 +377,8 @@
       <input type="number" class="pct-input-sm" id="globalPctInput"
         placeholder="—" min="1" max="500" step="1" title="Global default margin %">
       <span class="pct-suffix">%</span>
+      <button type="button" class="protection-toggle" id="globalProtectionBtn" aria-pressed="true" title="Global low-market protection"></button>
+      <span class="global-strip-label">Protection</span>
       <span class="cascade-hint">→ L2 category % → L3 item override</span>
     </div>
 
@@ -390,6 +418,8 @@
 ═══════════════════════════════════════════════════════════════ */
 let globalPct  = null;
 let catPcts    = {};
+let globalProtectionEnabled = true;
+let catProtections = {};
 let catalog    = [];
 let catOrder   = [];   // display order — array of type strings
 let selections = new Map();
@@ -398,6 +428,37 @@ let sortableInst = null;
 
 const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
 const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
+
+const shieldSvg = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20 6v5.3c0 5.1-3.2 8.6-8 10.2-4.8-1.6-8-5.1-8-10.2V6l8-3.5Z"/><path d="m8.7 12 2.1 2.1 4.6-4.7"/></svg>`;
+
+function resolveCategoryProtection(type) {
+  if (Object.prototype.hasOwnProperty.call(catProtections, type)) {
+    return { enabled: catProtections[type], level: 'l2', inherited: false };
+  }
+  return { enabled: globalProtectionEnabled, level: 'l1', inherited: true };
+}
+
+function resolveProtection(item) {
+  const itemOverride = selections.get(item.id)?.protectionOverride;
+  if (itemOverride != null) return { enabled: itemOverride, level: 'l3', inherited: false };
+  const category = resolveCategoryProtection(item.type);
+  return { ...category, inherited: true };
+}
+
+function protectionButton(state, scope) {
+  const source = state.inherited ? `Inherited ${state.level.toUpperCase()}` : `Explicit ${scope}`;
+  const title = `${scope} low-market protection: ${state.enabled ? 'enabled' : 'disabled'} (${source})`;
+  return `<button type="button" class="protection-toggle ${state.enabled ? 'enabled' : ''} ${state.inherited ? 'inherited' : ''}"
+    aria-pressed="${state.enabled}" title="${title}">${shieldSvg}</button>`;
+}
+
+function updateGlobalProtectionButton() {
+  const btn = document.getElementById('globalProtectionBtn');
+  btn.innerHTML = shieldSvg;
+  btn.classList.toggle('enabled', globalProtectionEnabled);
+  btn.setAttribute('aria-pressed', String(globalProtectionEnabled));
+  btn.title = `Global low-market protection: ${globalProtectionEnabled ? 'enabled' : 'disabled'}`;
+}
 
 /* ── Utils ────────────────────────────────────────────────────────────── */
 function toast(msg, err = false) {
@@ -482,10 +543,16 @@ async function loadCatalog() {
     for (const [t, v] of Object.entries(data.cat_pcts || {})) {
       catPcts[t] = v != null ? parseFloat(v) * 100 : null;
     }
+    globalProtectionEnabled = data.global_protection_enabled !== false;
+    catProtections = {};
+    for (const [type, enabled] of Object.entries(data.cat_protections || {})) {
+      catProtections[type] = enabled === true;
+    }
     globalPct = data.global_pct != null ? parseFloat(data.global_pct) * 100 : null;
 
     // Set global input
     document.getElementById('globalPctInput').value = globalPct != null ? globalPct : '';
+    updateGlobalProtectionButton();
 
     // Init selections from existing listings
     selections.clear();
@@ -501,7 +568,12 @@ async function loadCatalog() {
           override = { price_mode: 'market_pct', market_pct: parseFloat(item.market_pct) * 100, fixed_price: null, notes: item.notes || '' };
         }
         // market_pct=null means inherit → no override
-        selections.set(item.id, { checked, override });
+        selections.set(item.id, {
+          checked,
+          override,
+          protectionOverride: item.item_protection_enabled == null
+            ? null : item.item_protection_enabled === true,
+        });
       }
     }
 
@@ -530,6 +602,11 @@ document.getElementById('globalPctInput').addEventListener('input', e => {
   updateStats();
 });
 document.getElementById('globalPctInput').addEventListener('change', () => { renderCatalog(); });
+document.getElementById('globalProtectionBtn').addEventListener('click', () => {
+  globalProtectionEnabled = !globalProtectionEnabled;
+  updateGlobalProtectionButton();
+  renderCatalog();
+});
 
 /* ── Render catalog ───────────────────────────────────────────────────── */
 function renderCatalog() {
@@ -553,6 +630,9 @@ function renderCatalog() {
     const catChecked    = checkedCount === filtered.length && filtered.length > 0;
     const catIndet      = checkedCount > 0 && checkedCount < filtered.length;
     const catPct        = catPcts[type] ?? null;
+    const catProtection = resolveCategoryProtection(type);
+    const catProtectionReset = catProtection.inherited ? ''
+      : `<button type="button" class="protection-reset cat-protection-reset" title="Inherit global protection">&times;</button>`;
     const resolvedLabel = catPct != null ? `${pctFmt(catPct)}` : (globalPct != null ? `↑ ${pctFmt(globalPct)} global` : '—');
     const isOpen        = prevOpen.has(type) || (q && filtered.some(i => i.name.toLowerCase().includes(q)));
 
@@ -566,6 +646,9 @@ function renderCatalog() {
         <input type="checkbox" class="cat-check" ${catChecked ? 'checked' : ''}>
         <span class="cat-label">${esc(type)}</span>
         <span class="cat-tally"><span class="n-listed">${listedCount}</span>/${filtered.length}</span>
+        <div class="protection-wrap cat-protection-wrap" onclick="event.stopPropagation()">
+          ${protectionButton(catProtection, 'Category')}${catProtectionReset}
+        </div>
         <div class="cat-pct-wrap" onclick="event.stopPropagation()">
           <span class="cat-pct-label">L2 %</span>
           <input type="number" class="cat-pct-input ${catPct != null ? 'has-value' : ''}"
@@ -591,7 +674,7 @@ function renderCatalog() {
 
     // Expand/collapse
     sec.querySelector('.cat-row').addEventListener('click', e => {
-      if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-check') ||
+      if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-protection-wrap') || e.target.closest('.cat-check') ||
           e.target.closest('.sort-btns') || e.target.closest('.drag-handle')) return;
       sec.classList.toggle('open');
     });
@@ -612,6 +695,17 @@ function renderCatalog() {
     });
     pctInput.addEventListener('change', () => { renderCatalog(); });
 
+    sec.querySelector('.cat-protection-wrap .protection-toggle').addEventListener('click', e => {
+      e.stopPropagation();
+      catProtections[type] = !resolveCategoryProtection(type).enabled;
+      renderCatalog();
+    });
+    sec.querySelector('.cat-protection-reset')?.addEventListener('click', e => {
+      e.stopPropagation();
+      delete catProtections[type];
+      renderCatalog();
+    });
+
     // Wire item rows
     wireItemRows(sec, filtered, type);
     body.appendChild(sec);
@@ -628,6 +722,9 @@ function renderItemRow(item, type) {
   const s   = selections.get(item.id);
   const chk = s?.checked ?? false;
   const res = resolvePrice(item);
+  const protection = resolveProtection(item);
+  const protectionReset = protection.inherited ? ''
+    : `<button type="button" class="protection-reset item-protection-reset" title="Inherit category/global protection">&times;</button>`;
 
   let priceHtml = '';
   if (!chk && !s?.override) {
@@ -654,6 +751,9 @@ function renderItemRow(item, type) {
       <span class="item-name-col" title="${esc(item.name)}">${esc(item.name)}</span>
       <div class="item-price-col">
         ${priceHtml}
+        <span class="protection-wrap item-protection-wrap">
+          ${protectionButton(protection, 'Item')}${protectionReset}
+        </span>
         <button class="item-edit-btn ${s?.override ? 'active' : ''}" title="Set item override">✏</button>
       </div>
     </div>
@@ -701,6 +801,19 @@ function wireItemRows(sec, items, type) {
       renderCatalog();
     });
     row.querySelector('.item-check').addEventListener('click', e => e.stopPropagation());
+
+    row.querySelector('.item-protection-wrap .protection-toggle').addEventListener('click', e => {
+      e.stopPropagation();
+      const current = selections.get(item.id) || { checked: false, override: null, protectionOverride: null };
+      selections.set(item.id, { ...current, protectionOverride: !resolveProtection(item).enabled });
+      renderCatalog();
+    });
+    row.querySelector('.item-protection-reset')?.addEventListener('click', e => {
+      e.stopPropagation();
+      const current = selections.get(item.id);
+      if (current) selections.set(item.id, { ...current, protectionOverride: null });
+      renderCatalog();
+    });
 
     row.querySelector('.item-edit-btn').addEventListener('click', e => {
       e.stopPropagation();
@@ -833,7 +946,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
     for (const item of items) {
       const s = selections.get(item.id);
       // Preserve an explicit item price even when it is not published.
-      if (!s || (!s.checked && !s.override)) continue;
+      if (!s || (!s.checked && !s.override && s.protectionOverride == null)) continue;
       const o = s.override;
       listings.push({
         torn_item_id: item.id,
@@ -846,6 +959,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
         fixed_price:  o?.price_mode === 'fixed' ? o.fixed_price : null,
         notes:        o?.notes || null,
         is_active:    s.checked,
+        market_protection_enabled: s.protectionOverride,
       });
     }
   }
@@ -854,13 +968,23 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
   for (const [type, pct] of Object.entries(catPcts)) {
     if (pct != null) configCats[type] = pct;
   }
+  const configProtections = {};
+  for (const [type, enabled] of Object.entries(catProtections)) {
+    configProtections[type] = enabled;
+  }
 
   try {
     const r = await api('/admin/api/trade/bulk-save', {
       method: 'POST',
       body: JSON.stringify({
         listings,
-        config: { global_pct: globalPct, categories: configCats, category_order: catOrder },
+        config: {
+          global_pct: globalPct,
+          categories: configCats,
+          category_order: catOrder,
+          global_protection_enabled: globalProtectionEnabled,
+          category_protections: configProtections,
+        },
       }),
     });
     const hiddenPricing = Math.max(0, Number(r.pricing_count || 0) - Number(r.count || 0));

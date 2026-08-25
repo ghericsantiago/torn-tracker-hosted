@@ -402,7 +402,20 @@ Receipt previews include both the newest recorded item-market lowest offer and
 the daily frequent-support reference selected from `item_market` history.
 Before the cash check and receipt creation, the preview endpoint automatically
 applies low-market protection whenever the daily frequent-support price is below
-Torn market value; there is no configurable drop trigger.
+Torn market value; there is no configurable drop trigger. Whether protection is
+eligible follows a separate three-level configuration cascade:
+`item protection override -> category protection override -> global protection
+default`. Category and item values are nullable so clearing an override restores
+inheritance. Existing installations migrate with global protection enabled,
+preserving the behavior that predated these controls.
+
+Trade Price Management shows the receipt shield at all three levels. Green means
+the effective protection state is enabled and gray means disabled; a dashed shield
+is inherited, while a solid shield is an explicit setting. Clicking a global
+shield toggles its default. Clicking a category or item shield stores the opposite
+of its current effective state as an explicit override, and the adjacent reset
+control returns it to its parent. Category protection can be configured without a
+category percentage, and item protection can be retained on a hidden listing.
 
 Trade Admin stores public visibility separately from explicit item pricing. If an
 item has a fixed-price or custom-percentage override and is then unchecked, its
@@ -411,7 +424,7 @@ trade listing but its item-level price still wins over category/global fallback
 for receipt pricing. Receipt preview reports it as `in_catalog=false`, preserving
 the unlisted-item warning and negotiation message. Unchecked items without an
 explicit override are removed as before.
-For an affected percentage-priced item, the same resolved buy percentage is applied to
+For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
 that supported price instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and frequent support $70
 quotes $56 rather than $80. Explicit fixed-price listings are never changed.
@@ -460,6 +473,15 @@ the band observed most recently on that day wins, followed by the lower median a
 a deterministic final tie-break. The raw newest observation remains available
 separately for audit. The support line is therefore the median of the densest 1%
 price band, not the average, minimum, or a fitted trend line across the whole day.
+
+One observed boundary case is Panda Plushie on 2026-08-25: its winning anchored
+band was approximately `$44,889` through `$45,337.89`, with a `$45,300` median
+and 139 samples when the receipt was created. Torn market value was approximately
+`$45,339`, only `$39` (about 0.09%) above support. It still received protection
+because the current rule has no minimum market-drop threshold: any positive drop
+that lowers the rounded percentage offer qualifies. The near overlap of the red
+Support and dashed Market Value graph lines is therefore expected under the
+current rule, and also illustrates the fixed-anchor band's hard upper boundary.
 
 When protection applies, its audit fields are carried in `items_override` and
 stored with the receipt item: the unprotected offer, frequent-support price,

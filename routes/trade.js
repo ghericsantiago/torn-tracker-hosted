@@ -17,6 +17,11 @@ const CASCADE_SELECT = `
     ti.market_price,
     tcc.market_pct                                          AS cat_pct,
     tp.default_market_pct                                   AS global_pct,
+    tl.market_protection_enabled                            AS item_protection_enabled,
+    tcc.market_protection_enabled                           AS cat_protection_enabled,
+    tp.market_protection_enabled                            AS global_protection_enabled,
+    COALESCE(tl.market_protection_enabled, tcc.market_protection_enabled,
+             tp.market_protection_enabled, true)            AS resolved_protection_enabled,
     COALESCE(tl.market_pct, tcc.market_pct, tp.default_market_pct) AS resolved_pct,
     CASE
       WHEN tl.price_mode = 'fixed' THEN tl.fixed_price
@@ -119,12 +124,17 @@ router.put('/admin/api/trade/profile', requireAuth, async (req, res) => {
 router.get('/admin/api/trade/config', requireAuth, async (req, res) => {
   try {
     const [profileRes, catRes] = await Promise.all([
-      db.query('SELECT default_market_pct FROM trade_profiles WHERE id = 1'),
-      db.query('SELECT item_type, market_pct FROM trade_category_configs WHERE profile_id = 1 ORDER BY item_type'),
+      db.query('SELECT default_market_pct, market_protection_enabled FROM trade_profiles WHERE id = 1'),
+      db.query('SELECT item_type, market_pct, market_protection_enabled FROM trade_category_configs WHERE profile_id = 1 ORDER BY item_type'),
     ]);
     res.json({
       global_pct:  profileRes.rows[0]?.default_market_pct ?? null,
       categories:  Object.fromEntries(catRes.rows.map(r => [r.item_type, r.market_pct])),
+      global_protection_enabled: profileRes.rows[0]?.market_protection_enabled !== false,
+      category_protections: Object.fromEntries(
+        catRes.rows.filter(r => r.market_protection_enabled != null)
+          .map(r => [r.item_type, r.market_protection_enabled])
+      ),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -144,6 +154,11 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
         tl.is_active,
         tcc.market_pct           AS cat_pct,
         tp.default_market_pct    AS global_pct,
+        tl.market_protection_enabled AS item_protection_enabled,
+        tcc.market_protection_enabled AS cat_protection_enabled,
+        tp.market_protection_enabled AS global_protection_enabled,
+        COALESCE(tl.market_protection_enabled, tcc.market_protection_enabled,
+                 tp.market_protection_enabled, true) AS resolved_protection_enabled,
         tp.category_order        AS category_order,
         CASE
           WHEN tl.price_mode = 'fixed' THEN tl.fixed_price
@@ -171,15 +186,21 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
     const globalPct   = rows[0]?.global_pct ?? null;
     const categoryOrder = rows[0]?.category_order ?? [];
     const catPcts     = {};
+    const catProtections = {};
     for (const r of rows) {
       if (r.cat_pct != null) catPcts[r.type] = r.cat_pct;
+      if (r.cat_protection_enabled != null) catProtections[r.type] = r.cat_protection_enabled;
     }
 
     const categories = Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([type, items]) => ({ type, items }));
 
-    res.json({ categories, global_pct: globalPct, cat_pcts: catPcts, category_order: categoryOrder });
+    res.json({
+      categories, global_pct: globalPct, cat_pcts: catPcts, category_order: categoryOrder,
+      global_protection_enabled: rows[0]?.global_protection_enabled !== false,
+      cat_protections: catProtections,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -194,23 +215,29 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
 
     // 1. Save global default + category order
     const gp       = config.global_pct != null ? parseFloat(config.global_pct) / 100 : null;
+    const globalProtection = config.global_protection_enabled !== false;
     const catOrd   = Array.isArray(config.category_order) ? JSON.stringify(config.category_order) : null;
     await client.query(
-      'UPDATE trade_profiles SET default_market_pct=$1, category_order=$2, updated_at=NOW() WHERE id=1',
-      [gp, catOrd]
+      `UPDATE trade_profiles SET default_market_pct=$1, category_order=$2,
+         market_protection_enabled=$3, updated_at=NOW() WHERE id=1`,
+      [gp, catOrd, globalProtection]
     );
 
     // 2. Replace category configs entirely
     await client.query('DELETE FROM trade_category_configs WHERE profile_id=1');
     const cats = config.categories || {};
-    for (const [type, pct] of Object.entries(cats)) {
-      if (pct != null) {
-        await client.query(
-          `INSERT INTO trade_category_configs (profile_id, item_type, market_pct)
-           VALUES (1, $1, $2)`,
-          [type, parseFloat(pct) / 100]
-        );
-      }
+    const categoryProtections = config.category_protections || {};
+    const configuredTypes = new Set([...Object.keys(cats), ...Object.keys(categoryProtections)]);
+    for (const type of configuredTypes) {
+      const pct = cats[type];
+      const protection = Object.prototype.hasOwnProperty.call(categoryProtections, type)
+        ? categoryProtections[type] === true : null;
+      await client.query(
+        `INSERT INTO trade_category_configs
+           (profile_id, item_type, market_pct, market_protection_enabled)
+         VALUES (1, $1, $2, $3)`,
+        [type, pct != null ? parseFloat(pct) / 100 : null, protection]
+      );
     }
 
     // 3. Replace listings
@@ -227,14 +254,18 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
         // market_pct=value → explicit item-level override
         const fp = l.price_mode === 'fixed'      ? (parseInt(l.fixed_price) || null) : null;
         const mp = l.price_mode === 'market_pct' ? (l.market_pct != null ? parseFloat(l.market_pct) : null) : null;
+        const protection = l.market_protection_enabled == null ? null : l.market_protection_enabled === true;
         await client.query(
           `INSERT INTO trade_listings
-             (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price, market_pct, notes, is_active)
-           VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8)
+             (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price,
+              market_pct, notes, is_active, market_protection_enabled)
+           VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8,$9)
            ON CONFLICT (profile_id, torn_item_id) DO UPDATE SET
              item_name=$2, item_type=$3, price_mode=$4, fixed_price=$5,
-             market_pct=$6, notes=$7, is_active=$8, updated_at=NOW()`,
-          [l.torn_item_id, l.item_name, l.item_type, l.price_mode, fp, mp, l.notes || null, l.is_active !== false]
+             market_pct=$6, notes=$7, is_active=$8,
+             market_protection_enabled=$9, updated_at=NOW()`,
+          [l.torn_item_id, l.item_name, l.item_type, l.price_mode, fp, mp,
+           l.notes || null, l.is_active !== false, protection]
         );
       }
     }
