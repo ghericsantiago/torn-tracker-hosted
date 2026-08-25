@@ -249,7 +249,7 @@
         await load();
         result.textContent = data.cancelled
           ? `${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled.`
-          : 'No eligible unmatched pending receipts found.';
+          : 'No unmatched pending receipts found.';
         result.style.color = data.cancelled ? '#fbbf24' : '#4ade80';
       } catch (error) {
         result.textContent = `Receipt check failed: ${error.message}`;
