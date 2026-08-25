@@ -416,7 +416,8 @@ router.post('/api/receipt/create', cors(CORS_TORN), async (req, res) => {
              seller_id = EXCLUDED.seller_id,
              seller_name = EXCLUDED.seller_name,
              status = 'pending',
-             completed_at = NULL
+             completed_at = NULL,
+             auto_cancelled = FALSE
        RETURNING id, short_id`,
       [trade_id, sid, buyer.id || null, buyer.name || null,
        seller.id || null, seller.name || null,
@@ -437,7 +438,7 @@ router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
   try {
     if (!await verifyToken(req, res)) return;
     await db.query(
-      `UPDATE trade_receipts SET status='completed', completed_at=NOW()
+      `UPDATE trade_receipts SET status='completed', completed_at=NOW(), auto_cancelled=FALSE
        WHERE (short_id=$1 OR id::text=$1) AND status='pending'`,
       [req.params.id]
     );

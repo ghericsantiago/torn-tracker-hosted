@@ -5,7 +5,7 @@ const db      = require('../db');
 const { syncItem } = require('../services/sync');
 const { fetchAllTornItems } = require('../services/torn');
 const { cleanupOldRecords } = require('../scheduler');
-const { cancelUnmatchedPendingReceipts } = require('../services/receipt-reconciliation');
+const { reconcileReceiptStatuses } = require('../services/receipt-reconciliation');
 
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
@@ -54,15 +54,16 @@ router.get('/receipts', requireAuth, (req, res) => {
 
 router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
-    const cancelled = await cancelUnmatchedPendingReceipts();
+    const reconciled = await reconcileReceiptStatuses();
     const { rows } = await db.query(
       `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
               total_value, created_at, completed_at
        FROM trade_receipts ORDER BY created_at DESC`
     );
-    if (cancelled.length) {
-      console.log(`[receipts] Auto-cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
-      res.set('X-Auto-Cancelled-Receipts', String(cancelled.length));
+    if (reconciled.cancelled.length || reconciled.completed.length) {
+      console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+      res.set('X-Auto-Cancelled-Receipts', String(reconciled.cancelled.length));
+      res.set('X-Auto-Completed-Receipts', String(reconciled.completed.length));
     }
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -70,12 +71,14 @@ router.get('/api/receipts', requireAuth, async (req, res) => {
 
 router.post('/api/receipts/reconcile', requireAuth, async (_req, res) => {
   try {
-    const cancelled = await cancelUnmatchedPendingReceipts();
-    if (cancelled.length) console.log(`[receipts] Manually cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
+    const reconciled = await reconcileReceiptStatuses();
+    if (reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Manual reconciliation: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
     res.json({
       ok: true,
-      cancelled: cancelled.length,
-      trade_ids: cancelled.map(row => String(row.trade_id)),
+      cancelled: reconciled.cancelled.length,
+      completed: reconciled.completed.length,
+      cancelled_trade_ids: reconciled.cancelled.map(row => String(row.trade_id)),
+      completed_trade_ids: reconciled.completed.map(row => String(row.trade_id)),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -88,7 +91,8 @@ router.patch('/api/receipts/:id/status', requireAuth, async (req, res) => {
     const { rows } = await db.query(
       `UPDATE trade_receipts
        SET status = $1::text,
-           completed_at = CASE WHEN $1::text = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END
+           completed_at = CASE WHEN $1::text = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END,
+           auto_cancelled = FALSE
        WHERE id = $2 RETURNING *`,
       [status, req.params.id]
     );

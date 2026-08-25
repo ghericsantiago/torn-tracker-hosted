@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { syncAllItems } = require('./services/sync');
-const { cancelUnmatchedPendingReceipts } = require('./services/receipt-reconciliation');
+const { reconcileReceiptStatuses } = require('./services/receipt-reconciliation');
 const db = require('./db');
 
 let running      = false;
@@ -42,8 +42,8 @@ async function runReceiptReconciliation() {
   if (now - lastReceiptReconciliation < ONE_HOUR_MS) return;
   lastReceiptReconciliation = now;
   try {
-    const cancelled = await cancelUnmatchedPendingReceipts();
-    if (cancelled.length) console.log(`[receipts] Auto-cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
+    const reconciled = await reconcileReceiptStatuses();
+    if (reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
   } catch (err) {
     console.error('[receipts] Auto-cancel error:', err.message);
   }

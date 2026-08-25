@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS trade_receipts (
   completed_at TIMESTAMPTZ
 );
 
+ALTER TABLE trade_receipts ADD COLUMN IF NOT EXISTS auto_cancelled BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE UNIQUE INDEX IF NOT EXISTS trade_receipts_trade_id_idx ON trade_receipts (trade_id);
 
 -- Upgrade databases whose receipt table predates public short links.

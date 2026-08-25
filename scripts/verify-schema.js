@@ -9,7 +9,7 @@ const REQUIRED_COLUMNS = {
   trade_profiles: ['default_market_pct', 'category_order', 'receipt_token', 'market_protection_enabled'],
   trade_listings: ['torn_item_id', 'price_mode', 'market_pct', 'fixed_price', 'market_protection_enabled'],
   trade_category_configs: ['item_type', 'market_pct', 'market_protection_enabled'],
-  trade_receipts: ['short_id', 'items', 'total_value', 'completed_at'],
+  trade_receipts: ['short_id', 'items', 'total_value', 'completed_at', 'auto_cancelled'],
   activity: ['category'],
   manual_adjustments: ['scope'],
   item_sources: ['dir'],

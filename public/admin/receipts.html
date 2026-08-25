@@ -247,9 +247,10 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
         await load();
-        result.textContent = data.cancelled
-          ? `${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled.`
-          : 'No unmatched pending receipts found.';
+        const changes = [];
+        if (data.cancelled) changes.push(`${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled`);
+        if (data.completed) changes.push(`${data.completed} previously auto-cancelled receipt${data.completed === 1 ? '' : 's'} completed`);
+        result.textContent = changes.length ? changes.join('; ') + '.' : 'All receipt statuses already match Inventory Monitor.';
         result.style.color = data.cancelled ? '#fbbf24' : '#4ade80';
       } catch (error) {
         result.textContent = `Receipt check failed: ${error.message}`;
