@@ -309,6 +309,14 @@ come from the persisted production accounting implementation described above. It
 JavaScript references are relative to the HTML asset, while the production page itself is served
 through the authenticated `/admin/trading-profit` route.
 
+The item table is server-paginated in batches of 50 and lot tabs in batches of 30. An
+`IntersectionObserver` requests the next batch as the corresponding Load More control approaches
+the viewport; the controls also remain directly clickable. Sorting is performed by whitelisted
+server columns so it covers unloaded rows as well as visible rows. Items default to latest
+activity date descending, while each lot tab defaults to acquisition date descending. Clicking
+any sortable heading reverses its direction; selecting a new heading uses descending order except
+for item name, which starts ascending. Native `loading="lazy"` is also set on item images.
+
 ---
 
 ## 6. Reference data files

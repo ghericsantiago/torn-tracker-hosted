@@ -57,11 +57,23 @@
       </div>
       <div class="table-wrap">
         <table class="data-table item-table">
-          <thead><tr><th>Item</th><th>Bought</th><th>Purchase cost</th><th>Sold</th><th>Revenue</th><th>FIFO cost</th><th>Profit</th><th>Margin</th><th>Remaining</th><th></th></tr></thead>
+          <thead><tr>
+            <th><button class="sort-button" data-item-sort="item">Item</button></th>
+            <th><button class="sort-button active" data-item-sort="date">Date <span>↓</span></button></th>
+            <th><button class="sort-button" data-item-sort="bought">Bought</button></th>
+            <th><button class="sort-button" data-item-sort="purchase_cost">Purchase cost</button></th>
+            <th><button class="sort-button" data-item-sort="sold">Sold</button></th>
+            <th><button class="sort-button" data-item-sort="revenue">Revenue</button></th>
+            <th><button class="sort-button" data-item-sort="fifo_cost">FIFO cost</button></th>
+            <th><button class="sort-button" data-item-sort="profit">Profit</button></th>
+            <th><button class="sort-button" data-item-sort="margin">Margin</button></th>
+            <th><button class="sort-button" data-item-sort="remaining">Remaining</button></th><th></th>
+          </tr></thead>
           <tbody id="itemRows"></tbody>
         </table>
       </div>
       <div class="empty-state" id="emptyState">No items match these filters.</div>
+      <button class="load-more" id="loadMoreItems">Load more items</button>
     </section>
 
     <div id="detailHome">
@@ -80,6 +92,7 @@
       </div>
       <div class="asof" id="asOfNote">Open-lot balances are shown as of now, independent of the report date filter.</div>
       <div class="table-wrap"><table class="data-table"><thead id="lotHead"></thead><tbody id="lotRows"></tbody></table></div>
+      <button class="load-more" id="loadMoreLots">Load more lots</button>
     </section>
     </div>
   </main>

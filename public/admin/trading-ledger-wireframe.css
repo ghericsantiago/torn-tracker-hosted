@@ -36,6 +36,11 @@
 .data-table { width:100%; border-collapse:collapse; min-width:850px; }
 .data-table th { position:sticky; top:0; text-align:right; padding:9px 12px; color:var(--text-muted); background:#0b0c14; font:600 .58rem var(--mono); text-transform:uppercase; white-space:nowrap; }
 .data-table th:first-child,.data-table td:first-child { text-align:left; }
+.sort-button { border:0; background:transparent; color:inherit; font:inherit; text-transform:inherit; cursor:pointer; white-space:nowrap; }
+.sort-button:hover,.sort-button.active { color:var(--accent); }
+.load-more { display:none; width:100%; border:0; border-top:1px solid var(--glass-border); padding:11px; background:rgba(110,231,247,.035); color:var(--accent); font:600 .68rem var(--mono); cursor:pointer; }
+.load-more:hover { background:rgba(110,231,247,.08); }
+.load-more.visible { display:block; }
 .data-table td { border-top:1px solid rgba(255,255,255,.045); padding:10px 12px; text-align:right; font:500 .7rem var(--mono); white-space:nowrap; }
 .item-table tbody tr { cursor:pointer; }.item-table tbody tr:hover,.item-table tbody tr.selected { background:rgba(110,231,247,.045); }
 .item-cell { display:flex; align-items:center; gap:9px; text-align:left; }

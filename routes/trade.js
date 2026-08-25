@@ -327,14 +327,19 @@ router.post('/admin/api/trading-profit/rebuild', requireAuth, async (req, res) =
 router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) => {
   try {
     const from=req.query.from||null, to=req.query.to||null, q=(req.query.q||'').trim();
+    const limit=Math.min(100,Math.max(10,Number(req.query.limit)||50));
+    const offset=Math.max(0,Number(req.query.offset)||0);
+    const sortColumns={date:'last_activity',item:'name',bought:'bought',purchase_cost:'purchase_cost',sold:'sold',revenue:'revenue',fifo_cost:'fifo_cost',profit:'profit',margin:'margin',remaining:'remaining'};
+    const sort=sortColumns[req.query.sort]||'last_activity';
+    const direction=String(req.query.direction).toLowerCase()==='asc'?'ASC':'DESC';
     const {rows}=await db.query(`
       WITH purchases AS (
-        SELECT item_id, SUM(qty) bought, SUM(total_price) purchase_cost
+        SELECT item_id, SUM(qty) bought, SUM(total_price) purchase_cost, MAX(happened_at) last_buy
         FROM trading_events WHERE side='buy' AND channel IN ('buy','trade','ammo_buy','points_buy')
           AND ($1::date IS NULL OR happened_at >= $1::date)
           AND ($2::date IS NULL OR happened_at < $2::date + interval '1 day') GROUP BY item_id
       ), sales AS (
-        SELECT e.item_id, SUM(e.qty) sold, SUM(e.total_price) revenue,
+        SELECT e.item_id, SUM(e.qty) sold, SUM(e.total_price) revenue, MAX(e.happened_at) last_sale,
           SUM(COALESCE(m.cost,0)) fifo_cost, SUM(COALESCE(m.profit,0)) profit,
           SUM(e.unmatched_qty) unmatched
         FROM trading_events e LEFT JOIN (
@@ -344,36 +349,72 @@ router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) =
           AND ($1::date IS NULL OR e.happened_at >= $1::date)
           AND ($2::date IS NULL OR e.happened_at < $2::date + interval '1 day') GROUP BY e.item_id
       ), open AS (
-        SELECT item_id,SUM(qty_remaining) remaining,SUM(qty_remaining*unit_cost) open_cost
+        SELECT item_id,SUM(qty_remaining) remaining,SUM(qty_remaining*unit_cost) open_cost,MAX(acquired_at) last_lot
         FROM trading_fifo_lots GROUP BY item_id
       )
       SELECT ti.id item_id,ti.name,ti.type,COALESCE(p.bought,0) bought,COALESCE(p.purchase_cost,0) purchase_cost,
         COALESCE(s.sold,0) sold,COALESCE(s.revenue,0) revenue,COALESCE(s.fifo_cost,0) fifo_cost,
         COALESCE(s.profit,0) profit,COALESCE(s.unmatched,0) unmatched,COALESCE(o.remaining,0) remaining,
-        COALESCE(o.open_cost,0) open_cost
+        COALESCE(o.open_cost,0) open_cost,
+        GREATEST(p.last_buy,s.last_sale,o.last_lot) last_activity,
+        CASE WHEN COALESCE(s.revenue,0)>0 THEN COALESCE(s.profit,0)/s.revenue*100 ELSE 0 END margin,
+        COUNT(*) OVER() total_count,
+        SUM(COALESCE(p.bought,0)) OVER() total_bought,
+        SUM(COALESCE(p.purchase_cost,0)) OVER() total_purchase_cost,
+        SUM(COALESCE(s.sold,0)) OVER() total_sold,
+        SUM(COALESCE(s.revenue,0)) OVER() total_revenue,
+        SUM(COALESCE(s.fifo_cost,0)) OVER() total_fifo_cost,
+        SUM(COALESCE(s.profit,0)) OVER() total_profit,
+        SUM(COALESCE(s.unmatched,0)) OVER() total_unmatched,
+        SUM(COALESCE(o.remaining,0)) OVER() total_remaining,
+        SUM(COALESCE(o.open_cost,0)) OVER() total_open_cost
       FROM torn_items ti LEFT JOIN purchases p ON p.item_id=ti.id LEFT JOIN sales s ON s.item_id=ti.id
       LEFT JOIN open o ON o.item_id=ti.id
       WHERE (p.item_id IS NOT NULL OR s.item_id IS NOT NULL OR o.item_id IS NOT NULL)
-        AND ($3='' OR ti.name ILIKE '%'||$3||'%') ORDER BY profit DESC,ti.name`,[from,to,q]);
-    const items=rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,['item_id','name','type'].includes(k)?v:Number(v)])));
-    const totals=items.reduce((a,x)=>{for(const k of ['bought','purchase_cost','sold','revenue','fifo_cost','profit','unmatched','remaining','open_cost'])a[k]+=x[k];return a;},{bought:0,purchase_cost:0,sold:0,revenue:0,fifo_cost:0,profit:0,unmatched:0,remaining:0,open_cost:0});
-    res.json({items,totals});
+        AND ($3='' OR ti.name ILIKE '%'||$3||'%')
+      ORDER BY ${sort} ${direction} NULLS LAST,ti.name ASC LIMIT $4 OFFSET $5`,[from,to,q,limit,offset]);
+    const meta=rows[0]||{};
+    const hidden=new Set(['total_count','total_bought','total_purchase_cost','total_sold','total_revenue','total_fifo_cost','total_profit','total_unmatched','total_remaining','total_open_cost']);
+    const items=rows.map(r=>Object.fromEntries(Object.entries(r).filter(([k])=>!hidden.has(k)).map(([k,v])=>[k,['item_id','name','type','last_activity'].includes(k)?v:Number(v)])));
+    const totals={bought:Number(meta.total_bought)||0,purchase_cost:Number(meta.total_purchase_cost)||0,sold:Number(meta.total_sold)||0,revenue:Number(meta.total_revenue)||0,fifo_cost:Number(meta.total_fifo_cost)||0,profit:Number(meta.total_profit)||0,unmatched:Number(meta.total_unmatched)||0,remaining:Number(meta.total_remaining)||0,open_cost:Number(meta.total_open_cost)||0};
+    res.json({items,totals,total:Number(meta.total_count)||0,limit,offset,sort:req.query.sort||'date',direction:direction.toLowerCase()});
   } catch(e){console.error('[trading-profit/overview]',e);res.status(500).json({error:e.message});}
 });
 
 router.get('/admin/api/trading-profit/items/:itemId', requireAuth, async (req,res)=>{
   try{
     const itemId=Number(req.params.itemId); if(!itemId)return res.status(400).json({error:'Invalid item'});
-    const [itemRes,lotsRes,activityRes]=await Promise.all([
+    const lotLimit=Math.min(100,Math.max(10,Number(req.query.lot_limit)||30));
+    const lotOffset=Math.max(0,Number(req.query.lot_offset)||0);
+    const lotSortColumns={date:'l.acquired_at',original:'l.qty_original',remaining:'l.qty_remaining',unit_cost:'l.unit_cost',remaining_cost:'l.qty_remaining*l.unit_cost'};
+    const lotSort=lotSortColumns[req.query.lot_sort]||'l.acquired_at';
+    const lotDirection=String(req.query.lot_direction).toLowerCase()==='asc'?'ASC':'DESC';
+    const lotStatus=['open','sold','converted','all'].includes(req.query.lot_status)?req.query.lot_status:'open';
+    const [itemRes,lotsRes,activityRes,lotCountsRes]=await Promise.all([
       db.query('SELECT id item_id,name,type FROM torn_items WHERE id=$1',[itemId]),
       db.query(`SELECT l.id,l.acquired_at,l.qty_original,l.qty_remaining,l.unit_cost,e.channel,e.trade_id,e.log_id,
+        COUNT(*) OVER() total_count,
         COALESCE(json_agg(json_build_object('date',s.happened_at,'side',s.side,'qty',m.qty,'unit_revenue',m.unit_revenue,'profit',m.realized_profit,'channel',s.channel,'trade_id',s.trade_id,'log_id',s.log_id)) FILTER(WHERE m.id IS NOT NULL),'[]') sales
         FROM trading_fifo_lots l JOIN trading_events e ON e.id=l.event_id
         LEFT JOIN trading_fifo_matches m ON m.lot_id=l.id LEFT JOIN trading_events s ON s.id=m.sale_event_id
-        WHERE l.item_id=$1 GROUP BY l.id,e.channel,e.trade_id,e.log_id ORDER BY l.acquired_at,l.id`,[itemId]),
+        WHERE l.item_id=$1 GROUP BY l.id,e.channel,e.trade_id,e.log_id
+        HAVING $4='all'
+          OR ($4='open' AND l.qty_remaining>0)
+          OR ($4='sold' AND l.qty_remaining=0 AND COALESCE(bool_or(s.side='sell'),false))
+          OR ($4='converted' AND COALESCE(bool_or(s.side='museum'),false))
+        ORDER BY ${lotSort} ${lotDirection},l.id ${lotDirection} LIMIT $2 OFFSET $3`,[itemId,lotLimit,lotOffset,lotStatus]),
       db.query(`SELECT id,happened_at,side,channel,qty,unit_price,total_price,unmatched_qty,trade_id,log_id FROM trading_events WHERE item_id=$1 ORDER BY happened_at DESC,id DESC`,[itemId])
+      ,db.query(`WITH x AS (
+          SELECT l.id,l.qty_remaining,COALESCE(bool_or(s.side='sell'),false) has_sale,
+            COALESCE(bool_or(s.side='museum'),false) has_museum
+          FROM trading_fifo_lots l LEFT JOIN trading_fifo_matches m ON m.lot_id=l.id
+          LEFT JOIN trading_events s ON s.id=m.sale_event_id WHERE l.item_id=$1 GROUP BY l.id
+        ) SELECT COUNT(*) FILTER(WHERE qty_remaining>0) open,
+          COUNT(*) FILTER(WHERE qty_remaining=0 AND has_sale) sold,
+          COUNT(*) FILTER(WHERE has_museum) converted,COUNT(*) total FROM x`,[itemId])
     ]);
-    res.json({item:itemRes.rows[0]||null,lots:lotsRes.rows.map(l=>({...l,qty_original:Number(l.qty_original),qty_remaining:Number(l.qty_remaining),unit_cost:Number(l.unit_cost),sales:l.sales})),activity:activityRes.rows.map(x=>({...x,qty:Number(x.qty),unit_price:Number(x.unit_price),total_price:Number(x.total_price),unmatched_qty:Number(x.unmatched_qty)}))});
+    const counts=lotCountsRes.rows[0]||{};
+    res.json({item:itemRes.rows[0]||null,lots:lotsRes.rows.map(l=>({id:l.id,acquired_at:l.acquired_at,qty_original:Number(l.qty_original),qty_remaining:Number(l.qty_remaining),unit_cost:Number(l.unit_cost),channel:l.channel,trade_id:l.trade_id,log_id:l.log_id,sales:l.sales})),lotTotal:Number(lotsRes.rows[0]?.total_count)||0,lotCounts:{open:Number(counts.open)||0,sold:Number(counts.sold)||0,converted:Number(counts.converted)||0,all:Number(counts.total)||0},lotLimit,lotOffset,activity:activityRes.rows.map(x=>({...x,qty:Number(x.qty),unit_price:Number(x.unit_price),total_price:Number(x.total_price),unmatched_qty:Number(x.unmatched_qty)}))});
   }catch(e){console.error('[trading-profit/item]',e);res.status(500).json({error:e.message});}
 });
 
