@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Trade Chat Sender
 // @namespace    https://torn.com/
-// @version      1.4
+// @version      1.5
 // @description  Sends trade messages from the property page every 70 seconds
 // @match        https://www.torn.com/properties.php*
 // @grant        GM_getValue
@@ -16,6 +16,7 @@
 
     const LOCK_KEY = 'tradeSenderActiveTab';
     const ENABLE_KEY = 'tradeSenderEnabled';
+    const NEXT_SEND_KEY = 'tradeSenderNextSendAt';
 
     const TAB_ID =
         Date.now().toString(36) +
@@ -24,6 +25,13 @@
     let senderInterval = null;
     let countdownInterval = null;
     let remaining = SEND_INTERVAL;
+
+    function getRemainingSeconds() {
+        const nextSendAt = Number(GM_getValue(NEXT_SEND_KEY, 0));
+        return nextSendAt > 0
+            ? Math.max(0, Math.ceil((nextSendAt - Date.now()) / 1000))
+            : SEND_INTERVAL;
+    }
 
     const value = [
         `💰 BUYING ITEMS 💰`,
@@ -252,6 +260,7 @@
     function start() {
 
         const currentOwner = localStorage.getItem(LOCK_KEY);
+        const wasEnabled = GM_getValue(ENABLE_KEY, false);
 
         // Prevent multiple tabs from sending
         if (currentOwner && currentOwner !== TAB_ID) {
@@ -266,14 +275,39 @@
         localStorage.setItem(LOCK_KEY, TAB_ID);
         GM_setValue(ENABLE_KEY, true);
 
-        clearInterval(senderInterval);
+        clearTimeout(senderInterval);
         clearInterval(countdownInterval);
 
-        remaining = SEND_INTERVAL;
+        let nextSendAt = wasEnabled ? Number(GM_getValue(NEXT_SEND_KEY, 0)) : 0;
+        if (!Number.isFinite(nextSendAt) || nextSendAt <= 0) {
+            nextSendAt = Date.now() + SEND_INTERVAL * 1000;
+            GM_setValue(NEXT_SEND_KEY, nextSendAt);
+        }
+        remaining = getRemainingSeconds();
 
         console.log(
-            `🟢 Trade sender enabled. First attempt in ${SEND_INTERVAL}s`
+            `🟢 Trade sender enabled. Next attempt in ${remaining}s`
         );
+
+        const scheduleNextSend = () => {
+            const scheduledAt = Number(GM_getValue(NEXT_SEND_KEY, 0));
+            const delay = Math.max(0, scheduledAt - Date.now());
+
+            senderInterval = setTimeout(async () => {
+                if (localStorage.getItem(LOCK_KEY) !== TAB_ID) {
+                    stop(false);
+                    return;
+                }
+
+                const followingSendAt = Date.now() + SEND_INTERVAL * 1000;
+                GM_setValue(NEXT_SEND_KEY, followingSendAt);
+                remaining = SEND_INTERVAL;
+                updateButton();
+                scheduleNextSend();
+
+                await sendMessage();
+            }, delay);
+        };
 
         // =====================================================
         // COUNTDOWN
@@ -286,7 +320,7 @@
                 return;
             }
 
-            remaining--;
+            remaining = getRemainingSeconds();
 
             if (isTradeOpen()) {
                 console.log(
@@ -298,31 +332,11 @@
                 );
             }
 
-            if (remaining <= 0) {
-                remaining = SEND_INTERVAL;
-            }
-
             updateButton();
 
         }, 1000);
 
-        // =====================================================
-        // SEND INTERVAL
-        // =====================================================
-
-        senderInterval = setInterval(async () => {
-
-            if (localStorage.getItem(LOCK_KEY) !== TAB_ID) {
-                stop(false);
-                return;
-            }
-
-            remaining = SEND_INTERVAL;
-            updateButton();
-
-            await sendMessage();
-
-        }, SEND_INTERVAL * 1000);
+        scheduleNextSend();
 
         updateButton();
     }
@@ -333,7 +347,7 @@
 
     function stop(removeLock = true) {
 
-        clearInterval(senderInterval);
+        clearTimeout(senderInterval);
         clearInterval(countdownInterval);
 
         senderInterval = null;
@@ -347,6 +361,7 @@
         }
 
         GM_setValue(ENABLE_KEY, false);
+        GM_setValue(NEXT_SEND_KEY, 0);
 
         remaining = SEND_INTERVAL;
 
