@@ -64,7 +64,7 @@
       const support = item.protection_lowest_price ?? item.market_reference_price;
       const trackedDate = item.market_reference_date ? String(item.market_reference_date).slice(0, 10) : 'latest tracked day';
       const samples = item.market_reference_samples ? `, observed ${item.market_reference_samples} time${Number(item.market_reference_samples) === 1 ? '' : 's'}` : '';
-      const protectionHelp = `Protection applied: frequent support ${fmt(support)} (${drop} below market ${fmt(item.market_price)}) is the median of the densest 1% price band from ${trackedDate}${samples}. The normal ${(Number(item.resolved_pct || 0) * 100).toFixed(0)}% buy rate changed the unit offer from ${fmt(item.unprotected_price)} to ${fmt(item.effective_price)}.`;
+      const protectionHelp = `Protection applied: highest dense level ${fmt(support)} (${drop} below market ${fmt(item.market_price)}) is the median of the highest qualifying 1% price band from ${trackedDate}${samples}. The normal ${(Number(item.resolved_pct || 0) * 100).toFixed(0)}% buy rate changed the unit offer from ${fmt(item.unprotected_price)} to ${fmt(item.effective_price)}.`;
       const protectionBadge = item.market_protection_applied ? `
         <span class="tt-protection" data-idx="${idx}" title="${protectionHelp}" tabindex="0" aria-label="${protectionHelp}"
           style="display:inline-flex;width:17px;height:17px;align-items:center;justify-content:center;border-radius:50%;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.38);color:#f87171;cursor:help">

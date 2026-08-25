@@ -158,7 +158,7 @@
       let adjustBadge = item.market_protection_applied
         ? `<span class="protection-help" tabindex="0" role="img"
             aria-label="Market price protection applied"
-            data-help="The median of the day's densest 1% lowest-market price band is below market value, so this offer was calculated from that supported price.">
+            data-help="The day's highest dense 1% lowest-offer band is below market value, so this offer was calculated from that band's median.">
             <svg class="protection-shield" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 2.5 20 6v5.3c0 5.1-3.2 8.6-8 10.2-4.8-1.6-8-5.1-8-10.2V6l8-3.5Z" />
               <path d="m8.7 12 2.1 2.1 4.6-4.7" />
@@ -244,10 +244,10 @@
         ? String(item.market_reference_date).slice(0, 10)
         : 'the most recent tracked day';
       const sampleText = item.market_reference_samples
-        ? ` It was recorded ${item.market_reference_samples} time${Number(item.market_reference_samples) === 1 ? '' : 's'} on ${referenceDate}.`
+        ? ` Its band contained ${item.market_reference_samples} of ${item.market_reference_observations || item.market_reference_samples} daily polls on ${referenceDate}.`
         : ` It came from ${referenceDate}.`;
-      const protectionHelp = `Frequent support is the median of the densest 1% lowest-market price band during the selected tracking day.${sampleText} ` +
-        `Because ${fmt(protectedLowest)} was ${drop} below Torn market value ${fmt(protectedMarketValue)}, the ${rate} buy rate was applied to support instead of market value. ` +
+      const protectionHelp = `The resale ceiling is the median of the highest 1% price band containing at least 5% of the day's polls (minimum three).${sampleText} ` +
+        `Because ${fmt(protectedLowest)} was ${drop} below Torn market value ${fmt(protectedMarketValue)}, the ${rate} buy rate was applied to that ceiling instead of market value. ` +
         `That changed the unit offer from ${fmt(item.unprotected_price)} to ${fmt(item.effective_price)}.`;
       protectionRows.push(
         `<div class="calc-row">
@@ -302,7 +302,7 @@
     const bounds = trackingDayBounds(item.market_reference_date);
     chartTitle.textContent = item.item_name;
     chartMeta.textContent = bounds
-      ? `${bounds.day} · Asia/Manila · ${item.market_reference_samples || 0} support-band sample${Number(item.market_reference_samples) === 1 ? '' : 's'}`
+      ? `${bounds.day} · Asia/Manila · ${item.market_reference_samples || 0}/${item.market_reference_observations || item.market_reference_samples || 0} polls in highest dense band`
       : 'Most recent tracked market data';
     chartMessage.textContent = 'Loading market history…';
     chartMessage.classList.remove('hidden');
@@ -347,7 +347,7 @@
               pointHoverRadius: 6, borderWidth: 2, tension: .2, fill: true,
             },
             {
-              label: 'Frequent Support', data: repeated(support),
+              label: 'Highest Dense Level', data: repeated(support),
               borderColor: '#f87171', pointRadius: 0, borderWidth: 2, tension: 0,
             },
             {

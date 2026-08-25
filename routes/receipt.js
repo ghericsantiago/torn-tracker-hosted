@@ -6,7 +6,7 @@ const fs      = require('fs');
 const path    = require('path');
 const router  = express.Router();
 const db      = require('../db');
-const { selectFrequentMarketSupport } = require('./receipt-market-support');
+const { selectDailyResaleCeiling } = require('./receipt-resale-ceiling');
 const { applyMarketDropProtection } = require('./receipt-protection');
 
 function shortId() {
@@ -106,7 +106,7 @@ async function buildPricedItems(tornData, itemsOverride) {
   let globalPct = null;
   let globalProtection = true;
   if (itemIds.length) {
-    const [priceRes, itemRes, latestMarketRes, frequentMarketRes, profileRes] = await Promise.all([
+    const [priceRes, itemRes, latestMarketRes, resaleCeilingRes, profileRes] = await Promise.all([
       db.query(PRICE_LOOKUP, [itemIds]),
       db.query(
         `SELECT ti.id, ti.name, ti.type, ti.market_price,
@@ -148,14 +148,14 @@ async function buildPricedItems(tornData, itemsOverride) {
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
     for (const r of itemRes.rows)  itemMap[r.id] = r;
     const latestMarketMap = Object.fromEntries(latestMarketRes.rows.map(r => [r.item_id, r]));
-    const frequentMarketMap = Object.fromEntries(selectFrequentMarketSupport(frequentMarketRes.rows));
+    const resaleCeilingMap = Object.fromEntries(selectDailyResaleCeiling(resaleCeilingRes.rows));
     globalPct = profileRes.rows[0]?.default_market_pct ?? null;
     globalProtection = profileRes.rows[0]?.market_protection_enabled !== false;
 
     for (const id of itemIds) {
       if (itemMap[id]) {
         itemMap[id].latest_market = latestMarketMap[id] || null;
-        itemMap[id].frequent_market = frequentMarketMap[id] || null;
+        itemMap[id].resale_ceiling = resaleCeilingMap[id] || null;
       }
     }
   }
@@ -185,7 +185,7 @@ async function buildPricedItems(tornData, itemsOverride) {
     const listing = priceMap[id];
     const baseItem = itemMap[id];
     const latestMarket = baseItem?.latest_market || null;
-    const frequentMarket = baseItem?.frequent_market || null;
+    const resaleCeiling = baseItem?.resale_ceiling || null;
 
     let catalogPrice = listing ? (Number(listing.effective_price) || null) : null;
     if (!listing && baseItem?.market_price && globalPct) {
@@ -208,10 +208,14 @@ async function buildPricedItems(tornData, itemsOverride) {
       market_price:    marketPrice,
       latest_lowest_price: latestMarket?.price != null ? Number(latestMarket.price) : null,
       latest_lowest_at: latestMarket?.created_at || null,
-      market_reference_price: frequentMarket?.price != null ? Number(frequentMarket.price) : null,
-      market_reference_date: frequentMarket?.tracked_date || null,
-      market_reference_samples: frequentMarket?.sample_count != null ? Number(frequentMarket.sample_count) : null,
-      market_reference_last_observed_at: frequentMarket?.last_observed_at || null,
+      market_reference_price: resaleCeiling?.price != null ? Number(resaleCeiling.price) : null,
+      market_reference_date: resaleCeiling?.tracked_date || null,
+      market_reference_samples: resaleCeiling?.sample_count != null ? Number(resaleCeiling.sample_count) : null,
+      market_reference_observations: resaleCeiling?.observation_count != null ? Number(resaleCeiling.observation_count) : null,
+      market_reference_minimum_dense_samples: resaleCeiling?.minimum_dense_samples != null ? Number(resaleCeiling.minimum_dense_samples) : null,
+      market_reference_band_low: resaleCeiling?.band_low_price != null ? Number(resaleCeiling.band_low_price) : null,
+      market_reference_band_high: resaleCeiling?.band_high_price != null ? Number(resaleCeiling.band_high_price) : null,
+      market_reference_last_observed_at: resaleCeiling?.last_observed_at || null,
       price_mode:      override?.priceMode || listing?.price_mode || (catalogPrice != null && !listing ? 'market_pct' : null),
       resolved_pct:    override?.priceMode === 'market_pct'
         ? override.marketPct

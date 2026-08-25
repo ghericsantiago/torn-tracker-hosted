@@ -399,9 +399,9 @@ If Torn's cash element is temporarily unavailable, the cash gate is skipped so
 the existing pricing flow is not blocked by incomplete page rendering.
 
 Receipt previews include both the newest recorded item-market lowest offer and
-the daily frequent-support reference selected from `item_market` history.
+the daily highest-dense resale ceiling selected from `item_market` history.
 Before the cash check and receipt creation, the preview endpoint automatically
-applies low-market protection whenever the daily frequent-support price is below
+applies low-market protection whenever the daily resale ceiling is below
 Torn market value; there is no configurable drop trigger. Whether protection is
 eligible follows a separate three-level configuration cascade:
 `item protection override -> category protection override -> global protection
@@ -425,8 +425,8 @@ for receipt pricing. Receipt preview reports it as `in_catalog=false`, preservin
 the unlisted-item warning and negotiation message. Unchecked items without an
 explicit override are removed as before.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
-that supported price instead of market value, and only when this reduces the
-quote. For example, an 80% buy rate with market value $100 and frequent support $70
+that resale ceiling instead of market value, and only when this reduces the
+quote. For example, an 80% buy rate with market value $100 and highest dense level $70
 quotes $56 rather than $80. Explicit fixed-price listings are never changed.
 Items without stored lowest-offer history continue through the existing price
 cascade. The adjusted item prices are sent as receipt overrides, so the receipt,
@@ -434,19 +434,19 @@ cash sufficiency check, posted total, and added trade money all use the protecte
 amount.
 
 In formula form, the normal unit offer is `round(market_value * buy_rate)` and the
-protected unit offer is `round(frequent_support * buy_rate)`. Protection is marked
+protected unit offer is `round(resale_ceiling * buy_rate)`. Protection is marked
 only when the item uses percentage pricing, all three inputs are positive,
-`frequent_support < market_value`, and the protected offer is strictly lower than
+`resale_ceiling < market_value`, and the protected offer is strictly lower than
 the normal offer. The reported drop percentage is
-`(market_value - frequent_support) / market_value * 100`; it is audit/display data,
+`(market_value - resale_ceiling) / market_value * 100`; it is audit/display data,
 not a threshold test. Quantity affects only the line total (`protected unit offer *
 quantity`), not the unit-price decision.
 
 ```mermaid
 flowchart LR
     M["Torn market value"] --> N["Normal offer<br/>round(market value x buy rate)"]
-    H["Lowest-price history"] --> S["Daily frequent support"]
-    S --> P["Protected offer<br/>round(frequent support x buy rate)"]
+    H["Lowest-price history"] --> S["Highest dense resale ceiling"]
+    S --> P["Protected offer<br/>round(resale ceiling x buy rate)"]
     R["Resolved buy rate"] --> N
     R --> P
     N --> C{"Percentage pricing and<br/>protected offer &lt; normal offer?"}
@@ -458,54 +458,49 @@ flowchart LR
 ```
 
 The market sync retains every successful lowest-price poll, including unchanged
-prices, so daily frequency is meaningful. Receipt protection groups observations
-from the current Asia/Manila calendar day into near-price bands using a 1% margin.
-Each band is anchored to its lowest price, and includes observations no more than
-1% above that fixed anchor. Using a fixed anchor prevents a sequence of small price
-steps from chaining into one much wider band. The band containing the most
-observations wins, and its median observed price becomes the frequent-support
-reference. A percentage margin scales across cheap and expensive items more
-appropriately than a fixed dollar margin.
+prices, so daily density is meaningful. Receipt protection groups observations
+from the current Asia/Manila calendar day into fixed-anchor bands using a 1% margin.
+Each band starts at its lowest price and includes observations no more than 1%
+above that anchor; neighboring steps cannot chain into a wider band.
 
-If an item has no observation today, the same grouping is applied to the most
-recent day on which that item was tracked. If two bands have equal sample counts,
-the band observed most recently on that day wins, followed by the lower median as
-a deterministic final tie-break. The raw newest observation remains available
-separately for audit. The support line is therefore the median of the densest 1%
-price band, not the average, minimum, or a fitted trend line across the whole day.
+A band qualifies as dense when it contains at least 5% of all valid polls that day,
+with an absolute minimum of three observations. Among qualifying bands, the band
+with the highest median price wins, and that median becomes the resale ceiling. A
+single high spike therefore cannot disable protection, while a repeatedly observed
+upper price region can. If the history is too sparse for any band to meet the
+minimum, the densest available band is used, with the higher median winning a tie.
+If an item has no observation today, the same process uses its most recent tracked
+day. The raw newest observation remains available separately for audit.
 
-One observed boundary case is Panda Plushie on 2026-08-25: its winning anchored
-band was approximately `$44,889` through `$45,337.89`, with a `$45,300` median
-and 139 samples when the receipt was created. Torn market value was approximately
-`$45,339`, only `$39` (about 0.09%) above support. It still received protection
-because the current rule has no minimum market-drop threshold: any positive drop
-that lowers the rounded percentage offer qualifies. The near overlap of the red
-Support and dashed Market Value graph lines is therefore expected under the
-current rule, and also illustrates the fixed-anchor band's hard upper boundary.
+This reference deliberately measures the highest credible resale region rather
+than technical-analysis support. For Panda Plushie on 2026-08-25, the repeated
+upper cluster around `$49,000` is selected instead of the denser `$45,300` region
+or a one-off maximum. Because that highest dense level is above Torn market value,
+the item is not protected under the resale-opportunity rule.
 
 When protection applies, its audit fields are carried in `items_override` and
-stored with the receipt item: the unprotected offer, frequent-support price,
+stored with the receipt item: the unprotected offer, highest-dense resale ceiling,
 observed market drop, resolved buy percentage, and final
 protected unit price. The public receipt marks the affected price with a shield
 icon. Hovering the icon, or focusing it with a keyboard, shows short help text
-explaining that the day's frequent market support was unusually below market value;
+explaining that the day's highest credible resale level was unusually below market value;
 the page-level tooltip dynamically opens above or below the shield so table
 overflow cannot clip it. The compact calculation section shows each protected
-item as a Market → Support → Offer flow with the original offer struck through;
+item as a Market → Ceiling → Offer flow with the original offer struck through;
 unprotected pricing rules are summarized as small percentage/fixed-price chips.
 The calculation-row shield has a detailed hover/keyboard tooltip containing the
-selected tracking date, frequency sample count when available, market-value drop,
+selected tracking date, dense-band and total poll counts when available, market-value drop,
 buy rate, and original-versus-protected unit offer.
 The standalone `tampermonkey/trade-receipt.user.js` preview also marks protected
-rows with a red shield and a compact support/drop/original-offer line. Its native
+rows with a red shield and a compact ceiling/drop/original-offer line. Its native
 hover/keyboard help contains the same audit context. Confirming an untouched row
 passes the protection audit fields into receipt creation; manually editing its
 fixed/% offer dims the shield and intentionally replaces automatic protection.
 On the public receipt, each protected item also has a graph button beside its
 name. It opens a responsive modal patterned after the Bazaar Pricer chart and
 loads every lowest-offer poll from the item's selected Asia/Manila tracking day.
-The graph overlays the jagged lowest-offer history with horizontal Frequent
-Support and Torn Market Value lines, and displays the winning support-band sample
+The graph overlays the jagged lowest-offer history with horizontal Highest Dense
+Level and Torn Market Value lines, and displays the winning dense-band sample
 count. The modal supports button, backdrop, and Escape-key closing; unprotected
 items do not show the graph control.
 Trade Automation also switches to an editable protected-price

@@ -17,7 +17,7 @@ function percentageItem(protectionEnabled) {
   };
 }
 
-test('enabled protection reduces a percentage offer from frequent support', () => {
+test('enabled protection reduces a percentage offer from the resale ceiling', () => {
   const [item] = applyMarketDropProtection([percentageItem(true)]);
   assert.equal(item.market_protection_applied, true);
   assert.equal(item.effective_price, 56);
