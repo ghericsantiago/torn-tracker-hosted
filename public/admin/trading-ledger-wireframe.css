@@ -68,8 +68,9 @@
 @media(max-width:650px){
   .ledger-shell{width:min(100% - 18px,1400px);padding-top:16px}.page-head{align-items:flex-start}.wireframe-badge{display:none}
   .summary-grid{grid-template-columns:repeat(2,1fr)}.filter-card{align-items:stretch}.date-presets{width:100%;overflow:auto}.date-presets button{flex:1}.date-field{flex:1}.panel-actions{display:none}
-  .item-table{min-width:0;table-layout:fixed}.item-table th:nth-child(2),.item-table td:nth-child(2),.item-table th:nth-child(3),.item-table td:nth-child(3),.item-table th:nth-child(4),.item-table td:nth-child(4),.item-table th:nth-child(5),.item-table td:nth-child(5),.item-table th:nth-child(6),.item-table td:nth-child(6),.item-table th:nth-child(7),.item-table td:nth-child(7),.item-table th:nth-child(9),.item-table td:nth-child(9){display:none}
-  .item-table th:first-child{width:auto}.item-table th:nth-child(8){width:84px}.item-table th:nth-child(10){width:62px}.item-table th:nth-child(11){width:25px}
+  .item-table,.item-table thead,.item-table tbody{display:block;width:100%;min-width:0}.item-table thead tr,.item-table tbody tr[data-id]{display:grid;grid-template-columns:minmax(0,1fr) 84px 62px 25px;width:100%}
+  .item-table th:nth-child(2),.item-table td:nth-child(2),.item-table th:nth-child(3),.item-table td:nth-child(3),.item-table th:nth-child(4),.item-table td:nth-child(4),.item-table th:nth-child(5),.item-table td:nth-child(5),.item-table th:nth-child(6),.item-table td:nth-child(6),.item-table th:nth-child(7),.item-table td:nth-child(7),.item-table th:nth-child(9),.item-table td:nth-child(9){display:none}
+  .item-table .detail-row,.item-table .detail-row>td{display:block;width:100%}
   .item-table th,.item-table td{padding:9px 6px}.item-table th:first-child,.item-table td:first-child{padding-left:12px}.item-table th:last-child,.item-table td:last-child{padding-left:0;padding-right:8px}
   .item-cell{min-width:0}.item-cell>div{min-width:0}.item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .detail-stats{grid-template-columns:repeat(2,1fr)}.tabs{overflow:auto}.tabs button{white-space:nowrap}

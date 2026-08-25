@@ -249,6 +249,8 @@ and current remaining quantity. Tapping a row expands the detail panel directly 
 the bought quantity, purchase cost, sold quantity, revenue, FIFO cost, profit, margin, current
 lot counts, remaining units, and open cost basis are available before the lot tabs. Desktop keeps
 the complete sortable table.
+The compact row uses a fixed mobile grid, so inserting or removing the expanded detail panel never
+changes the widths of its item, profit, remaining, or expand columns.
 
 Realized profit is calculated only for matched quantity:
 
