@@ -289,6 +289,8 @@ only; unsold lots appear under open quantity/cost basis and do not count as prof
 partly or fully unmatched, the UI shows the known matched profit plus an `Incomplete cost basis`
 warning instead of treating the missing cost as zero. Negative profit is red, positive profit is
 green, and neutral/unknown values do not use either success color.
+In lot rows, an em dash (`—`) under Revenue or Profit means the lot has no sold quantity and the
+value is not applicable; it is not a minus sign or a negative amount.
 
 Each item's detail view must also expose the FIFO lots directly, with **Open Lots**, **Sold
 Lots**, **Converted**, and **All Lots** tabs. An open-lot row shows acquisition date/source, original quantity,
