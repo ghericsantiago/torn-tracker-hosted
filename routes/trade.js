@@ -324,9 +324,23 @@ router.post('/admin/api/trading-profit/rebuild', requireAuth, async (req, res) =
   catch (e) { console.error('[trading-profit/rebuild]', e); res.status(500).json({ error: e.message }); }
 });
 
+router.get('/admin/api/trading-profit/categories', requireAuth, async (_req, res) => {
+  try {
+    const { rows } = await db.query(`SELECT DISTINCT ti.type
+      FROM torn_items ti
+      WHERE ti.type IS NOT NULL AND ti.type<>''
+        AND (EXISTS (SELECT 1 FROM trading_fifo_lots l WHERE l.item_id=ti.id)
+          OR EXISTS (SELECT 1 FROM trading_events e WHERE e.item_id=ti.id))
+      ORDER BY ti.type`);
+    res.json({ categories: rows.map(row => row.type) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) => {
   try {
     const from=req.query.from||null, to=req.query.to||null, q=(req.query.q||'').trim();
+    const category=(req.query.category||'').trim();
+    const currentOnly=String(req.query.current_only).toLowerCase()!=='false';
     const limit=Math.min(100,Math.max(10,Number(req.query.limit)||50));
     const offset=Math.max(0,Number(req.query.offset)||0);
     const sortColumns={date:'last_activity',item:'name',bought:'bought',purchase_cost:'purchase_cost',sold:'sold',revenue:'revenue',fifo_cost:'fifo_cost',profit:'profit',margin:'margin',remaining:'remaining'};
@@ -372,7 +386,9 @@ router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) =
       LEFT JOIN open o ON o.item_id=ti.id
       WHERE (p.item_id IS NOT NULL OR s.item_id IS NOT NULL OR o.item_id IS NOT NULL)
         AND ($3='' OR ti.name ILIKE '%'||$3||'%')
-      ORDER BY ${sort} ${direction} NULLS LAST,ti.name ASC LIMIT $4 OFFSET $5`,[from,to,q,limit,offset]);
+        AND ($4='' OR ti.type=$4)
+        AND (NOT $5::boolean OR COALESCE(o.remaining,0)>0)
+      ORDER BY ${sort} ${direction} NULLS LAST,ti.name ASC LIMIT $6 OFFSET $7`,[from,to,q,category,currentOnly,limit,offset]);
     const meta=rows[0]||{};
     const hidden=new Set(['total_count','total_bought','total_purchase_cost','total_sold','total_revenue','total_fifo_cost','total_profit','total_unmatched','total_remaining','total_open_cost']);
     const items=rows.map(r=>Object.fromEntries(Object.entries(r).filter(([k])=>!hidden.has(k)).map(([k,v])=>[k,['item_id','name','type','last_activity'].includes(k)?v:Number(v)])));

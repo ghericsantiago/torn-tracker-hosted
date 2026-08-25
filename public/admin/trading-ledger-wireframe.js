@@ -30,10 +30,18 @@
     const params = new URLSearchParams({
       q: $('itemSearch').value.trim(), limit: itemPage.limit, offset,
       sort: itemPage.sort, direction: itemPage.direction,
+      category: $('categoryFilter').value,
+      current_only: $('currentLotsOnly').checked,
     });
     if ($('dateFrom').value) params.set('from', $('dateFrom').value);
     if ($('dateTo').value) params.set('to', $('dateTo').value);
     return params;
+  }
+
+  async function loadCategories() {
+    const response = await api('/admin/api/trading-profit/categories');
+    $('categoryFilter').insertAdjacentHTML('beforeend', response.categories.map(category =>
+      `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join(''));
   }
 
   async function loadItems(reset = true) {
@@ -241,6 +249,8 @@
   let searchTimer;
   $('itemSearch').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => loadItems(true), 250); };
   $('dateFrom').onchange = $('dateTo').onchange = () => loadItems(true);
+  $('categoryFilter').onchange = () => loadItems(true);
+  $('currentLotsOnly').onchange = () => loadItems(true);
   document.querySelectorAll('.date-presets button').forEach(button => button.onclick = () => preset(button.dataset.days));
   document.querySelectorAll('[data-item-sort]').forEach(button => button.onclick = () => setItemSort(button.dataset.itemSort));
   document.querySelectorAll('.tabs button').forEach(button => button.onclick = async () => {
@@ -249,7 +259,7 @@
   });
   $('loadMoreItems').onclick = () => loadItems(false);
   $('loadMoreLots').onclick = () => loadLots(false);
-  $('resetFilters').onclick = () => { $('itemSearch').value = ''; itemPage.sort = 'date'; itemPage.direction = 'desc'; preset('30'); };
+  $('resetFilters').onclick = () => { $('itemSearch').value = ''; $('categoryFilter').value = ''; $('currentLotsOnly').checked = true; itemPage.sort = 'date'; itemPage.direction = 'desc'; preset('30'); };
   $('closeDetail').onclick = closeDetail;
   $('rebuildLedger').onclick = async () => {
     const button = $('rebuildLedger'); button.disabled = true; button.textContent = 'Rebuilding…';
@@ -267,5 +277,7 @@
     observer.observe($('loadMoreLots'));
   }
 
-  preset('30');
+  loadCategories().then(() => preset('30')).catch(error => {
+    $('itemRows').innerHTML = `<tr><td colspan="11" class="negative">${escapeHtml(error.message)}</td></tr>`;
+  });
 })();

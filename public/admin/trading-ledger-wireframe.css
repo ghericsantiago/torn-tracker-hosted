@@ -14,6 +14,10 @@
 .date-presets button { padding:7px 10px; border-radius:6px; font-size:.72rem; }
 .date-presets button.selected { color:#071014; background:var(--accent); font-weight:700; }
 .search-field,.date-field { display:flex; align-items:center; gap:7px; border:1px solid var(--glass-border); border-radius:8px; padding:6px 9px; background:rgba(255,255,255,.025); }
+.select-field,.toggle-field { display:flex; align-items:center; gap:7px; border:1px solid var(--glass-border); border-radius:8px; padding:6px 9px; background:rgba(255,255,255,.025); }
+.select-field span,.toggle-field span { color:var(--text-muted); font:600 .6rem var(--mono); text-transform:uppercase; }
+.select-field select { color:var(--text); background:#0b0c14; border:0; outline:0; font:inherit; font-size:.77rem; max-width:150px; }
+.toggle-field { cursor:pointer; user-select:none; }.toggle-field input { accent-color:var(--accent); }
 .search-field { flex:1; min-width:210px; }
 .search-field span,.date-field span { color:var(--text-muted); font:600 .6rem var(--mono); text-transform:uppercase; }
 .search-field input,.date-field input { color:var(--text); background:transparent; border:0; outline:0; font:inherit; font-size:.77rem; }

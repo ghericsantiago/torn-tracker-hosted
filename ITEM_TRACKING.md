@@ -235,6 +235,15 @@ not a sale; the sell log is the outgoing commercial event.
 The Trading dashboard uses the same remaining lots as `/admin/inventory`, rather than maintaining
 a second commercial-only quantity model. A sale without sufficient canonical FIFO history is an
 **unmatched sale** with unknown cost basis; it must not be silently assigned a `$0` cost.
+
+The item table can be filtered by Torn item category as well as item name and report date. A
+**Current lots only** toggle is enabled by default and hides items whose present canonical FIFO
+balance is zero; disabling it restores fully depleted and unmatched-sale items. Category and
+current-balance filters are applied on the server before totals, sorting, and lazy pagination, so
+summary cards and result counts describe the visible filtered result set. The current-lot test is
+independent of the report date because it answers whether the item is held now, while the date
+range continues to control the displayed purchase and sale activity.
+
 Realized profit is calculated only for matched quantity:
 
 ```
