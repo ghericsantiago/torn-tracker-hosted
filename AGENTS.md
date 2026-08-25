@@ -1,5 +1,11 @@
 # Project Instructions (AGENTS.md)
 
+## Standing rule — ship completed changes
+
+After implementing and verifying a requested code change, **commit it, push it to `origin/main`,
+and deploy it using `DEPLOYMENT.md`** unless the user explicitly asks to keep the change local or
+not deploy it. Verify the production process and affected route after deployment.
+
 ## Standing rule — documentation must stay in sync
 
 **Whenever you change `portfolio-tracker.user-v2.js` (or any tracker/script behavior),

@@ -45,6 +45,8 @@
 .status-open { color:var(--accent); border-color:rgba(110,231,247,.25); }.status-partial { color:var(--warn); border-color:rgba(251,191,36,.25); }.status-sold { color:var(--profit); border-color:rgba(74,222,128,.25); }
 .chevron { color:var(--accent); font-size:1rem; }.empty-state { display:none; padding:42px; text-align:center; color:var(--text-muted); }
 .detail-panel { display:none; scroll-margin-top:62px; }.detail-panel.visible { display:block; }
+.detail-row > td { padding:0!important; text-align:left!important; white-space:normal!important; background:#090a12; }
+.detail-row .detail-panel { margin:0; border-width:1px 0; border-radius:0; }
 .item-identity { gap:11px; }.item-identity img { width:46px; height:46px; }.icon-button { font-size:1.35rem; padding:3px 8px; }.icon-button:hover { color:var(--text); }
 .detail-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:var(--glass-border); border-bottom:1px solid var(--glass-border); }
 .mini-stat { background:#0a0b12; padding:11px 13px; }.mini-stat span { display:block; color:var(--text-muted); font:.57rem var(--mono); text-transform:uppercase; }.mini-stat strong { display:block; margin-top:5px; font:.75rem var(--mono); }

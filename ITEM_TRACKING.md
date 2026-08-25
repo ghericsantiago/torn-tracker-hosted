@@ -245,8 +245,9 @@ range, search/select an item, then see quantity bought, purchase cost, quantity 
 revenue, realized FIFO cost, realized profit, margin, remaining trading quantity, and remaining
 cost basis. Summary cards show cash spent, revenue, realized profit, margin, open cost basis, and
 unmatched sale quantity. The main item table uses one row per item and can be sorted by profit,
-revenue, quantity sold, or remaining cost basis; clicking a row opens its buy/sell timeline and
-the FIFO lots consumed by each sale. A secondary chronological Activity view supports auditing
+revenue, quantity sold, or remaining cost basis; clicking a row expands its detail panel directly
+beneath that item, showing its buy/sell timeline and the FIFO lots consumed by each sale. Opening
+another item moves the single detail panel beneath that row. A secondary chronological Activity view supports auditing
 all incoming and outgoing events.
 
 The initial filters should stay small and prominent: date (Today, 7D, 30D, This Month, All, or
