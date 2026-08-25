@@ -754,10 +754,12 @@ Status edits update the in-memory record and reapply the active filters.
 The Inventory Monitor's `trade_events` table is the authority for whether a Torn trade completed.
 Any receipt that is still `pending` and has no row with the same Torn trade id is immediately
 changed to the existing `cancelled` status; there is no age or synchronization grace period.
-Such rows are marked `auto_cancelled`. If a later reconciliation finds their completed Inventory
-Monitor trade, they automatically change to `completed` and receive a completion timestamp.
-Manually cancelled receipts are not marked and are never revived. It runs hourly in the hosted
-scheduler and also immediately before the authenticated receipt list is returned.
+If a pending receipt does have a matching completed Inventory Monitor trade, it changes directly
+to `completed`. Unmatched cancellations are marked `auto_cancelled`; if a later reconciliation
+finds their completed trade, they also change to `completed` and receive a completion timestamp.
+Manually cancelled receipts are not marked and are never revived. Reconciliation runs at the start
+of every one-minute hosted scheduler cycle and immediately before the authenticated receipt list
+is returned, so the potentially longer market-item sync cannot delay receipt status changes.
 The receipt-list header also provides **Check Receipts**, which runs the same reconciliation on
 demand, reloads the list, and reports how many pending receipts were cancelled.
 The receipt list loads the newest 20 rows first and requests additional 20-row pages as its bottom

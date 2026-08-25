@@ -5,9 +5,7 @@ const db = require('./db');
 
 let running      = false;
 let lastCleanup  = 0;
-let lastReceiptReconciliation = 0;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const ONE_HOUR_MS = 60 * 60 * 1000;
 
 async function runCleanup() {
   const now = Date.now();
@@ -38,9 +36,6 @@ async function cleanupOldRecords() {
 }
 
 async function runReceiptReconciliation() {
-  const now = Date.now();
-  if (now - lastReceiptReconciliation < ONE_HOUR_MS) return;
-  lastReceiptReconciliation = now;
   try {
     const reconciled = await reconcileReceiptStatuses();
     if (reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
@@ -54,9 +49,9 @@ function start() {
     if (running) return;
     running = true;
     try {
+      await runReceiptReconciliation();
       await syncAllItems();
       await runCleanup();
-      await runReceiptReconciliation();
     } catch (err) {
       console.error('[scheduler] Unexpected error:', err.message, '\n', err.stack);
     } finally {
