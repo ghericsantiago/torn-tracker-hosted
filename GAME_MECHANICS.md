@@ -122,6 +122,8 @@ Example: exchanging **2 × Plushie Set** deducts `2× Sheep Plushie, 2× Teddy B
   log is the source of truth, not a computed table.
 - The log names the **set**, not the individual items consumed — the composition table is
   the only way to know which specific items left.
+- For FIFO accounting, a Museum exchange is a permanent non-sale depletion: each constituent
+  item consumes owned lots, but creates no item-sale revenue or realized trading profit.
 
 ---
 

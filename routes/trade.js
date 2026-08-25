@@ -367,7 +367,7 @@ router.get('/admin/api/trading-profit/items/:itemId', requireAuth, async (req,re
     const [itemRes,lotsRes,activityRes]=await Promise.all([
       db.query('SELECT id item_id,name,type FROM torn_items WHERE id=$1',[itemId]),
       db.query(`SELECT l.id,l.acquired_at,l.qty_original,l.qty_remaining,l.unit_cost,e.channel,e.trade_id,e.log_id,
-        COALESCE(json_agg(json_build_object('date',s.happened_at,'qty',m.qty,'unit_revenue',m.unit_revenue,'profit',m.realized_profit,'channel',s.channel,'trade_id',s.trade_id,'log_id',s.log_id)) FILTER(WHERE m.id IS NOT NULL),'[]') sales
+        COALESCE(json_agg(json_build_object('date',s.happened_at,'side',s.side,'qty',m.qty,'unit_revenue',m.unit_revenue,'profit',m.realized_profit,'channel',s.channel,'trade_id',s.trade_id,'log_id',s.log_id)) FILTER(WHERE m.id IS NOT NULL),'[]') sales
         FROM trading_fifo_lots l JOIN trading_events e ON e.id=l.event_id
         LEFT JOIN trading_fifo_matches m ON m.lot_id=l.id LEFT JOIN trading_events s ON s.id=m.sale_event_id
         WHERE l.item_id=$1 GROUP BY l.id,e.channel,e.trade_id,e.log_id ORDER BY l.acquired_at,l.id`,[itemId]),

@@ -223,9 +223,10 @@ of the player's complete inventory. It therefore accepts only these movements:
 | Completed trade: items received and money given | Open incoming lots; prefer receipt item prices, otherwise allocate money by item market-value weight |
 | Bazaar/item-market/shop sale log | Match the outgoing quantity against the oldest open lots for that item |
 | Completed trade: items given and money received | Match outgoing items against the oldest lots; allocate proceeds by item market-value weight |
+| Museum exchange (7000) | Expand the set composition and consume the oldest lots as a non-sale `museum` outflow |
 
 Everything else is out of scope: free finds/rewards, gifts, faction transfers, item use,
-transformations, museum exchanges, display/listing moves, and manual inventory reconciliation.
+transformations, display/listing moves, and manual inventory reconciliation.
 Listing an item is not a sale; the sell log is the outgoing commercial event. Completed player
 trades must be assembled by `parsed_trade_id` before any rows or FIFO matches are written.
 
@@ -265,12 +266,16 @@ warning instead of treating the missing cost as zero. Negative profit is red, po
 green, and neutral/unknown values do not use either success color.
 
 Each item's detail view must also expose the FIFO lots directly, with **Open Lots**, **Sold
-Lots**, and **All Lots** tabs. An open-lot row shows acquisition date/source, original quantity,
+Lots**, **Converted**, and **All Lots** tabs. An open-lot row shows acquisition date/source, original quantity,
 sold quantity, remaining quantity, unit cost, original cost, and remaining cost basis. A
 fully-sold lot shows the same acquisition fields plus the final depletion date, total proceeds
 attributed to its matched units, realized profit, margin, and links/expanders for every sale that
 consumed it. A partially sold acquisition appears in Open Lots with both sold and remaining
 quantities and in All Lots as one lot; it must not be displayed as two unrelated acquisitions.
+Museum-depleted quantities appear in their own Converted column and tab. A fully depleted lot is
+labelled Converted when all depletion came from Museum exchanges, Sold when it came from sales,
+or Mixed when both occurred. Museum quantities reduce remaining lots and cost basis but never add
+sales revenue or realized profit.
 
 Conversely, expanding a sale shows all acquisition lots it consumed, including quantity and cost
 drawn from each lot. This makes the relationship auditable in both directions: acquisition lot →

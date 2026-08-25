@@ -1,6 +1,6 @@
 'use strict';
 const db = require('../db');
-const { BUY_TYPE_SET, SELL_TYPE_SET } = require('./log-types');
+const { BUY_TYPE_SET, SELL_TYPE_SET, MUSEUM_SETS } = require('./log-types');
 
 const TRADE_TYPES = new Set([4430,4440,4441,4445,4446]);
 const CHANNELS = new Map([
@@ -11,6 +11,10 @@ const CHANNELS = new Map([
 ]);
 
 function extractItems(data={}) {
+  if(typeof data.set==='string'&&MUSEUM_SETS[data.set]){
+    const sets=Math.max(1,Number(data.quantity)||1);
+    return MUSEUM_SETS[data.set].map(x=>({itemId:Number(x.item_id),qty:Number(x.qty)*sets}));
+  }
   const raw = Array.isArray(data.items) ? data.items : Array.isArray(data.item) ? data.item : data.item != null ? [{id:data.item,qty:data.quantity}] : [];
   return raw.map(x=>({itemId:Number(x.id??x.ID),qty:Number(x.qty??x.quantity??1)||1})).filter(x=>x.itemId&&x.qty>0);
 }
@@ -27,7 +31,7 @@ async function rebuildTradingProfit() {
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(82734191)');
-    const types=[...BUY_TYPE_SET,...SELL_TYPE_SET,...TRADE_TYPES];
+    const types=[...BUY_TYPE_SET,...SELL_TYPE_SET,...TRADE_TYPES,7000];
     const {rows:logs}=await client.query('SELECT id,log_type,happened_at,data FROM torn_logs WHERE log_type=ANY($1) ORDER BY happened_at,id',[types]);
     const {rows:catalog}=await client.query('SELECT id,market_price FROM torn_items');
     const prices=new Map(catalog.map(x=>[Number(x.id),Number(x.market_price)||0]));
@@ -50,10 +54,10 @@ async function rebuildTradingProfit() {
         if(log.log_type===4446)t.in.push(...extractItems(d));
         continue;
       }
-      const side=BUY_TYPE_SET.has(log.log_type)?'buy':SELL_TYPE_SET.has(log.log_type)?'sell':null;
+      const side=BUY_TYPE_SET.has(log.log_type)?'buy':SELL_TYPE_SET.has(log.log_type)?'sell':log.log_type===7000?'museum':null;
       if(!side)continue; const its=extractItems(d), amount=total(d);
       const allocated=allocate(its,amount,prices);
-      allocated.forEach((x,i)=>events.push({key:`log:${log.id}:${x.itemId}:${i}`,at:log.happened_at,logId:log.id,tradeId:null,type:log.log_type,channel:CHANNELS.get(log.log_type)||'other',side,itemId:x.itemId,qty:x.qty,total:x.total}));
+      allocated.forEach((x,i)=>events.push({key:`log:${log.id}:${x.itemId}:${i}`,at:log.happened_at,logId:log.id,tradeId:null,type:log.log_type,channel:log.log_type===7000?'museum':(CHANNELS.get(log.log_type)||'other'),side,itemId:x.itemId,qty:x.qty,total:x.total}));
     }
     for(const t of trades.values()){
       const receiptPriced=t.in.map(x=>{const unit=receiptCosts.get(`${t.id}:${x.itemId}`);return unit==null?null:{...x,total:unit*x.qty}});
@@ -72,7 +76,7 @@ async function rebuildTradingProfit() {
       if(!queues.has(e.item_id))queues.set(e.item_id,[]);const queue=queues.get(e.item_id);
       if(e.side==='buy'){const lot={event_id:eventIds.get(e.source_key),item_id:e.item_id,acquired_at:e.happened_at,qty_original:e.qty,qty_remaining:e.qty,unit_cost:e.unit_price};queue.push(lot);lotData.push(lot);continue;}
       let left=e.qty;
-      for(const lot of queue){if(!left)break;if(!lot.qty_remaining)continue;const take=Math.min(left,lot.qty_remaining);matchData.push({sale_event_id:eventIds.get(e.source_key),lot_event_id:lot.event_id,qty:take,unit_cost:lot.unit_cost,unit_revenue:e.unit_price,realized_profit:(e.unit_price-lot.unit_cost)*take});lot.qty_remaining-=take;left-=take;}
+      for(const lot of queue){if(!left)break;if(!lot.qty_remaining)continue;const take=Math.min(left,lot.qty_remaining);matchData.push({sale_event_id:eventIds.get(e.source_key),lot_event_id:lot.event_id,qty:take,unit_cost:lot.unit_cost,unit_revenue:e.unit_price,realized_profit:e.side==='sell'?(e.unit_price-lot.unit_cost)*take:0});lot.qty_remaining-=take;left-=take;}
       if(left)unmatched.push({id:eventIds.get(e.source_key),qty:left});
     }
     if(lotData.length){const {rows:lotRows}=await client.query(`INSERT INTO trading_fifo_lots(event_id,item_id,acquired_at,qty_original,qty_remaining,unit_cost)
