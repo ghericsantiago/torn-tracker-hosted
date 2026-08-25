@@ -223,17 +223,18 @@ of the player's complete inventory. It therefore accepts only these movements:
 | Completed trade: items received and money given | Open incoming lots; prefer receipt item prices, otherwise allocate money by item market-value weight |
 | Bazaar/item-market/shop sale log | Match the outgoing quantity against the oldest open lots for that item |
 | Completed trade: items given and money received | Match outgoing items against the oldest lots; allocate proceeds by item market-value weight |
-| Museum exchange (7000) | Expand the set composition and consume the oldest lots as a non-sale `museum` outflow |
+| Museum exchange (7000) | Consume canonical inventory FIFO lots as a non-sale `museum` outflow |
+| Use/gift/faction/other permanent outflow | Consume canonical inventory FIFO lots as a non-sale `use` outflow so remaining lots stay aligned |
 
-Everything else is out of scope: free finds/rewards, gifts, faction transfers, item use,
-transformations, display/listing moves, and manual inventory reconciliation.
-Listing an item is not a sale; the sell log is the outgoing commercial event. Completed player
-trades must be assembled by `parsed_trade_id` before any rows or FIFO matches are written.
+Acquisition and depletion quantities follow the Inventory Monitor's canonical `fifo_lots` and
+`transactions`, including free acquisitions, use, gifts, faction movements, transformations,
+Museum conversions, and reconciliation. Only commercial buy/trade-in and sell/trade-out rows
+contribute to the Trading dashboard's purchase, revenue, and profit measures. Listing an item is
+not a sale; the sell log is the outgoing commercial event.
 
-This restricted ledger represents **open trading lots**, not current owned quantity. For
-example, an item bought and later consumed remains open in this ledger because consumption is
-deliberately excluded. Likewise, a sale of pre-tracking, gifted, or otherwise unrecorded stock
-is an **unmatched sale** with unknown cost basis; it must not be silently assigned a `$0` cost.
+The Trading dashboard uses the same remaining lots as `/admin/inventory`, rather than maintaining
+a second commercial-only quantity model. A sale without sufficient canonical FIFO history is an
+**unmatched sale** with unknown cost basis; it must not be silently assigned a `$0` cost.
 Realized profit is calculated only for matched quantity:
 
 ```
@@ -286,18 +287,18 @@ original quantity, and Sold when it is zero. Date filters apply to sale/profit r
 the Open Lots tab reflects the current lot state; a clear `As of now` label prevents the two time
 contexts from being confused.
 
-Persistence is in the hosted Trading database, independent of the inventory monitor's
-`torn_tracker_v2` tables: `trading_events` contains commercial events deduplicated by Torn log id
-(or trade id + side + item id for grouped trades), `trading_fifo_lots` contains acquisition lots,
-and `trading_fifo_matches` records each sale-to-lot allocation. `services/trading-profit.js`
-rebuilds those derived tables chronologically and atomically from `torn_logs`; the full 15-minute
-portfolio sync refreshes it, and the authenticated page also provides a manual Rebuild action.
-Completed receipt data may enrich a matching trade's incoming unit costs, but Torn logs remain
-the source of truth for whether and when the trade completed.
+Persistence is in the hosted database: `trading_events`, `trading_fifo_lots`, and
+`trading_fifo_matches` are reporting tables derived from the Inventory Monitor's canonical
+`fifo_lots` and `transactions`. `services/trading-profit.js` first enriches Trade lots and Trade
+buy transactions from matching completed receipt item `effective_price` values, then replays all
+canonical acquisitions and outflows chronologically for sale-to-lot profit matching. The copied
+lot's final `qty_remaining` is taken directly from Inventory Monitor so both pages show the same
+open lots. The full 15-minute portfolio sync refreshes the report, and the authenticated page also
+provides a manual Rebuild action. Torn logs remain the source of truth for whether and when the
+trade completed; receipts supply the exact agreed per-item buy prices.
 
-The current implementation replays all retained `torn_logs` history. Stock acquired before that
-history, or acquired through an excluded non-commercial event, naturally appears as unmatched
-when sold. An optional opening trading-lot import is not currently implemented.
+The current implementation follows all retained Inventory Monitor history and its reconciliation
+lots. Stock sold before that history can still appear unmatched.
 
 The production front end is implemented by
 `public/admin/trading-ledger-wireframe.html`, `.css`, and `.js`. The interface provides date

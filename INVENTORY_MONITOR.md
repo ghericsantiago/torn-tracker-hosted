@@ -342,11 +342,20 @@ The **Ledger** tab (9th tab, after Market) records every buy, sell, and item out
 as a **transaction** and tracks item cost using a **FIFO lot** model (implemented in
 `src/ledger/`):
 
+The hosted Trading Profit page (`/admin/trading-profit`) treats these persisted `fifo_lots` and
+`transactions` as its canonical quantity model. Its rebuild first replaces eligible Trade-lot
+unit costs with the matching completed receipt item's `effective_price`, then copies the exact
+Inventory Monitor `remaining_qty` and reconstructs sale-to-lot profit matches. Consequently its
+open lots align with this Inventory tab; non-sale outflows reduce lots but do not count as trading
+revenue or realized profit.
+
 - **FIFO lots** (`src/ledger/fifo.js` — `fifoIn` / `fifoOut`) are created on acquisition
   (BUY_LOG_TYPES, FREE_LOG_TYPES, TRADE_IN, AMMO_BUY, POINTS_LOG_TYPES, VIRUS_COMPLETE,
   RACING_UNENLIST) and depleted oldest-first on disposal (USAGE, SELL, AMMO_SELL, TRADE_OUT,
-  POINTS_MARKET_ADD, BAZAAR_SELL, MARKET_SELL). Free items receive `unit_cost = 0`; trades
-  use proportional market-value allocation applied post-batch by `createTradeFifoFinalizer`.
+  POINTS_MARKET_ADD, BAZAAR_SELL, MARKET_SELL). Free items receive `unit_cost = 0`; completed
+  Trade receipts supply each received item's exact `effective_price` when available. Trades
+  without a matching completed receipt fall back to proportional market-value allocation applied
+  post-batch by `createTradeFifoFinalizer`.
   FIFO tracks **ownership** (not location) — stocking to bazaar/market does not deplete lots.
   Points use pseudo item_id `__points__`; FIFO OUT fires at 5000 (listing), FIFO IN at 5001
   (cancelled — points returned).

@@ -44,6 +44,7 @@
 .status-pill { display:inline-block; padding:3px 6px; border-radius:99px; font-size:.57rem; border:1px solid var(--glass-border); }
 .status-open { color:var(--accent); border-color:rgba(110,231,247,.25); }.status-partial { color:var(--warn); border-color:rgba(251,191,36,.25); }.status-sold { color:var(--profit); border-color:rgba(74,222,128,.25); }
 .status-converted { color:#c084fc; border-color:rgba(192,132,252,.3); }.status-mixed { color:#f0abfc; border-color:rgba(240,171,252,.3); }
+.status-depleted { color:var(--text-dim); border-color:rgba(148,163,184,.3); }
 .chevron { color:var(--accent); font-size:1rem; }.empty-state { display:none; padding:42px; text-align:center; color:var(--text-muted); }
 .detail-panel { display:none; scroll-margin-top:62px; }.detail-panel.visible { display:block; }
 .detail-row > td { padding:0!important; text-align:left!important; white-space:normal!important; background:#090a12; }

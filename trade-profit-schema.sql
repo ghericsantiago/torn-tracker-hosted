@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS trading_events (
   trade_id text,
   log_type integer NOT NULL,
   channel text NOT NULL,
-  side text NOT NULL CHECK (side IN ('buy','sell','museum')),
+  side text NOT NULL CHECK (side IN ('buy','sell','museum','use')),
   item_id integer NOT NULL,
   qty integer NOT NULL CHECK (qty > 0),
   unit_price numeric NOT NULL DEFAULT 0,
@@ -19,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_trading_events_item ON trading_events(item_id);
 -- Upgrade ledgers created before Museum conversions were tracked.
 ALTER TABLE trading_events DROP CONSTRAINT IF EXISTS trading_events_side_check;
 ALTER TABLE trading_events ADD CONSTRAINT trading_events_side_check
-  CHECK (side IN ('buy','sell','museum'));
+  CHECK (side IN ('buy','sell','museum','use'));
 
 CREATE TABLE IF NOT EXISTS trading_fifo_lots (
   id bigserial PRIMARY KEY,

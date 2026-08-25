@@ -18,8 +18,27 @@
 
 const { fifoOut } = require('./fifo');
 
-function createTradeFifoFinalizer({ catalog }) {
-  return function finalizeNewTrades(state, processedSet) {
+function createTradeFifoFinalizer({ catalog, pool }) {
+  return async function finalizeNewTrades(state, processedSet) {
+    const pendingTradeIds = [...state.trades.byId.keys()].filter(id => !processedSet.has(`trade_fifo:${id}`));
+    const receiptPrices = new Map();
+    if (pool && pendingTradeIds.length) {
+      try {
+        const { rows } = await pool.query(`
+          SELECT tr.trade_id::text trade_id,
+                 (j.item_data->>'torn_item_id')::text item_id,
+                 (j.item_data->>'effective_price')::numeric unit_price
+          FROM trade_receipts tr
+          CROSS JOIN LATERAL jsonb_array_elements(tr.items) AS j(item_data)
+          WHERE tr.status='completed' AND tr.trade_id::text=ANY($1::text[])
+            AND j.item_data->>'effective_price' IS NOT NULL`, [pendingTradeIds.map(String)]);
+        for (const row of rows) receiptPrices.set(`${row.trade_id}:${row.item_id}`, Number(row.unit_price));
+      } catch (e) {
+        // Standalone Inventory Monitor deployments may not have the hosted receipt table.
+        console.warn(`[trade-fifo] receipt lookup unavailable; using allocation fallback: ${e.message}`);
+      }
+    }
+
     for (const [tradeId, trade] of state.trades.byId) {
       const dedupKey = `trade_fifo:${tradeId}`;
       if (processedSet.has(dedupKey)) continue;
@@ -38,10 +57,13 @@ function createTradeFifoFinalizer({ catalog }) {
 
       for (const item of recvItems) {
         const weight    = item.qty * (Number(catalog.itemValue(item.itemId)) || 0);
-        const allocated = recvTotalWeight > 0
-          ? Math.round((weight / recvTotalWeight) * moneyPaid)
-          : 0;
-        const unitCost  = item.qty > 0 ? Math.round(allocated / item.qty) : 0;
+        const receiptUnitCost = receiptPrices.get(`${tradeId}:${item.itemId}`);
+        const allocated = Number.isFinite(receiptUnitCost)
+          ? Math.round(receiptUnitCost) * item.qty
+          : recvTotalWeight > 0 ? Math.round((weight / recvTotalWeight) * moneyPaid) : 0;
+        const unitCost = Number.isFinite(receiptUnitCost)
+          ? Math.round(receiptUnitCost)
+          : item.qty > 0 ? Math.round(allocated / item.qty) : 0;
 
         const lot = {
           id: null,

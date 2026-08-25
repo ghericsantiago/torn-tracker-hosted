@@ -330,7 +330,7 @@ router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) =
     const {rows}=await db.query(`
       WITH purchases AS (
         SELECT item_id, SUM(qty) bought, SUM(total_price) purchase_cost
-        FROM trading_events WHERE side='buy'
+        FROM trading_events WHERE side='buy' AND channel IN ('buy','trade','ammo_buy','points_buy')
           AND ($1::date IS NULL OR happened_at >= $1::date)
           AND ($2::date IS NULL OR happened_at < $2::date + interval '1 day') GROUP BY item_id
       ), sales AS (

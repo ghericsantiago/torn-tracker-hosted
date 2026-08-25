@@ -102,7 +102,7 @@ function createPoller({ config, state, db, logClient, applyLog, finalizeNewTrade
       // Without this, trade keys wouldn't survive a restart and trades would be re-finalized.
       if (finalizeNewTrades) {
         const prevLen = state.processedIds.length;
-        finalizeNewTrades(state, processedSet);
+        await finalizeNewTrades(state, processedSet);
         if (state.processedIds.length > prevLen) {
           newProcessed.push(...state.processedIds.slice(prevLen));
         }
