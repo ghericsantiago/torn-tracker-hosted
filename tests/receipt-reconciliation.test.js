@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const db = require('../db');
 const { reconcileReceiptStatuses } = require('../services/receipt-reconciliation');
 
-test('reconciliation cancels unmatched pending receipts and completes matched pending or auto-cancelled receipts', async () => {
+test('reconciliation enforces cancelled without a trade and completed with a trade regardless of current status', async () => {
   const originalQuery = db.query;
   const queries = [];
   db.query = async sql => {
@@ -18,10 +18,9 @@ test('reconciliation cancels unmatched pending receipts and completes matched pe
     const result = await reconcileReceiptStatuses();
     assert.deepEqual(result.cancelled.map(row => row.trade_id), ['100']);
     assert.deepEqual(result.completed.map(row => row.trade_id), ['200']);
-    assert.match(queries[0], /status='pending'/);
+    assert.match(queries[0], /status<>'cancelled'/);
     assert.match(queries[0], /NOT EXISTS/);
-    assert.match(queries[1], /receipt\.status='pending'/);
-    assert.match(queries[1], /receipt\.auto_cancelled=TRUE/);
+    assert.match(queries[1], /status<>'completed'/);
     assert.match(queries[1], /EXISTS/);
   } finally {
     db.query = originalQuery;

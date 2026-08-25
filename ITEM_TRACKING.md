@@ -754,12 +754,13 @@ Status edits update the in-memory record and reapply the active filters.
 The Inventory Monitor's `trade_events` table is the authority for whether a Torn trade completed.
 Any receipt that is still `pending` and has no row with the same Torn trade id is immediately
 changed to the existing `cancelled` status; there is no age or synchronization grace period.
-If a pending receipt does have a matching completed Inventory Monitor trade, it changes directly
-to `completed`. Unmatched cancellations are marked `auto_cancelled`; if a later reconciliation
-finds their completed trade, they also change to `completed` and receive a completion timestamp.
-Manually cancelled receipts are not marked and are never revived. Reconciliation runs at the start
-of every one-minute hosted scheduler cycle and immediately before the authenticated receipt list
-is returned, so the potentially longer market-item sync cannot delay receipt status changes.
+If a receipt does have a matching completed Inventory Monitor trade, it is `completed` and receives
+a completion timestamp. Inventory Monitor is authoritative regardless of the receipt's current or
+manually selected status: every unmatched receipt becomes `cancelled`, and every matched receipt
+becomes `completed`. Thus **Check Receipts** corrects an intentionally or accidentally incorrect
+manual status in either direction. Reconciliation also runs at the start of every one-minute hosted
+scheduler cycle and immediately before the authenticated receipt list is returned, so the
+potentially longer market-item sync cannot delay receipt status changes.
 The public receipt polls while Pending and renders the reconciled state explicitly: Completed is
 green, Cancelled is red, and only Pending is labeled `In Progress`. When polling observes a final
 state it updates the pill and stops polling; Cancelled is never presented as still in progress.
