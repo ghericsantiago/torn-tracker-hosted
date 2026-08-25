@@ -36,6 +36,17 @@ Four processes run under PM2:
 ssh -i "C:\Users\My PC\.ssh\id_ed25519" ubuntu@140.245.47.60 "cd torn-tracker && git pull && pm2 restart torn-tracker --update-env"
 ```
 
+When a deploy changes `trade-schema-v2.sql`, apply its idempotent migration before
+the restart. The Node command uses the application's dotenv/database configuration,
+so it also works when the server `.env` has CRLF line endings:
+
+```bash
+cd torn-tracker
+npm run migrate-trade
+npm run verify-schema
+pm2 restart torn-tracker --update-env
+```
+
 Or step by step on the server:
 
 ```bash
