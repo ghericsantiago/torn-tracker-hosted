@@ -244,6 +244,12 @@ summary cards and result counts describe the visible filtered result set. The cu
 independent of the report date because it answers whether the item is held now, while the date
 range continues to control the displayed purchase and sale activity.
 
+On narrow mobile screens, the item table becomes a compact summary showing item, realized profit,
+and current remaining quantity. Tapping a row expands the detail panel directly beneath it, where
+the bought quantity, purchase cost, sold quantity, revenue, FIFO cost, profit, margin, current
+lot counts, remaining units, and open cost basis are available before the lot tabs. Desktop keeps
+the complete sortable table.
+
 Realized profit is calculated only for matched quantity:
 
 ```

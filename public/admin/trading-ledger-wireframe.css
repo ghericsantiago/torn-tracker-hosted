@@ -65,4 +65,12 @@
 .tabs button { padding:8px 10px 10px; font-size:.72rem; border-bottom:2px solid transparent; }.tabs button.active { color:var(--accent); border-bottom-color:var(--accent); }.tabs span { color:var(--text-muted); font:.58rem var(--mono); }
 .asof { padding:8px 16px; color:var(--text-muted); background:rgba(110,231,247,.025); font-size:.65rem; }
 @media(max-width:1050px){.summary-grid{grid-template-columns:repeat(3,1fr)}.detail-stats{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:650px){.ledger-shell{width:min(100% - 18px,1400px);padding-top:16px}.page-head{align-items:flex-start}.wireframe-badge{display:none}.summary-grid{grid-template-columns:repeat(2,1fr)}.filter-card{align-items:stretch}.date-presets{width:100%;overflow:auto}.date-presets button{flex:1}.date-field{flex:1}.panel-actions{display:none}.detail-stats{grid-template-columns:repeat(2,1fr)}.tabs{overflow:auto}.tabs button{white-space:nowrap}}
+@media(max-width:650px){
+  .ledger-shell{width:min(100% - 18px,1400px);padding-top:16px}.page-head{align-items:flex-start}.wireframe-badge{display:none}
+  .summary-grid{grid-template-columns:repeat(2,1fr)}.filter-card{align-items:stretch}.date-presets{width:100%;overflow:auto}.date-presets button{flex:1}.date-field{flex:1}.panel-actions{display:none}
+  .item-table{min-width:0;table-layout:fixed}.item-table th:nth-child(2),.item-table td:nth-child(2),.item-table th:nth-child(3),.item-table td:nth-child(3),.item-table th:nth-child(4),.item-table td:nth-child(4),.item-table th:nth-child(5),.item-table td:nth-child(5),.item-table th:nth-child(6),.item-table td:nth-child(6),.item-table th:nth-child(7),.item-table td:nth-child(7),.item-table th:nth-child(9),.item-table td:nth-child(9){display:none}
+  .item-table th:first-child{width:auto}.item-table th:nth-child(8){width:84px}.item-table th:nth-child(10){width:62px}.item-table th:nth-child(11){width:25px}
+  .item-table th,.item-table td{padding:9px 6px}.item-table th:first-child,.item-table td:first-child{padding-left:12px}.item-table th:last-child,.item-table td:last-child{padding-left:0;padding-right:8px}
+  .item-cell{min-width:0}.item-cell>div{min-width:0}.item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .detail-stats{grid-template-columns:repeat(2,1fr)}.tabs{overflow:auto}.tabs button{white-space:nowrap}
+}

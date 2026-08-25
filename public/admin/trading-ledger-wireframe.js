@@ -165,6 +165,9 @@
     $('detailName').textContent = item.name;
     $('detailMeta').textContent = `${item.type || 'Other'} · Item #${item.item_id}`;
     $('detailStats').innerHTML = [
+      ['Bought', num(row.bought) + ' units', ''], ['Purchase cost', money(row.purchase_cost), ''],
+      ['Sold', num(row.sold) + ' units', ''], ['Sales revenue', money(row.revenue), ''],
+      ['FIFO cost', money(row.fifo_cost), ''],
       ['Realized profit', money(row.profit), profitClass(row.profit)],
       ['Margin', row.revenue ? (row.profit / row.revenue * 100).toFixed(1) + '%' : '—', profitClass(row.profit)],
       ['Open lots', detail.lotCounts.open, ''], ['Sold lots', detail.lotCounts.sold, ''],
