@@ -760,6 +760,9 @@ finds their completed trade, they also change to `completed` and receive a compl
 Manually cancelled receipts are not marked and are never revived. Reconciliation runs at the start
 of every one-minute hosted scheduler cycle and immediately before the authenticated receipt list
 is returned, so the potentially longer market-item sync cannot delay receipt status changes.
+The public receipt polls while Pending and renders the reconciled state explicitly: Completed is
+green, Cancelled is red, and only Pending is labeled `In Progress`. When polling observes a final
+state it updates the pill and stops polling; Cancelled is never presented as still in progress.
 The receipt-list header also provides **Check Receipts**, which runs the same reconciliation on
 demand, reloads the list, and reports how many pending receipts were cancelled.
 The receipt list loads the newest 20 rows first and requests additional 20-row pages as its bottom

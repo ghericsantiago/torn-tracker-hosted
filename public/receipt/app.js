@@ -78,7 +78,7 @@
 
   async function load() {
     try {
-      const res = await fetch(`/api/receipt/${id}`);
+      const res = await fetch(`/api/receipt/${id}`, { cache: 'no-store' });
       if (!res.ok) return showError(res.status === 404 ? 'Receipt not found.' : `Error ${res.status}`);
       const data = await res.json();
       render(data);
@@ -128,13 +128,17 @@
     const pill = document.getElementById('statusPill');
     const statusText = document.getElementById('statusText');
     pill.className = 'status-pill ' + r.status;
-    statusText.textContent = r.status === 'completed' ? 'Completed' : 'In Progress';
+    statusText.textContent = r.status === 'completed' ? 'Completed' : r.status === 'cancelled' ? 'Cancelled' : 'In Progress';
 
     if (r.completed_at) {
       document.getElementById('completedSep').style.display   = '';
       document.getElementById('completedLabel').style.display = '';
       document.getElementById('completedAt').style.display    = '';
       document.getElementById('completedAt').textContent = fmtDate(r.completed_at);
+    } else {
+      document.getElementById('completedSep').style.display   = 'none';
+      document.getElementById('completedLabel').style.display = 'none';
+      document.getElementById('completedAt').style.display    = 'none';
     }
 
     // Items
