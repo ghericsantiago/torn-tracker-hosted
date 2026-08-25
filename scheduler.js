@@ -38,7 +38,7 @@ async function cleanupOldRecords() {
 async function runReceiptReconciliation() {
   try {
     const reconciled = await reconcileReceiptStatuses();
-    if (reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Reconciled receipts: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
   } catch (err) {
     console.error('[receipts] Auto-cancel error:', err.message);
   }

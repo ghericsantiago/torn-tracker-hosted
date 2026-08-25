@@ -3,6 +3,17 @@
 const db = require('../db');
 
 async function reconcileReceiptStatuses() {
+  const pending = await db.query(
+    `UPDATE trade_receipts receipt
+     SET status='pending', completed_at=NULL, auto_cancelled=FALSE
+     WHERE receipt.status<>'pending'
+       AND receipt.created_at >= NOW() - INTERVAL '10 minutes'
+       AND NOT EXISTS (
+         SELECT 1 FROM trade_events completed_trade
+         WHERE completed_trade.trade_id=receipt.trade_id::text
+       )
+     RETURNING receipt.id, receipt.trade_id`
+  );
   const cancelled = await db.query(
     `UPDATE trade_receipts receipt
      SET status='cancelled', completed_at=NULL, auto_cancelled=TRUE
@@ -23,7 +34,7 @@ async function reconcileReceiptStatuses() {
        )
      RETURNING receipt.id, receipt.trade_id`
   );
-  return { cancelled: cancelled.rows, completed: completed.rows };
+  return { pending: pending.rows, cancelled: cancelled.rows, completed: completed.rows };
 }
 
 module.exports = { reconcileReceiptStatuses };

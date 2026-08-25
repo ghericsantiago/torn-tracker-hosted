@@ -81,8 +81,9 @@ router.get('/api/receipts', requireAuth, async (req, res) => {
         [q, from, to]
       ),
     ]);
-    if (reconciled.cancelled.length || reconciled.completed.length) {
-      console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) {
+      console.log(`[receipts] Reconciled receipts: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+      res.set('X-Auto-Pending-Receipts', String(reconciled.pending.length));
       res.set('X-Auto-Cancelled-Receipts', String(reconciled.cancelled.length));
       res.set('X-Auto-Completed-Receipts', String(reconciled.completed.length));
     }
@@ -95,9 +96,10 @@ router.get('/api/receipts', requireAuth, async (req, res) => {
 router.post('/api/receipts/reconcile', requireAuth, async (_req, res) => {
   try {
     const reconciled = await reconcileReceiptStatuses();
-    if (reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Manual reconciliation: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Manual reconciliation: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
     res.json({
       ok: true,
+      pending: reconciled.pending.length,
       cancelled: reconciled.cancelled.length,
       completed: reconciled.completed.length,
       cancelled_trade_ids: reconciled.cancelled.map(row => String(row.trade_id)),

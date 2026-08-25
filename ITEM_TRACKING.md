@@ -754,6 +754,8 @@ Status edits update the in-memory record and reapply the active filters.
 The Inventory Monitor's `trade_events` table is the authority for whether a Torn trade completed.
 Any receipt with no row for the same Torn trade id receives a 10-minute synchronization grace
 period from receipt creation, then changes to the existing `cancelled` status on reconciliation.
+During those first 10 minutes an unmatched receipt is authoritatively `pending` and the public
+receipt displays `In Progress`, overriding an incorrect manual Completed or Cancelled selection.
 If a receipt does have a matching completed Inventory Monitor trade, it is `completed` and receives
 a completion timestamp. Inventory Monitor is authoritative regardless of the receipt's current or
 manually selected status: every unmatched receipt becomes `cancelled`, and every matched receipt

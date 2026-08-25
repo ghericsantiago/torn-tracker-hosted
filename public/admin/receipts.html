@@ -261,6 +261,7 @@
         if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
         await load();
         const changes = [];
+        if (data.pending) changes.push(`${data.pending} receipt${data.pending === 1 ? '' : 's'} reset to In Progress during the grace period`);
         if (data.cancelled) changes.push(`${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled`);
         if (data.completed) changes.push(`${data.completed} matched receipt${data.completed === 1 ? '' : 's'} completed`);
         result.textContent = changes.length ? changes.join('; ') + '.' : 'All receipt statuses already match Inventory Monitor.';
