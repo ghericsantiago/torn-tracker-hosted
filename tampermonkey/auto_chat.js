@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Torn Trade Chat Sender
 // @namespace    https://torn.com/
-// @version      1.2
-// @description  Sends trade message every 70 seconds only when Trade chat is open
-// @match        https://www.torn.com/*
+// @version      1.4
+// @description  Sends trade messages from the property page every 70 seconds
+// @match        https://www.torn.com/properties.php*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==
@@ -16,7 +16,6 @@
 
     const LOCK_KEY = 'tradeSenderActiveTab';
     const ENABLE_KEY = 'tradeSenderEnabled';
-    const PERSIST_KEY = 'tradeSenderPersist';
 
     const TAB_ID =
         Date.now().toString(36) +
@@ -62,28 +61,8 @@
 
     document.body.appendChild(toggleButton);
 
-    const persistButton = document.createElement('button');
-
-    Object.assign(persistButton.style, {
-        position: 'fixed',
-        bottom: '60px',
-        right: '20px',
-        zIndex: '999999',
-        padding: '6px 12px',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        color: '#fff',
-        fontSize: '11px',
-        minWidth: '120px'
-    });
-
-    document.body.appendChild(persistButton);
-
     function updateButton() {
         const enabled = GM_getValue(ENABLE_KEY, false);
-        const persist = GM_getValue(PERSIST_KEY, false);
         const owner = localStorage.getItem(LOCK_KEY);
 
         if (enabled && owner === TAB_ID) {
@@ -94,8 +73,6 @@
             toggleButton.style.background = '#e74c3c';
         }
 
-        persistButton.textContent = persist ? '📌 Persist: ON' : '📌 Persist: OFF';
-        persistButton.style.background = persist ? '#2980b9' : '#7f8c8d';
     }
 
     // =========================================================
@@ -405,16 +382,7 @@
 
         if (localStorage.getItem(LOCK_KEY) === TAB_ID) {
             localStorage.removeItem(LOCK_KEY);
-            if (!GM_getValue(PERSIST_KEY, false)) {
-                GM_setValue(ENABLE_KEY, false);
-            }
         }
-    });
-
-    persistButton.addEventListener('click', () => {
-        const current = GM_getValue(PERSIST_KEY, false);
-        GM_setValue(PERSIST_KEY, !current);
-        updateButton();
     });
 
     // =========================================================
@@ -423,8 +391,8 @@
 
     updateButton();
 
-    // Auto-resume on page load if persist is on and was previously enabled
-    if (GM_getValue(PERSIST_KEY, false) && GM_getValue(ENABLE_KEY, false)) {
+    // The main enabled setting persists, so resume automatically after reload.
+    if (GM_getValue(ENABLE_KEY, false)) {
         start();
     }
 
