@@ -251,6 +251,8 @@ lot counts, remaining units, and open cost basis are available before the lot ta
 the complete sortable table.
 The compact row uses a fixed mobile grid, so inserting or removing the expanded detail panel never
 changes the widths of its item, profit, remaining, or expand columns.
+Those compact-grid rules apply only to the outer item table; expanded lot and activity tables keep
+their full column structure and use horizontal scrolling on narrow screens.
 
 Realized profit is calculated only for matched quantity:
 
