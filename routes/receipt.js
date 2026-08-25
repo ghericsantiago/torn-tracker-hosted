@@ -6,6 +6,7 @@ const fs      = require('fs');
 const path    = require('path');
 const router  = express.Router();
 const db      = require('../db');
+const { selectFrequentMarketSupport } = require('./receipt-market-support');
 
 function shortId() {
   return crypto.randomBytes(6).toString('base64url').slice(0, 8);
@@ -121,21 +122,11 @@ async function buildPricedItems(tornData, itemsOverride) {
            SELECT item_id, MAX(tracked_date) AS tracked_date
            FROM observations
            GROUP BY item_id
-         ), frequencies AS (
-           SELECT o.item_id, o.price, o.tracked_date,
-                  COUNT(*)::int AS sample_count,
-                  MAX(o.created_at) AS last_observed_at,
-                  ROW_NUMBER() OVER (
-                    PARTITION BY o.item_id
-                    ORDER BY COUNT(*) DESC, MAX(o.created_at) DESC, o.price ASC
-                  ) AS rank
-           FROM observations o
-           JOIN selected_days d USING (item_id, tracked_date)
-           GROUP BY o.item_id, o.price, o.tracked_date
          )
-         SELECT item_id, price, tracked_date, sample_count, last_observed_at
-         FROM frequencies
-         WHERE rank = 1`,
+         SELECT o.item_id, o.price, o.created_at, o.tracked_date
+         FROM observations o
+         JOIN selected_days d USING (item_id, tracked_date)
+         ORDER BY o.item_id, o.price, o.created_at`,
         [itemIds]
       ),
       db.query('SELECT default_market_pct FROM trade_profiles WHERE id = 1'),
@@ -143,7 +134,7 @@ async function buildPricedItems(tornData, itemsOverride) {
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
     for (const r of itemRes.rows)  itemMap[r.id] = r;
     const latestMarketMap = Object.fromEntries(latestMarketRes.rows.map(r => [r.item_id, r]));
-    const frequentMarketMap = Object.fromEntries(frequentMarketRes.rows.map(r => [r.item_id, r]));
+    const frequentMarketMap = Object.fromEntries(selectFrequentMarketSupport(frequentMarketRes.rows));
     globalPct = profileRes.rows[0]?.default_market_pct ?? null;
 
     for (const id of itemIds) {

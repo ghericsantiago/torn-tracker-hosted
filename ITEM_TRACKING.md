@@ -420,13 +420,46 @@ cascade. The adjusted item prices are sent as receipt overrides, so the receipt,
 cash sufficiency check, posted total, and added trade money all use the protected
 amount.
 
+In formula form, the normal unit offer is `round(market_value * buy_rate)` and the
+protected unit offer is `round(frequent_support * buy_rate)`. Protection is marked
+only when the item uses percentage pricing, all three inputs are positive,
+`frequent_support < market_value`, and the protected offer is strictly lower than
+the normal offer. The reported drop percentage is
+`(market_value - frequent_support) / market_value * 100`; it is audit/display data,
+not a threshold test. Quantity affects only the line total (`protected unit offer *
+quantity`), not the unit-price decision.
+
+```mermaid
+flowchart LR
+    M["Torn market value"] --> N["Normal offer<br/>round(market value x buy rate)"]
+    H["Lowest-price history"] --> S["Daily frequent support"]
+    S --> P["Protected offer<br/>round(frequent support x buy rate)"]
+    R["Resolved buy rate"] --> N
+    R --> P
+    N --> C{"Percentage pricing and<br/>protected offer &lt; normal offer?"}
+    P --> C
+    C -- Yes --> O["Use protected offer"]
+    C -- No --> U["Keep normal/fixed offer"]
+    O --> T["Line total = unit offer x quantity"]
+    U --> T
+```
+
 The market sync retains every successful lowest-price poll, including unchanged
-prices, so daily frequency is meaningful. Receipt protection uses the most
-frequently observed lowest price on the current Asia/Manila calendar day. If an
-item has no observation today, it uses the mode from the most recent day on which
-that item was tracked. If two prices have equal sample counts, the price observed
-most recently on that day wins (then the lower price as a deterministic final
-tie-break). The raw newest observation remains available separately for audit.
+prices, so daily frequency is meaningful. Receipt protection groups observations
+from the current Asia/Manila calendar day into near-price bands using a 1% margin.
+Each band is anchored to its lowest price, and includes observations no more than
+1% above that fixed anchor. Using a fixed anchor prevents a sequence of small price
+steps from chaining into one much wider band. The band containing the most
+observations wins, and its median observed price becomes the frequent-support
+reference. A percentage margin scales across cheap and expensive items more
+appropriately than a fixed dollar margin.
+
+If an item has no observation today, the same grouping is applied to the most
+recent day on which that item was tracked. If two bands have equal sample counts,
+the band observed most recently on that day wins, followed by the lower median as
+a deterministic final tie-break. The raw newest observation remains available
+separately for audit. The support line is therefore the median of the densest 1%
+price band, not the average, minimum, or a fitted trend line across the whole day.
 
 When protection applies, its audit fields are carried in `items_override` and
 stored with the receipt item: the unprotected offer, frequent-support price,
