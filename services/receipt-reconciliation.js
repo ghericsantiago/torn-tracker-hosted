@@ -6,7 +6,9 @@ async function reconcileReceiptStatuses() {
   const cancelled = await db.query(
     `UPDATE trade_receipts receipt
      SET status='cancelled', completed_at=NULL, auto_cancelled=TRUE
-     WHERE receipt.status<>'cancelled' AND NOT EXISTS (
+     WHERE receipt.status<>'cancelled'
+       AND receipt.created_at < NOW() - INTERVAL '10 minutes'
+       AND NOT EXISTS (
          SELECT 1 FROM trade_events completed_trade
          WHERE completed_trade.trade_id=receipt.trade_id::text
      )

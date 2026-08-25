@@ -19,6 +19,7 @@ test('reconciliation enforces cancelled without a trade and completed with a tra
     assert.deepEqual(result.cancelled.map(row => row.trade_id), ['100']);
     assert.deepEqual(result.completed.map(row => row.trade_id), ['200']);
     assert.match(queries[0], /status<>'cancelled'/);
+    assert.match(queries[0], /INTERVAL '10 minutes'/);
     assert.match(queries[0], /NOT EXISTS/);
     assert.match(queries[1], /status<>'completed'/);
     assert.match(queries[1], /EXISTS/);
