@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trading Profit — Torn Tracker</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./trading-ledger-wireframe.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
+      <div class="nav-right">
+        <a class="btn btn-ghost btn-sm mobile-hide" href="/admin/trade">Trade Admin</a>
+        <a class="btn btn-ghost btn-sm mobile-hide" href="/admin/receipts">Receipts</a>
+        <span class="btn btn-sm active-nav">Profit</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="ledger-shell">
+    <header class="page-head">
+      <div>
+        <div class="eyebrow">Trading / Profit</div>
+        <h1>Item Profit</h1>
+        <p>See what you bought, what sold, and the profit made using FIFO cost.</p>
+      </div>
+      <button id="rebuildLedger" class="ghost-button">Rebuild ledger</button>
+    </header>
+
+    <section class="filter-card">
+      <div class="date-presets" aria-label="Date range">
+        <button data-days="0">Today</button>
+        <button data-days="7">7D</button>
+        <button class="selected" data-days="30">30D</button>
+        <button data-days="month">This Month</button>
+        <button data-days="all">All</button>
+      </div>
+      <label class="search-field">
+        <span>Item</span>
+        <input id="itemSearch" type="search" placeholder="Search item name…" autocomplete="off">
+      </label>
+      <label class="date-field"><span>From</span><input id="dateFrom" type="date"></label>
+      <label class="date-field"><span>To</span><input id="dateTo" type="date"></label>
+      <button id="resetFilters" class="reset-btn">Reset</button>
+    </section>
+
+    <div class="filter-context" id="filterContext">Sales in the last 30 days · FIFO may use earlier purchases</div>
+
+    <section class="summary-grid" id="summaryGrid"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Items</h2><p>Click an item to inspect its acquisition and sale lots.</p></div>
+        <div class="panel-actions"><button class="ghost-button">Advanced filters</button><button class="ghost-button">Export CSV</button></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table item-table">
+          <thead><tr><th>Item</th><th>Bought</th><th>Purchase cost</th><th>Sold</th><th>Revenue</th><th>FIFO cost</th><th>Profit</th><th>Margin</th><th>Remaining</th><th></th></tr></thead>
+          <tbody id="itemRows"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState">No items match these filters.</div>
+    </section>
+
+    <section class="panel detail-panel" id="itemDetail">
+      <div class="detail-head">
+        <div class="item-identity"><img id="detailImage" alt=""><div><div class="eyebrow">Item detail</div><h2 id="detailName"></h2><p id="detailMeta"></p></div></div>
+        <button id="closeDetail" class="icon-button" aria-label="Close">×</button>
+      </div>
+      <div class="detail-stats" id="detailStats"></div>
+      <div class="tabs" role="tablist">
+        <button class="active" data-tab="open">Open Lots <span id="openCount"></span></button>
+        <button data-tab="sold">Sold Lots <span id="soldCount"></span></button>
+        <button data-tab="all">All Lots <span id="allCount"></span></button>
+        <button data-tab="activity">Activity <span id="activityCount"></span></button>
+      </div>
+      <div class="asof" id="asOfNote">Open-lot balances are shown as of now, independent of the report date filter.</div>
+      <div class="table-wrap"><table class="data-table"><thead id="lotHead"></thead><tbody id="lotRows"></tbody></table></div>
+    </section>
+  </main>
+
+  <script src="./trading-ledger-wireframe.js"></script>
+</body>
+</html>

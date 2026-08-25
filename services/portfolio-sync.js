@@ -7,6 +7,7 @@ const {
   POINT_MARKET_ID, TornApiError,
 } = require('./torn');
 const { processLots } = require('./lot-processor');
+const { rebuildTradingProfit } = require('./trading-profit');
 
 const INVENTORY_CATEGORIES = [
   'Alcohol', 'Artifact', 'Booster', 'Candy', 'Car', 'Clothing', 'Defensive',
@@ -357,6 +358,7 @@ async function runSync() {
     await syncItemCatalog(apiKey);
     await syncLogs(apiKey);
     await processLots();
+    await rebuildTradingProfit();
     await snapshotInventory(apiKey);
     await setSyncState('last_sync_ts', Math.floor(Date.now() / 1000));
     console.log('[portfolio] Sync complete');

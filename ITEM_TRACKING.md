@@ -211,6 +211,99 @@ Group all sub-logs by `data.parsed_trade_id` (anchor log 4430), then:
 
 ---
 
+### 5b. Trading FIFO profit monitor (hosted Trading system)
+
+The hosted Trading admin area has a separate, log-derived **Trading FIFO** view at
+`/admin/trading-profit`. Its purpose is commercial activity and realized trading performance, not reconstruction
+of the player's complete inventory. It therefore accepts only these movements:
+
+| Commercial event | Trading FIFO effect |
+|---|---|
+| Item/bazaar/shop purchase log | Open an incoming FIFO lot at the logged total cost |
+| Completed trade: items received and money given | Open incoming lots; prefer receipt item prices, otherwise allocate money by item market-value weight |
+| Bazaar/item-market/shop sale log | Match the outgoing quantity against the oldest open lots for that item |
+| Completed trade: items given and money received | Match outgoing items against the oldest lots; allocate proceeds by item market-value weight |
+
+Everything else is out of scope: free finds/rewards, gifts, faction transfers, item use,
+transformations, museum exchanges, display/listing moves, and manual inventory reconciliation.
+Listing an item is not a sale; the sell log is the outgoing commercial event. Completed player
+trades must be assembled by `parsed_trade_id` before any rows or FIFO matches are written.
+
+This restricted ledger represents **open trading lots**, not current owned quantity. For
+example, an item bought and later consumed remains open in this ledger because consumption is
+deliberately excluded. Likewise, a sale of pre-tracking, gifted, or otherwise unrecorded stock
+is an **unmatched sale** with unknown cost basis; it must not be silently assigned a `$0` cost.
+Realized profit is calculated only for matched quantity:
+
+```
+realized profit = allocated sale proceeds - sum(FIFO matched quantity × lot unit cost)
+```
+
+The UI lives under the authenticated Trading system (alongside Manage and Receipts) and
+is primarily an **item profit dashboard**. Its default workflow is: select a date preset or custom
+range, search/select an item, then see quantity bought, purchase cost, quantity sold, sales
+revenue, realized FIFO cost, realized profit, margin, remaining trading quantity, and remaining
+cost basis. Summary cards show cash spent, revenue, realized profit, margin, open cost basis, and
+unmatched sale quantity. The main item table uses one row per item and can be sorted by profit,
+revenue, quantity sold, or remaining cost basis; clicking a row opens its buy/sell timeline and
+the FIFO lots consumed by each sale. A secondary chronological Activity view supports auditing
+all incoming and outgoing events.
+
+The initial filters should stay small and prominent: date (Today, 7D, 30D, This Month, All, or
+custom range) and item-name autocomplete. Advanced filters for channel and direction can live in
+a collapsible panel. Filters apply together, active filters are visible as removable chips, and a
+single Reset action restores the default. Date filtering determines which sale events contribute
+to realized revenue/profit, but the cost of those sales must still be matched against acquisition
+lots from before the selected range. Purchases shown for the range and FIFO cost consumed in the
+range are therefore intentionally different measures and must have distinct labels/tooltips.
+
+Profit should be presented conservatively. `Realized profit` covers sold, FIFO-matched quantity
+only; unsold lots appear under open quantity/cost basis and do not count as profit. If a sale is
+partly or fully unmatched, the UI shows the known matched profit plus an `Incomplete cost basis`
+warning instead of treating the missing cost as zero. Negative profit is red, positive profit is
+green, and neutral/unknown values do not use either success color.
+
+Each item's detail view must also expose the FIFO lots directly, with **Open Lots**, **Sold
+Lots**, and **All Lots** tabs. An open-lot row shows acquisition date/source, original quantity,
+sold quantity, remaining quantity, unit cost, original cost, and remaining cost basis. A
+fully-sold lot shows the same acquisition fields plus the final depletion date, total proceeds
+attributed to its matched units, realized profit, margin, and links/expanders for every sale that
+consumed it. A partially sold acquisition appears in Open Lots with both sold and remaining
+quantities and in All Lots as one lot; it must not be displayed as two unrelated acquisitions.
+
+Conversely, expanding a sale shows all acquisition lots it consumed, including quantity and cost
+drawn from each lot. This makes the relationship auditable in both directions: acquisition lot →
+sales and sale → acquisition lots. The item header summarizes open lots, fully sold lots,
+partially sold lots, remaining units, and remaining cost basis. Lot status is derived from
+`remaining_qty`: Open when it equals original quantity, Partial when it is between zero and the
+original quantity, and Sold when it is zero. Date filters apply to sale/profit reporting, while
+the Open Lots tab reflects the current lot state; a clear `As of now` label prevents the two time
+contexts from being confused.
+
+Persistence is in the hosted Trading database, independent of the inventory monitor's
+`torn_tracker_v2` tables: `trading_events` contains commercial events deduplicated by Torn log id
+(or trade id + side + item id for grouped trades), `trading_fifo_lots` contains acquisition lots,
+and `trading_fifo_matches` records each sale-to-lot allocation. `services/trading-profit.js`
+rebuilds those derived tables chronologically and atomically from `torn_logs`; the full 15-minute
+portfolio sync refreshes it, and the authenticated page also provides a manual Rebuild action.
+Completed receipt data may enrich a matching trade's incoming unit costs, but Torn logs remain
+the source of truth for whether and when the trade completed.
+
+The current implementation replays all retained `torn_logs` history. Stock acquired before that
+history, or acquired through an excluded non-commercial event, naturally appears as unmatched
+when sold. An optional opening trading-lot import is not currently implemented.
+
+The production front end is implemented by
+`public/admin/trading-ledger-wireframe.html`, `.css`, and `.js`. The interface provides date
+presets/custom dates, item-name filtering, aggregate
+profit cards, the per-item profit table, and item detail tabs for Open Lots, Sold Lots, All Lots,
+and Activity. Data comes from authenticated `/admin/api/trading-profit/*` endpoints; calculations
+come from the persisted production accounting implementation described above. Its CSS and
+JavaScript references are relative to the HTML asset, while the production page itself is served
+through the authenticated `/admin/trading-profit` route.
+
+---
+
 ## 6. Reference data files
 
 | File | Use |

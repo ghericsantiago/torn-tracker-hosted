@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "migrate-trade": "node scripts/apply-trade-schema.js",
+    "migrate-trade-profit": "node scripts/apply-trade-profit-schema.js",
     "verify-schema": "node scripts/verify-schema.js",
     "reset-db": "node inventory-monitor/reset-db.js",
     "fix-faction-loan": "node inventory-monitor/fix-faction-loan.js"

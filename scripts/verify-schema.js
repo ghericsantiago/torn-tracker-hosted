@@ -14,6 +14,9 @@ const REQUIRED_COLUMNS = {
   manual_adjustments: ['scope'],
   item_sources: ['dir'],
   trade_events: ['gave_json', 'received_json'],
+  trading_events: ['source_key', 'side', 'item_id', 'unmatched_qty'],
+  trading_fifo_lots: ['event_id', 'qty_original', 'qty_remaining', 'unit_cost'],
+  trading_fifo_matches: ['sale_event_id', 'lot_id', 'qty', 'realized_profit'],
 };
 
 async function main() {

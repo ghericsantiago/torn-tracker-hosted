@@ -3,6 +3,7 @@ const path        = require('path');
 const router      = express.Router();
 const db          = require('../db');
 const requireAuth = require('../middleware/auth');
+const { rebuildTradingProfit } = require('../services/trading-profit');
 
 // ── SQL helpers ────────────────────────────────────────────────────────────
 // Resolves the 3-level cascade in SQL:
@@ -312,6 +313,68 @@ router.delete('/admin/api/trade/listings/:id', requireAuth, async (req, res) => 
     await db.query('DELETE FROM trade_listings WHERE id=$1 AND profile_id=1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/admin/trading-profit', requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin/trading-ledger-wireframe.html'));
+});
+
+router.post('/admin/api/trading-profit/rebuild', requireAuth, async (req, res) => {
+  try { res.json({ ok: true, ...(await rebuildTradingProfit()) }); }
+  catch (e) { console.error('[trading-profit/rebuild]', e); res.status(500).json({ error: e.message }); }
+});
+
+router.get('/admin/api/trading-profit/overview', requireAuth, async (req, res) => {
+  try {
+    const from=req.query.from||null, to=req.query.to||null, q=(req.query.q||'').trim();
+    const {rows}=await db.query(`
+      WITH purchases AS (
+        SELECT item_id, SUM(qty) bought, SUM(total_price) purchase_cost
+        FROM trading_events WHERE side='buy'
+          AND ($1::date IS NULL OR happened_at >= $1::date)
+          AND ($2::date IS NULL OR happened_at < $2::date + interval '1 day') GROUP BY item_id
+      ), sales AS (
+        SELECT e.item_id, SUM(e.qty) sold, SUM(e.total_price) revenue,
+          SUM(COALESCE(m.cost,0)) fifo_cost, SUM(COALESCE(m.profit,0)) profit,
+          SUM(e.unmatched_qty) unmatched
+        FROM trading_events e LEFT JOIN (
+          SELECT sale_event_id,SUM(qty*unit_cost) cost,SUM(realized_profit) profit
+          FROM trading_fifo_matches GROUP BY sale_event_id
+        ) m ON m.sale_event_id=e.id WHERE e.side='sell'
+          AND ($1::date IS NULL OR e.happened_at >= $1::date)
+          AND ($2::date IS NULL OR e.happened_at < $2::date + interval '1 day') GROUP BY e.item_id
+      ), open AS (
+        SELECT item_id,SUM(qty_remaining) remaining,SUM(qty_remaining*unit_cost) open_cost
+        FROM trading_fifo_lots GROUP BY item_id
+      )
+      SELECT ti.id item_id,ti.name,ti.type,COALESCE(p.bought,0) bought,COALESCE(p.purchase_cost,0) purchase_cost,
+        COALESCE(s.sold,0) sold,COALESCE(s.revenue,0) revenue,COALESCE(s.fifo_cost,0) fifo_cost,
+        COALESCE(s.profit,0) profit,COALESCE(s.unmatched,0) unmatched,COALESCE(o.remaining,0) remaining,
+        COALESCE(o.open_cost,0) open_cost
+      FROM torn_items ti LEFT JOIN purchases p ON p.item_id=ti.id LEFT JOIN sales s ON s.item_id=ti.id
+      LEFT JOIN open o ON o.item_id=ti.id
+      WHERE (p.item_id IS NOT NULL OR s.item_id IS NOT NULL OR o.item_id IS NOT NULL)
+        AND ($3='' OR ti.name ILIKE '%'||$3||'%') ORDER BY profit DESC,ti.name`,[from,to,q]);
+    const items=rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,['item_id','name','type'].includes(k)?v:Number(v)])));
+    const totals=items.reduce((a,x)=>{for(const k of ['bought','purchase_cost','sold','revenue','fifo_cost','profit','unmatched','remaining','open_cost'])a[k]+=x[k];return a;},{bought:0,purchase_cost:0,sold:0,revenue:0,fifo_cost:0,profit:0,unmatched:0,remaining:0,open_cost:0});
+    res.json({items,totals});
+  } catch(e){console.error('[trading-profit/overview]',e);res.status(500).json({error:e.message});}
+});
+
+router.get('/admin/api/trading-profit/items/:itemId', requireAuth, async (req,res)=>{
+  try{
+    const itemId=Number(req.params.itemId); if(!itemId)return res.status(400).json({error:'Invalid item'});
+    const [itemRes,lotsRes,activityRes]=await Promise.all([
+      db.query('SELECT id item_id,name,type FROM torn_items WHERE id=$1',[itemId]),
+      db.query(`SELECT l.id,l.acquired_at,l.qty_original,l.qty_remaining,l.unit_cost,e.channel,e.trade_id,e.log_id,
+        COALESCE(json_agg(json_build_object('date',s.happened_at,'qty',m.qty,'unit_revenue',m.unit_revenue,'profit',m.realized_profit,'channel',s.channel,'trade_id',s.trade_id,'log_id',s.log_id)) FILTER(WHERE m.id IS NOT NULL),'[]') sales
+        FROM trading_fifo_lots l JOIN trading_events e ON e.id=l.event_id
+        LEFT JOIN trading_fifo_matches m ON m.lot_id=l.id LEFT JOIN trading_events s ON s.id=m.sale_event_id
+        WHERE l.item_id=$1 GROUP BY l.id,e.channel,e.trade_id,e.log_id ORDER BY l.acquired_at,l.id`,[itemId]),
+      db.query(`SELECT id,happened_at,side,channel,qty,unit_price,total_price,unmatched_qty,trade_id,log_id FROM trading_events WHERE item_id=$1 ORDER BY happened_at DESC,id DESC`,[itemId])
+    ]);
+    res.json({item:itemRes.rows[0]||null,lots:lotsRes.rows.map(l=>({...l,qty_original:Number(l.qty_original),qty_remaining:Number(l.qty_remaining),unit_cost:Number(l.unit_cost),sales:l.sales})),activity:activityRes.rows.map(x=>({...x,qty:Number(x.qty),unit_price:Number(x.unit_price),total_price:Number(x.total_price),unmatched_qty:Number(x.unmatched_qty)}))});
+  }catch(e){console.error('[trading-profit/item]',e);res.status(500).json({error:e.message});}
 });
 
 module.exports = router;
