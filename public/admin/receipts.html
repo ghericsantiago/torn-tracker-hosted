@@ -145,12 +145,17 @@
           </tbody>
         </table>
       </div>
+      <button id="loadMoreReceipts" class="btn btn-ghost btn-sm" style="display:none;width:100%;border-radius:0;padding:.75rem">Load more receipts</button>
     </div>
 
   </main>
 
   <script>
     let allReceipts = [];
+    let totalReceipts = 0;
+    let receiptLoading = false;
+    let receiptReloadPending = false;
+    const receiptLimit = 20;
 
     function fmt(n) {
       return n == null ? '—' : '$' + Number(n).toLocaleString();
@@ -169,44 +174,52 @@
       return `<span class="status-pill ${s}" data-id="${id}"><span class="status-dot"></span>${statusLabel(s)}</span>`;
     }
 
-    async function load() {
-      const res = await fetch('/admin/api/receipts');
-      if (!res.ok) { document.getElementById('receiptsBody').innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load receipts.</td></tr>'; return; }
-      allReceipts = await res.json();
-      applyFilters();
+    function receiptParams(offset) {
+      const params = new URLSearchParams({ limit: receiptLimit, offset });
+      const query = document.getElementById('receiptSearch').value.trim();
+      if (query) params.set('q', query);
+      if (document.getElementById('dateFrom').value) params.set('from', document.getElementById('dateFrom').value);
+      if (document.getElementById('dateTo').value) params.set('to', document.getElementById('dateTo').value);
+      return params;
     }
 
-    function updateStats(rows) {
-
-      document.getElementById('statTotal').textContent     = rows.length;
-      document.getElementById('statPending').textContent   = rows.filter(r => r.status === 'pending').length;
-      document.getElementById('statCompleted').textContent = rows.filter(r => r.status === 'completed').length;
-      const vol = rows.reduce((s, r) => s + (Number(r.total_value) || 0), 0);
-      document.getElementById('statVolume').textContent    = fmt(vol);
+    async function load(reset = true) {
+      if (receiptLoading) { if (reset) receiptReloadPending = true; return; }
+      receiptLoading = true;
+      const offset = reset ? 0 : allReceipts.length;
+      const loadMore = document.getElementById('loadMoreReceipts');
+      loadMore.textContent = 'Loading...';
+      try {
+        const res = await fetch('/admin/api/receipts?' + receiptParams(offset));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        allReceipts = reset ? data.receipts : allReceipts.concat(data.receipts);
+        totalReceipts = data.total;
+        renderReceipts(data.totals);
+      } catch (error) {
+        document.getElementById('receiptsBody').innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load receipts: ${error.message}</td></tr>`;
+      } finally {
+        receiptLoading = false;
+        loadMore.textContent = 'Load more receipts';
+        if (receiptReloadPending) { receiptReloadPending = false; load(true); }
+      }
     }
 
-    function searchableReceipt(r) {
-      return [r.trade_id, r.id, r.short_id, r.status, r.buyer_name, r.buyer_id, r.seller_name, r.seller_id]
-        .filter(v => v != null).join(' ').toLowerCase();
+    function updateStats(totals) {
+      document.getElementById('statTotal').textContent     = totals.total;
+      document.getElementById('statPending').textContent   = totals.pending;
+      document.getElementById('statCompleted').textContent = totals.completed;
+      document.getElementById('statVolume').textContent    = fmt(totals.volume);
     }
 
-    function applyFilters() {
-      const query = document.getElementById('receiptSearch').value.trim().toLowerCase();
-      const fromValue = document.getElementById('dateFrom').value;
-      const toValue = document.getElementById('dateTo').value;
-      const from = fromValue ? new Date(`${fromValue}T00:00:00`) : null;
-      const to = toValue ? new Date(`${toValue}T23:59:59.999`) : null;
-      const rows = allReceipts.filter(r => {
-        const created = new Date(r.created_at);
-        return (!query || searchableReceipt(r).includes(query)) &&
-          (!from || created >= from) && (!to || created <= to);
-      });
-
-      updateStats(rows);
-      document.getElementById('filterCount').textContent = `${rows.length} of ${allReceipts.length}`;
+    function renderReceipts(totals) {
+      const rows = allReceipts;
+      updateStats(totals);
+      document.getElementById('filterCount').textContent = `${rows.length} of ${totalReceipts}`;
+      document.getElementById('loadMoreReceipts').style.display = rows.length < totalReceipts ? 'block' : 'none';
 
       const tbody = document.getElementById('receiptsBody');
-      if (!rows.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${allReceipts.length ? 'No receipts match these filters.' : 'No receipts yet.'}</td></tr>`; return; }
+      if (!rows.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${totalReceipts ? 'No receipts match these filters.' : 'No receipts found.'}</td></tr>`; return; }
 
       tbody.innerHTML = rows.map(r => `
         <tr data-id="${r.id}">
@@ -225,15 +238,15 @@
     let searchTimer = null;
     document.getElementById('receiptSearch').addEventListener('input', () => {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(applyFilters, 120);
+      searchTimer = setTimeout(() => load(true), 250);
     });
-    document.getElementById('dateFrom').addEventListener('change', applyFilters);
-    document.getElementById('dateTo').addEventListener('change', applyFilters);
+    document.getElementById('dateFrom').addEventListener('change', () => load(true));
+    document.getElementById('dateTo').addEventListener('change', () => load(true));
     document.getElementById('clearFilters').addEventListener('click', () => {
       document.getElementById('receiptSearch').value = '';
       document.getElementById('dateFrom').value = '';
       document.getElementById('dateTo').value = '';
-      applyFilters();
+      load(true);
     });
 
     document.getElementById('reconcileReceipts').addEventListener('click', async () => {
@@ -309,7 +322,7 @@
       const updated = await res.json();
       const index = allReceipts.findIndex(receipt => String(receipt.id) === String(id));
       if (index !== -1) allReceipts[index] = { ...allReceipts[index], ...updated };
-      applyFilters();
+      await load(true);
     });
 
     document.addEventListener('click', e => {
@@ -330,6 +343,14 @@
     document.getElementById('navBurger').addEventListener('click', () => {
       document.getElementById('navDropdown').classList.toggle('open');
     });
+
+    document.getElementById('loadMoreReceipts').addEventListener('click', () => load(false));
+    if ('IntersectionObserver' in window) {
+      const receiptObserver = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting) && allReceipts.length < totalReceipts) load(false);
+      }, { rootMargin: '300px' });
+      receiptObserver.observe(document.getElementById('loadMoreReceipts'));
+    }
 
     load();
   </script>

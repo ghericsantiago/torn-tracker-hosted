@@ -760,6 +760,9 @@ Manually cancelled receipts are not marked and are never revived. It runs hourly
 scheduler and also immediately before the authenticated receipt list is returned.
 The receipt-list header also provides **Check Receipts**, which runs the same reconciliation on
 demand, reloads the list, and reports how many pending receipts were cancelled.
+The receipt list loads the newest 20 rows first and requests additional 20-row pages as its bottom
+sentinel approaches the viewport. Search and inclusive date filters execute on the server, reset
+the paging cursor, and keep status/volume totals accurate across the entire filtered result set.
 The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
 the status panel, and all automation operate only while a trade page is open.
 If a pending alert appears while an already-open trade list is stale, that list

@@ -55,17 +55,40 @@ router.get('/receipts', requireAuth, (req, res) => {
 router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
     const reconciled = await reconcileReceiptStatuses();
-    const { rows } = await db.query(
-      `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
-              total_value, created_at, completed_at
-       FROM trade_receipts ORDER BY created_at DESC`
-    );
+    const paginated = req.query.limit != null;
+    const limit = paginated ? Math.min(100, Math.max(1, Number(req.query.limit) || 20)) : 1000000;
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const q = String(req.query.q || '').trim();
+    const from = req.query.from || null;
+    const to = req.query.to || null;
+    const filter = `WHERE ($1='' OR CONCAT_WS(' ',trade_id,id,short_id,status,buyer_name,buyer_id,seller_name,seller_id) ILIKE '%'||$1||'%')
+      AND ($2::date IS NULL OR created_at >= $2::date)
+      AND ($3::date IS NULL OR created_at < $3::date + INTERVAL '1 day')`;
+    const [listResult, totalsResult] = await Promise.all([
+      db.query(
+        `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
+                total_value, created_at, completed_at
+         FROM trade_receipts ${filter} ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
+        [q, from, to, limit, offset]
+      ),
+      db.query(
+        `SELECT COUNT(*)::int total,
+                COUNT(*) FILTER (WHERE status='pending')::int pending,
+                COUNT(*) FILTER (WHERE status='completed')::int completed,
+                COUNT(*) FILTER (WHERE status='cancelled')::int cancelled,
+                COALESCE(SUM(total_value),0) volume
+         FROM trade_receipts ${filter}`,
+        [q, from, to]
+      ),
+    ]);
     if (reconciled.cancelled.length || reconciled.completed.length) {
       console.log(`[receipts] Reconciled receipts: ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
       res.set('X-Auto-Cancelled-Receipts', String(reconciled.cancelled.length));
       res.set('X-Auto-Completed-Receipts', String(reconciled.completed.length));
     }
-    res.json(rows);
+    if (!paginated) return res.json(listResult.rows);
+    const totals = totalsResult.rows[0];
+    res.json({ receipts: listResult.rows, total: totals.total, totals, limit, offset });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
