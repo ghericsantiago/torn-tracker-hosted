@@ -479,6 +479,13 @@ rows with a red shield and a compact support/drop/original-offer line. Its nativ
 hover/keyboard help contains the same audit context. Confirming an untouched row
 passes the protection audit fields into receipt creation; manually editing its
 fixed/% offer dims the shield and intentionally replaces automatic protection.
+On the public receipt, each protected item also has a graph button beside its
+name. It opens a responsive modal patterned after the Bazaar Pricer chart and
+loads every lowest-offer poll from the item's selected Asia/Manila tracking day.
+The graph overlays the jagged lowest-offer history with horizontal Frequent
+Support and Torn Market Value lines, and displays the winning support-band sample
+count. The modal supports button, backdrop, and Escape-key closing; unprotected
+items do not show the graph control.
 Trade Automation also switches to an editable protected-price
 comment containing the receipt URL and adjusted total, warning the counterpart
 to review the lower offer and inviting negotiation. Separate editable templates

@@ -3,6 +3,8 @@
   if (!id) return showError('No receipt ID in URL.');
 
   let pollTimer = null;
+  let marketChart = null;
+  let chartLoadToken = 0;
   const helpTooltip = document.createElement('div');
   helpTooltip.className = 'receipt-help-tooltip hidden';
   helpTooltip.setAttribute('role', 'tooltip');
@@ -53,6 +55,26 @@
   });
   window.addEventListener('scroll', hideHelpTooltip, true);
   window.addEventListener('resize', hideHelpTooltip);
+
+  const chartOverlay = document.getElementById('marketChartOverlay');
+  const chartTitle = document.getElementById('marketChartTitle');
+  const chartMeta = document.getElementById('marketChartMeta');
+  const chartMessage = document.getElementById('marketChartMessage');
+  const chartClose = document.getElementById('marketChartClose');
+
+  function closeMarketChart() {
+    chartLoadToken += 1;
+    chartOverlay.classList.add('hidden');
+    document.body.classList.remove('chart-open');
+  }
+
+  chartClose.addEventListener('click', closeMarketChart);
+  chartOverlay.addEventListener('click', event => {
+    if (event.target === chartOverlay) closeMarketChart();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !chartOverlay.classList.contains('hidden')) closeMarketChart();
+  });
 
   async function load() {
     try {
@@ -129,6 +151,9 @@
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
       const notInCatalog = !item.in_catalog && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
+      const chartButton = item.market_protection_applied
+        ? `<button class="receipt-chart-btn" type="button" aria-label="Show market graph" title="Show market graph">&#128200;</button>`
+        : '';
 
       let adjustBadge = item.market_protection_applied
         ? `<span class="protection-help" tabindex="0" role="img"
@@ -155,7 +180,7 @@
           <div class="item-cell">
             <img class="item-icon" src="${imgSrc}" alt="" onerror="this.style.display='none'">
             <div class="item-text">
-              <div class="item-name">${item.item_name}</div>
+              <div class="item-name-row"><div class="item-name">${item.item_name}</div>${chartButton}</div>
               ${item.item_type ? `<div class="item-type">${item.item_type}</div>` : ''}
             </div>
           </div>
@@ -169,6 +194,11 @@
           ${item.effective_total != null ? fmt(item.effective_total) : '—'}
         </td>
       `;
+      const graphButton = tr.querySelector('.receipt-chart-btn');
+      if (graphButton) {
+        graphButton.setAttribute('aria-label', `Show market graph for ${item.item_name}`);
+        graphButton.addEventListener('click', () => openMarketChart(item));
+      }
       tbody.appendChild(tr);
     }
 
@@ -248,6 +278,110 @@
     }
 
     body.innerHTML = `${protectionRows.length ? `<div class="calc-list">${protectionRows.join('')}</div>` : ''}${ruleChips.length ? `<div class="rule-chips">${ruleChips.join('')}</div>` : ''}`;
+  }
+
+  function trackingDayBounds(value) {
+    const day = String(value || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+    const start = new Date(`${day}T00:00:00+08:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    return {
+      day,
+      from: start.toISOString(),
+      to: new Date(start.getTime() + 86400000 - 1).toISOString(),
+    };
+  }
+
+  function chartTime(iso) {
+    return new Date(iso).toLocaleTimeString(undefined, {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila', hour12: false,
+    });
+  }
+
+  async function openMarketChart(item) {
+    const bounds = trackingDayBounds(item.market_reference_date);
+    chartTitle.textContent = item.item_name;
+    chartMeta.textContent = bounds
+      ? `${bounds.day} · Asia/Manila · ${item.market_reference_samples || 0} support-band sample${Number(item.market_reference_samples) === 1 ? '' : 's'}`
+      : 'Most recent tracked market data';
+    chartMessage.textContent = 'Loading market history…';
+    chartMessage.classList.remove('hidden');
+    chartOverlay.classList.remove('hidden');
+    document.body.classList.add('chart-open');
+    chartClose.focus();
+
+    const token = ++chartLoadToken;
+    const query = bounds
+      ? `?from=${encodeURIComponent(bounds.from)}&to=${encodeURIComponent(bounds.to)}&limit=5000`
+      : '?limit=5000';
+
+    try {
+      const response = await fetch(`/api/market/${item.torn_item_id}${query}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const rows = await response.json();
+      if (token !== chartLoadToken) return;
+      const observations = (Array.isArray(rows) ? rows : []).filter(row => Number(row.price) > 0);
+      if (!observations.length) {
+        if (marketChart) marketChart.destroy();
+        marketChart = null;
+        chartMessage.textContent = 'No market observations are available for this tracking day.';
+        return;
+      }
+
+      const labels = observations.map(row => chartTime(row.created_at));
+      const lowestOffers = observations.map(row => Number(row.price));
+      const support = Number(item.protection_lowest_price ?? item.market_reference_price);
+      const marketValue = Number(item.protection_market_value ?? item.market_price);
+      const repeated = value => observations.map(() => Number.isFinite(value) && value > 0 ? value : null);
+
+      if (marketChart) marketChart.destroy();
+      marketChart = new window.Chart(document.getElementById('marketChartCanvas').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Lowest Offer', data: lowestOffers,
+              borderColor: '#6ee7f7', backgroundColor: 'rgba(110,231,247,.07)',
+              pointRadius: observations.length > 150 ? 1 : 3,
+              pointHoverRadius: 6, borderWidth: 2, tension: .2, fill: true,
+            },
+            {
+              label: 'Frequent Support', data: repeated(support),
+              borderColor: '#f87171', pointRadius: 0, borderWidth: 2, tension: 0,
+            },
+            {
+              label: 'Torn Market Value', data: repeated(marketValue),
+              borderColor: 'rgba(148,163,184,.65)', borderDash: [5, 4],
+              pointRadius: 0, borderWidth: 1.5, tension: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#94a3b8', boxWidth: 16, font: { size: 10 } } },
+            tooltip: { callbacks: { label: context => `${context.dataset.label}: ${fmt(context.parsed.y)}` } },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#64748b', maxRotation: 0, maxTicksLimit: 10, font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,.05)' },
+            },
+            y: {
+              ticks: { color: '#94a3b8', font: { size: 10 }, callback: value => fmt(value) },
+              grid: { color: 'rgba(255,255,255,.05)' },
+            },
+          },
+        },
+      });
+      chartMessage.classList.add('hidden');
+    } catch (_error) {
+      if (token !== chartLoadToken) return;
+      chartMessage.textContent = 'Failed to load market history.';
+      chartMessage.classList.remove('hidden');
+    }
   }
 
   function showError(msg) {
