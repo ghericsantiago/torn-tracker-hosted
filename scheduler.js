@@ -1,10 +1,13 @@
 const cron = require('node-cron');
 const { syncAllItems } = require('./services/sync');
+const { cancelUnmatchedPendingReceipts } = require('./services/receipt-reconciliation');
 const db = require('./db');
 
 let running      = false;
 let lastCleanup  = 0;
+let lastReceiptReconciliation = 0;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 async function runCleanup() {
   const now = Date.now();
@@ -34,6 +37,18 @@ async function cleanupOldRecords() {
   return result.rowCount ?? 0;
 }
 
+async function runReceiptReconciliation() {
+  const now = Date.now();
+  if (now - lastReceiptReconciliation < ONE_HOUR_MS) return;
+  lastReceiptReconciliation = now;
+  try {
+    const cancelled = await cancelUnmatchedPendingReceipts();
+    if (cancelled.length) console.log(`[receipts] Auto-cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
+  } catch (err) {
+    console.error('[receipts] Auto-cancel error:', err.message);
+  }
+}
+
 function start() {
   cron.schedule('* * * * *', async () => {
     if (running) return;
@@ -41,6 +56,7 @@ function start() {
     try {
       await syncAllItems();
       await runCleanup();
+      await runReceiptReconciliation();
     } catch (err) {
       console.error('[scheduler] Unexpected error:', err.message, '\n', err.stack);
     } finally {

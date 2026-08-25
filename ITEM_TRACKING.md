@@ -751,6 +751,13 @@ and status. Inclusive **From**/**To** date inputs filter by receipt creation tim
 in the browser's local timezone; search and dates combine, Clear resets all
 filters, and the receipt counts and volume are recalculated from the visible set.
 Status edits update the in-memory record and reapply the active filters.
+The Inventory Monitor's `trade_events` table is the authority for whether a Torn trade completed.
+A receipt that remains `pending` for at least 24 hours (configurable with
+`RECEIPT_ORPHAN_GRACE_HOURS`) and has no row with the same Torn trade id is automatically changed
+to the existing `cancelled` status. Newly created receipts receive the grace window so inventory
+log synchronization cannot cancel a legitimate in-progress trade. Completed and already-cancelled
+receipts are never changed by this reconciliation. It runs hourly in the hosted scheduler and
+also immediately before the authenticated receipt list is returned.
 The userscript is restricted to `https://www.torn.com/trade.php*`, so discovery,
 the status panel, and all automation operate only while a trade page is open.
 If a pending alert appears while an already-open trade list is stale, that list

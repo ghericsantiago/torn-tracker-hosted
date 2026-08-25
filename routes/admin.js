@@ -5,6 +5,7 @@ const db      = require('../db');
 const { syncItem } = require('../services/sync');
 const { fetchAllTornItems } = require('../services/torn');
 const { cleanupOldRecords } = require('../scheduler');
+const { cancelUnmatchedPendingReceipts } = require('../services/receipt-reconciliation');
 
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
@@ -53,11 +54,16 @@ router.get('/receipts', requireAuth, (req, res) => {
 
 router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
+    const cancelled = await cancelUnmatchedPendingReceipts();
     const { rows } = await db.query(
       `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
               total_value, created_at, completed_at
        FROM trade_receipts ORDER BY created_at DESC`
     );
+    if (cancelled.length) {
+      console.log(`[receipts] Auto-cancelled ${cancelled.length} pending receipt(s) without a completed inventory trade`);
+      res.set('X-Auto-Cancelled-Receipts', String(cancelled.length));
+    }
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
