@@ -122,6 +122,10 @@
       <button class="btn-link" id="btn-change-token" style="margin-left:auto">Change token</button>
     </div>
     <div class="row">
+      <span class="label">Trader</span>
+      <span class="value dim" id="trader-name">—</span>
+    </div>
+    <div class="row">
       <span class="label">Trade</span>
       <span class="value dim" id="trade-id">—</span>
     </div>
@@ -190,6 +194,9 @@
 
     function applyState(state) {
       const stage = state.stage || 'idle';
+      const nameEl = document.getElementById('trader-name');
+      nameEl.textContent = state.traderName || '—';
+      nameEl.className = 'value' + (state.traderName ? '' : ' dim');
       document.getElementById('trade-id').textContent = state.tradeId ? `#${state.tradeId}` : '—';
       document.getElementById('trade-id').className = 'value' + (state.tradeId ? '' : ' dim');
 

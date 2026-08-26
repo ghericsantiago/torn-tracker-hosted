@@ -1046,12 +1046,72 @@
     return div.innerHTML;
   }
 
+  function counterpartName() {
+    const selfId = currentUserId();
+    const msgs = document.querySelectorAll('.log li .msg, .trade-log li .msg');
+    for (const msg of msgs) {
+      const link = msg.querySelector('a[href*="profiles.php?XID="]');
+      if (!link) continue;
+      const authorId = link.href.match(/[?&]XID=(\d+)/i)?.[1] || '';
+      if (selfId && authorId && authorId !== selfId) return link.textContent.trim();
+    }
+    return '';
+  }
+
+  function makePanelDraggable(panel) {
+    const POS_KEY = 'tta_panel_pos_v1';
+    let dragging = false, startX, startY, startLeft, startTop;
+    const saved = readJson(POS_KEY, null);
+    if (saved) {
+      panel.style.right = 'auto';
+      panel.style.left = saved.x + 'px';
+      panel.style.top = saved.y + 'px';
+    }
+    const handle = document.getElementById('tta-drag');
+    if (!handle) return;
+    function start(e) {
+      dragging = true;
+      const t = e.touches?.[0] || e;
+      startX = t.clientX; startY = t.clientY;
+      const rect = panel.getBoundingClientRect();
+      startLeft = rect.left; startTop = rect.top;
+      panel.style.right = 'auto';
+      panel.style.left = startLeft + 'px';
+      panel.style.top = startTop + 'px';
+      document.addEventListener('mousemove', move);
+      document.addEventListener('touchmove', move, { passive: false });
+      document.addEventListener('mouseup', stop);
+      document.addEventListener('touchend', stop);
+    }
+    function move(e) {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const t = e.touches?.[0] || e;
+      const newX = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, startLeft + t.clientX - startX));
+      const newY = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, startTop + t.clientY - startY));
+      panel.style.left = newX + 'px';
+      panel.style.top = newY + 'px';
+    }
+    function stop() {
+      if (!dragging) return;
+      dragging = false;
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('mouseup', stop);
+      document.removeEventListener('touchend', stop);
+      writeJson(POS_KEY, { x: parseInt(panel.style.left), y: parseInt(panel.style.top) });
+    }
+    handle.addEventListener('mousedown', start);
+    handle.addEventListener('touchstart', start, { passive: true });
+  }
+
   function injectUi() {
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><span id="tta-remote" style="font-size:11px;white-space:nowrap">⬤ …</span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<span id="tta-drag" title="Drag to move">⠿</span><button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><span id="tta-remote" style="font-size:11px;white-space:nowrap">⬤ …</span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
+    makePanelDraggable(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
       settings.enabled = !settings.enabled;
@@ -1135,6 +1195,7 @@
   const style = document.createElement('style');
   style.textContent = `
     #tta-panel{position:fixed;right:12px;top:12px;z-index:2147483638;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 24px));padding:8px;border:1px solid #52606d;border-radius:8px;background:#15191dcc;color:#ddd;font:12px Arial,sans-serif;box-shadow:0 3px 16px #0008;backdrop-filter:blur(5px)}
+    #tta-drag{cursor:grab;color:#52606d;font-size:16px;line-height:1;padding:0 2px;user-select:none;flex-shrink:0}#tta-drag:active{cursor:grabbing}
     #tta-panel button{border:1px solid #66717c;border-radius:5px;background:#30363d;color:#eee;padding:5px 8px;cursor:pointer}#tta-panel #tta-toggle.on{border-color:#2e9d59;background:#176b39}#tta-state{min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tta-accept-ready{position:relative!important;z-index:2!important;outline:3px solid #ffd43b!important;box-shadow:0 0 0 5px #ffca2844,0 0 18px 8px #ffd43b99!important;animation:ttaAcceptPulse 1s ease-in-out infinite alternate!important}@keyframes ttaAcceptPulse{from{filter:brightness(1)}to{filter:brightness(1.65)}}
     #tta-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#000a;font:13px Arial,sans-serif}.tta-dialog{width:min(520px,calc(100vw - 30px));max-height:calc(100vh - 30px);overflow:auto;padding:18px;border:1px solid #59636e;border-radius:9px;background:#20252a;color:#eee;box-shadow:0 10px 40px #000}.tta-dialog h3{margin:0 0 14px}.tta-dialog label{display:block;margin:10px 0 4px}.tta-dialog small{color:#aab2ba}.tta-dialog textarea,.tta-dialog input[type=number],.tta-dialog input[type=password],.tta-dialog select{box-sizing:border-box;width:100%;margin-top:5px;padding:7px;border:1px solid #606b76;border-radius:4px;background:#11161a;color:#eee}.tta-dialog textarea{min-height:58px;resize:vertical}.tta-dialog .tta-check{display:flex;gap:7px;align-items:center}.tta-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:16px}.tta-action-spacer{flex:1}.tta-actions button{padding:7px 14px;border:1px solid #64707b;border-radius:5px;background:#343b42;color:#fff;cursor:pointer}.tta-actions #tta-reset{border-color:#a85252;background:#6f2929}.tta-actions #tta-save{border-color:#3d9660;background:#247044}
@@ -1151,8 +1212,8 @@
     const job = getJob();
     const settings = getSettings();
     const state = job
-      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: settings.enabled }
-      : { tradeId: null, stage: 'idle', error: '', enabled: settings.enabled };
+      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: settings.enabled, traderName: counterpartName() }
+      : { tradeId: null, stage: 'idle', error: '', enabled: settings.enabled, traderName: '' };
     GM_xmlhttpRequest({
       method: 'PUT',
       url: `${pricingServer(settings)}/api/trade/state`,
