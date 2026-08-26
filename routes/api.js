@@ -47,29 +47,31 @@ router.get('/market/:itemId', async (req, res) => {
   }
 });
 
-// GET /api/market/:itemId/ohlc — candlestick OHLC grouped by interval
+// GET /api/market/:itemId/ohlc — OHLC candlestick data bucketed by interval
 router.get('/market/:itemId/ohlc', async (req, res) => {
   const { itemId } = req.params;
   const { interval = '1 hour', from, to } = req.query;
 
   const allowed = ['1 minute', '5 minutes', '15 minutes', '30 minutes', '1 hour', '1 day'];
-  const safeInterval = allowed.includes(interval) ? interval : '1 hour';
+  const binInterval = allowed.includes(interval) ? interval : '1 hour';
 
   try {
+    // date_bin buckets arbitrary intervals cleanly (PostgreSQL 14+).
+    // array_agg with ORDER BY gives open (first) and close (last) within each bucket.
+    const params = [binInterval, itemId];
     let query = `
       SELECT
-        date_trunc('${safeInterval.replace(' ', '_')}', created_at) AS bucket,
-        MIN(price)   AS low,
-        MAX(price)   AS high,
-        FIRST_VALUE(price) OVER (PARTITION BY date_trunc('${safeInterval.replace(' ', '_')}', created_at) ORDER BY created_at ASC) AS open,
-        LAST_VALUE(price)  OVER (PARTITION BY date_trunc('${safeInterval.replace(' ', '_')}', created_at) ORDER BY created_at ASC
-          ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS close
+        date_bin($1::interval, created_at, TIMESTAMPTZ '2000-01-01') AS bucket,
+        MIN(price)                                                     AS low,
+        MAX(price)                                                     AS high,
+        (array_agg(price ORDER BY created_at ASC))[1]                 AS open,
+        (array_agg(price ORDER BY created_at DESC))[1]                AS close
       FROM item_market
-      WHERE item_id = $1
+      WHERE item_id = $2
     `;
-    const params = [itemId];
     if (from) { params.push(from); query += ` AND created_at >= $${params.length}`; }
     if (to)   { params.push(to);   query += ` AND created_at <= $${params.length}`; }
+    query += ` GROUP BY date_bin($1::interval, created_at, TIMESTAMPTZ '2000-01-01')`;
     query += ` ORDER BY bucket ASC`;
 
     const { rows } = await db.query(query, params);
@@ -80,32 +82,29 @@ router.get('/market/:itemId/ohlc', async (req, res) => {
 });
 
 // GET /api/best-items?fee=5
-// Strategy: buy at the avg daily low, sell at the avg daily high over 7 days.
-// Using daily averages instead of global MIN/MAX avoids one-off outliers skewing results.
-//
-// buy_target   = AVG(daily MIN price)  over last 7 days
-// sell_target  = AVG(daily MAX price)  over last 7 days
+// Strategy: buy at avg daily low, sell at avg daily high over last 7 days.
+// buy_target   = AVG(daily MIN price)
+// sell_target  = AVG(daily MAX price)
 // net_profit   = sell_target * (1 - fee%) - buy_target
-// margin_pct   = net_profit / sell_target * 100
-// confidence   = (days with price movement / 7) * 100
-// profit_score = margin_pct * (swing_days / 7)   ← sort key
-//
-// Minimum: 1 day with actual price movement in the last 7 days (confidence shows data quality).
+// confidence   = swing_days / 7 * 100  (days with intra-day price movement)
+// profit_score = margin_pct * (swing_days / 7)  — sort key
 router.get('/best-items', async (req, res) => {
   const rawFee = parseFloat(req.query.fee);
   const fee = Math.min(Math.max(isNaN(rawFee) ? 5 : rawFee, 0), 99);
-  const fm = (100 - fee) / 100; // fee multiplier, e.g. 0.95 for 5%
+  // Embed fm as a SQL literal to avoid $1-reuse incompatibility between PG and SQLite.
+  // Safe: fm is computed from a validated, clamped float — not raw user input.
+  const fm = ((100 - fee) / 100).toFixed(8);
   try {
     const { rows } = await db.query(`
       WITH daily_ranges AS (
         SELECT
           item_id,
-          DATE(created_at)       AS day,
-          MIN(price)             AS day_low,
-          MAX(price)             AS day_high,
-          COUNT(*)               AS day_records
+          DATE(created_at)  AS day,
+          MIN(price)        AS day_low,
+          MAX(price)        AS day_high,
+          COUNT(*)          AS day_records
         FROM item_market
-        WHERE created_at >= datetime('now', '-7 days')
+        WHERE created_at >= NOW() - INTERVAL '7 days'
         GROUP BY item_id, DATE(created_at)
       ),
       item_stats AS (
@@ -113,8 +112,8 @@ router.get('/best-items', async (req, res) => {
           item_id,
           COUNT(*)                                              AS active_days,
           SUM(CASE WHEN day_records > 1 THEN 1 ELSE 0 END)    AS swing_days,
-          ROUND(AVG(day_low),  0)                              AS buy_target,
-          ROUND(AVG(day_high), 0)                              AS sell_target
+          ROUND(AVG(day_low)::numeric,  0)                     AS buy_target,
+          ROUND(AVG(day_high)::numeric, 0)                     AS sell_target
         FROM daily_ranges
         GROUP BY item_id
         HAVING COUNT(*) >= 1
@@ -124,31 +123,31 @@ router.get('/best-items', async (req, res) => {
         mi.name,
         s.buy_target,
         s.sell_target,
-        ROUND(s.sell_target * $1 - s.buy_target, 0)                         AS net_profit,
-        ROUND((s.sell_target * $1 - s.buy_target) / s.sell_target * 100, 1) AS margin_pct,
+        ROUND((s.sell_target * ${fm} - s.buy_target)::numeric, 0)                          AS net_profit,
+        ROUND(((s.sell_target * ${fm} - s.buy_target) / s.sell_target * 100)::numeric, 1)  AS margin_pct,
         s.swing_days,
-        ROUND(CAST(s.swing_days AS REAL) / 7.0 * 100, 0)                   AS confidence_pct,
+        ROUND((s.swing_days::numeric / 7.0 * 100), 0)                                      AS confidence_pct,
         ROUND(
-          ((s.sell_target * $1 - s.buy_target) / s.sell_target * 100)
-          * (CAST(s.swing_days AS REAL) / 7.0),
+          ((s.sell_target * ${fm} - s.buy_target) / s.sell_target * 100)::numeric
+          * (s.swing_days::numeric / 7.0),
           2
-        )                                                                     AS profit_score
+        )                                                                                    AS profit_score
       FROM item_stats s
       JOIN monitored_items mi ON mi.torn_item_id = s.item_id
       WHERE s.buy_target > 0
-        AND s.sell_target * $1 > s.buy_target
-        AND mi.is_active = 1
+        AND s.sell_target * ${fm} > s.buy_target
+        AND mi.is_active = TRUE
         AND s.swing_days >= 1
       ORDER BY profit_score DESC
       LIMIT 20
-    `, [fm, fm, fm, fm]);
+    `);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/search?q= — item name autocomplete
+// GET /api/search?q= — monitored item name autocomplete
 router.get('/search', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.json([]);
@@ -157,7 +156,7 @@ router.get('/search', async (req, res) => {
       `SELECT torn_item_id AS item_id, name
        FROM monitored_items
        WHERE LOWER(name) LIKE LOWER($1) AND is_active = TRUE
-       GROUP BY torn_item_id
+       ORDER BY name ASC
        LIMIT 10`,
       [`%${q}%`]
     );

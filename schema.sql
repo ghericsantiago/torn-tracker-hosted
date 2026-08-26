@@ -7,12 +7,17 @@ CREATE TABLE IF NOT EXISTS monitored_items (
   name            VARCHAR(255),
   api_key         TEXT NOT NULL,
   is_active       BOOLEAN DEFAULT TRUE,
+  priority        INTEGER DEFAULT 4,
   retry_count     INTEGER DEFAULT 0,
+  record_count    INTEGER DEFAULT 0,
   last_sync       TIMESTAMPTZ,
   last_error      TEXT,
   last_error_date TIMESTAMPTZ,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Upgrade databases created before per-item sync priorities were introduced.
+ALTER TABLE monitored_items ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 4;
 
 CREATE TABLE IF NOT EXISTS item_market (
   id            SERIAL PRIMARY KEY,
@@ -25,8 +30,9 @@ CREATE TABLE IF NOT EXISTS item_market (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_item_market_item_id ON item_market(item_id);
-CREATE INDEX IF NOT EXISTS idx_item_market_created  ON item_market(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_item_market_item_id      ON item_market(item_id);
+CREATE INDEX IF NOT EXISTS idx_item_market_created       ON item_market(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_item_market_item_created  ON item_market(item_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,

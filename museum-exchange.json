@@ -1,0 +1,121 @@
+{
+  "museum": [
+    {
+      "name": "Plushie Set",
+      "points": 10,
+      "items": [
+        186,
+        187,
+        215,
+        258,
+        261,
+        266,
+        268,
+        269,
+        273,
+        274,
+        281,
+        384,
+        618
+      ]
+    },
+    {
+      "name": "Exotic Flower Set",
+      "points": 10,
+      "items": [
+        260,
+        264,
+        282,
+        277,
+        276,
+        271,
+        272,
+        263,
+        267,
+        385,
+        617
+      ]
+    },
+    {
+      "name": "Meteorite Fragment",
+      "points": 15,
+      "items": [
+        1488
+      ]
+    },
+    {
+      "name": "Patagonian Fossil",
+      "points": 20,
+      "items": [
+        1487
+      ]
+    },
+    {
+      "name": "Arrowhead Set",
+      "points": 25,
+      "items": [
+        1499,
+        1500,
+        1501,
+        1502,
+        1503,
+        1504
+      ]
+    },
+    {
+      "name": "Medieval Coin Set",
+      "points": 100,
+      "items": [
+        450,
+        451,
+        452
+      ]
+    },
+    {
+      "name": "Vairocana Buddha",
+      "points": 100,
+      "items": [
+        454
+      ]
+    },
+    {
+      "name": "Ganesha Sculpture",
+      "points": 250,
+      "items": [
+        453
+      ]
+    },
+    {
+      "name": "Shabti Sculpture",
+      "points": 500,
+      "items": [
+        458
+      ]
+    },
+    {
+      "name": "Companion Scripts",
+      "points": 1000,
+      "items": [
+        455,
+        456,
+        457
+      ]
+    },
+    {
+      "name": "Senet Game Set",
+      "points": 2000,
+      "items": [
+        462,
+        460,
+        461
+      ]
+    },
+    {
+      "name": "Egyptian Amulet",
+      "points": 10000,
+      "items": [
+        459
+      ]
+    }
+  ]
+}

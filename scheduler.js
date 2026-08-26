@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { syncAllItems } = require('./services/sync');
+const { reconcileReceiptStatuses } = require('./services/receipt-reconciliation');
 const db = require('./db');
 
 let running      = false;
@@ -34,11 +35,21 @@ async function cleanupOldRecords() {
   return result.rowCount ?? 0;
 }
 
+async function runReceiptReconciliation() {
+  try {
+    const reconciled = await reconcileReceiptStatuses();
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Reconciled receipts: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+  } catch (err) {
+    console.error('[receipts] Auto-cancel error:', err.message);
+  }
+}
+
 function start() {
   cron.schedule('* * * * *', async () => {
     if (running) return;
     running = true;
     try {
+      await runReceiptReconciliation();
       await syncAllItems();
       await runCleanup();
     } catch (err) {

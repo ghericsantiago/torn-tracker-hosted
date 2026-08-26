@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Local Receipt Fixture Tester</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3}
+    body{margin:0;padding:24px}.wrap{max-width:1050px;margin:auto}.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:18px;margin-bottom:16px}
+    h1{font-size:22px;margin:0 0 6px}h2{font-size:16px;margin:0 0 14px}.muted{color:#8b949e;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+    label{display:grid;gap:5px;font-size:12px;color:#8b949e}input{box-sizing:border-box;width:100%;padding:9px;border:1px solid #30363d;border-radius:6px;background:#0d1117;color:#e6edf3}
+    .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}button,a.btn{border:1px solid #388bfd;border-radius:6px;background:#1f6feb;color:#fff;padding:9px 12px;text-decoration:none;cursor:pointer;font-size:13px}button.secondary,a.secondary{background:#21262d;border-color:#484f58}button.danger{background:#8e2525;border-color:#d04a4a}
+    button:disabled{opacity:.5;cursor:not-allowed}.status{white-space:pre-wrap;font:12px ui-monospace,monospace;padding:10px;border-radius:6px;background:#0d1117;margin-top:12px}.error{color:#ff7b72}.ok{color:#7ee787}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid #30363d}th{color:#8b949e}.num{text-align:right}.protected{color:#7ee787;font-weight:700}.hidden{display:none}
+    pre{overflow:auto;max-height:320px;background:#0d1117;padding:12px;border-radius:6px;font-size:11px}
+  </style>
+</head>
+<body><main class="wrap">
+  <h1>Local Receipt Fixture Tester</h1>
+  <p class="muted">Available only while RECEIPT_FIXTURE_MODE=true outside production. The token stays in this page's memory and is not saved.</p>
+
+  <section class="card">
+    <h2>Test configuration</h2>
+    <div class="grid">
+      <label>Receipt token<input id="token" type="password" autocomplete="off" placeholder="UUID from Trade Admin"></label>
+      <label>Fixture trade ID<input id="tradeId" type="number" value="99999999"></label>
+      <label>Fake-market item ID<input id="itemId" type="number" value="206"></label>
+      <label>Fake lowest-offer drop (%)<input id="dropPct" type="number" min="0.1" max="99.9" step="0.1" value="40"></label>
+    </div>
+    <div class="actions">
+      <button id="fakeMarket">Create fake lowest offer</button>
+      <button id="preview" class="secondary">Preview pricing</button>
+      <button id="create" disabled>Create receipt</button>
+      <a id="openReceipt" class="btn secondary hidden" target="_blank">Open receipt</a>
+      <button id="cleanup" class="danger">Clean up test rows</button>
+    </div>
+    <div id="status" class="status">Ready.</div>
+  </section>
+
+  <section id="results" class="card hidden">
+    <h2>Preview <span id="total"></span></h2>
+    <div style="overflow:auto"><table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Market</th><th class="num">Highest dense</th><th class="num">Rate</th><th class="num">Offer</th><th>Protection</th></tr></thead><tbody id="items"></tbody></table></div>
+    <details><summary class="muted" style="margin-top:12px;cursor:pointer">Raw response</summary><pre id="raw"></pre></details>
+  </section>
+</main>
+<script>
+  let previewData = null;
+  let fakeMarketRowId = null;
+  const $ = id => document.getElementById(id);
+  const money = n => n == null ? '—' : '$' + Number(n).toLocaleString();
+  const status = (message, error=false) => { $('status').textContent=message; $('status').className='status '+(error?'error':'ok'); };
+  const headers = () => ({'Content-Type':'application/json','X-Receipt-Token':$('token').value.trim()});
+  async function request(url, options={}) {
+    if (!$('token').value.trim()) throw new Error('Paste your receipt token first.');
+    const response = await fetch(url, {...options, headers:{...headers(),...(options.headers||{})}});
+    const body = await response.json().catch(()=>({error:`HTTP ${response.status}`}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    return body;
+  }
+  function renderPreview(data) {
+    previewData=data; $('results').classList.remove('hidden'); $('create').disabled=false;
+    $('total').textContent='— '+money(data.total); $('raw').textContent=JSON.stringify(data,null,2);
+    $('items').innerHTML=data.items.map(item=>`<tr><td>${item.item_name}</td><td class="num">${item.quantity}</td><td class="num">${money(item.market_price)}</td><td class="num">${money(item.market_reference_price)}</td><td class="num">${item.resolved_pct==null?'—':(item.resolved_pct*100).toFixed(1)+'%'}</td><td class="num">${money(item.effective_price)}</td><td class="${item.market_protection_applied?'protected':''}">${item.market_protection_applied?'YES — was '+money(item.unprotected_price):'No'}</td></tr>`).join('');
+  }
+  $('fakeMarket').onclick=async()=>{try{const data=await request('/api/receipt/fixture/market',{method:'POST',body:JSON.stringify({item_id:Number($('itemId').value),drop_pct:Number($('dropPct').value)})});fakeMarketRowId=data.id;status(`Fake market row ${data.id} created: ${data.name} at ${money(data.price)}.`)}catch(e){status(e.message,true)}};
+  $('preview').onclick=async()=>{try{const data=await request('/api/receipt/preview',{method:'POST',body:JSON.stringify({trade_id:Number($('tradeId').value)})});renderPreview(data);status(`Preview complete: ${data.items.length} item(s), total ${money(data.total)}.`)}catch(e){status(e.message,true)}};
+  $('create').onclick=async()=>{try{if(!previewData)throw new Error('Run Preview first.');const fields=['torn_item_id','market_protection_applied','market_drop_pct','market_protection_threshold_pct','unprotected_price','protection_lowest_price','protection_market_value'];const overrides=previewData.items.map(item=>{const out={unit_price:item.effective_price??0};fields.forEach(k=>out[k]=item[k]??null);return out});const data=await request('/api/receipt/create',{method:'POST',body:JSON.stringify({trade_id:Number($('tradeId').value),items_override:overrides})});$('openReceipt').href=data.url;$('openReceipt').classList.remove('hidden');status(`Receipt created: ${data.url} — ${money(data.total)}.`)}catch(e){status(e.message,true)}};
+  $('cleanup').onclick=async()=>{try{const notes=[];if(fakeMarketRowId){const m=await request('/api/receipt/fixture/market/'+fakeMarketRowId,{method:'DELETE'});notes.push(`market rows: ${m.deleted}`);fakeMarketRowId=null}const r=await request('/api/receipt/fixture/trade/'+Number($('tradeId').value),{method:'DELETE'});notes.push(`receipts: ${r.deleted}`);previewData=null;$('create').disabled=true;$('openReceipt').classList.add('hidden');status('Cleanup complete — '+notes.join(', ')+'.')}catch(e){status(e.message,true)}};
+</script></body></html>

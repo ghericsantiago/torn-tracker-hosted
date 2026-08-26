@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torn Tracker — Receipts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 0.18rem 0.6rem; border-radius: 20px;
+      font-size: 0.7rem; font-family: var(--mono); font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+      cursor: pointer; user-select: none;
+    }
+    .status-pill::after { content: ' ▾'; font-size: 0.6rem; opacity: 0.6; }
+    .status-pill.completed  { background: rgba(74,222,128,.12);  color: #4ade80;       border: 1px solid rgba(74,222,128,.25); }
+    .status-pill.pending    { background: rgba(110,231,247,.1);  color: var(--accent); border: 1px solid rgba(110,231,247,.2); }
+    .status-pill.cancelled  { background: rgba(248,113,113,.1);  color: #f87171;       border: 1px solid rgba(248,113,113,.25); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; border-radius: 50%; }
+    /* Floating fixed menu — appended to body, escapes overflow:hidden */
+    #statusFloatMenu {
+      display: none; position: fixed;
+      background: #0d0f1a; border: 1px solid var(--glass-border);
+      border-radius: 8px; padding: 0.3rem; z-index: 9999;
+      min-width: 140px; box-shadow: 0 8px 32px rgba(0,0,0,.7);
+    }
+    #statusFloatMenu.open { display: block; }
+    .status-menu-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.7rem; border-radius: 5px;
+      font-size: 0.72rem; font-family: var(--mono); font-weight: 600;
+      cursor: pointer; text-transform: uppercase; letter-spacing: .06em;
+      transition: background 0.15s;
+    }
+    .status-menu-item:hover { background: rgba(255,255,255,0.07); }
+    .status-menu-item.opt-pending   { color: var(--accent); }
+    .status-menu-item.opt-completed { color: #4ade80; }
+    .status-menu-item.opt-cancelled { color: #f87171; }
+    .receipts-table td { vertical-align: middle; }
+    .view-link { font-size: 0.75rem; color: var(--text-muted); text-decoration: none; font-family: var(--mono); }
+    .view-link:hover { color: var(--accent); }
+    .total-val { font-family: var(--mono); font-weight: 600; }
+    .date-cell { font-size: 0.75rem; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.875rem; }
+    .receipt-toolbar { display:flex; align-items:end; gap:.55rem; flex-wrap:wrap; padding:.7rem 1.25rem; border-bottom:1px solid var(--glass-border); }
+    .receipt-filter { display:grid; gap:.2rem; }
+    .receipt-filter span { color:var(--text-muted); font:0.62rem var(--mono); text-transform:uppercase; letter-spacing:.07em; }
+    .receipt-filter input { height:32px; padding:0 .65rem; border:1px solid var(--glass-border); border-radius:6px; background:rgba(255,255,255,.025); color:var(--text); font:0.75rem var(--mono); }
+    .receipt-filter.search { flex:1 1 250px; }
+    .receipt-filter.search input { width:100%; }
+    .filter-count { margin-left:auto; align-self:center; color:var(--text-muted); font:0.7rem var(--mono); white-space:nowrap; }
+    @media (max-width:600px) { .receipt-filter.search { flex-basis:100%; } .receipt-filter.date { flex:1; } .receipt-filter.date input { width:100%; } .filter-count { margin-left:0; } }
+  </style>
+</head>
+<body>
+
+  <!-- Floating status menu — lives outside the table so overflow:hidden doesn't clip it -->
+  <div id="statusFloatMenu">
+    <div class="status-menu-item opt-pending"   data-val="pending"><span class="status-dot" style="background:var(--accent)"></span>Pending</div>
+    <div class="status-menu-item opt-completed" data-val="completed"><span class="status-dot" style="background:#4ade80"></span>Completed</div>
+    <div class="status-menu-item opt-cancelled" data-val="cancelled"><span class="status-dot" style="background:#f87171"></span>Cancelled</div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
+      <div class="nav-right">
+        <a href="/admin/dashboard" class="btn btn-ghost btn-sm mobile-hide">← Dashboard</a>
+        <a href="/admin/trade" class="btn btn-ghost btn-sm mobile-hide">Trade Admin</a>
+        <a href="/admin/receipts" class="btn btn-ghost btn-sm mobile-hide" style="color:var(--accent)">Receipts</a>
+        <a href="/trade" target="_blank" class="btn btn-ghost btn-sm mobile-hide">View Listing</a>
+        <button id="logoutBtn" class="btn btn-ghost btn-sm mobile-hide">Logout</button>
+        <button class="nav-burger" id="navBurger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="/admin/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
+      <a href="/admin/trade" class="btn btn-ghost btn-sm">Trade Admin</a>
+      <a href="/admin/receipts" class="btn btn-ghost btn-sm">Receipts</a>
+      <a href="/trade" target="_blank" class="btn btn-ghost btn-sm">View Listing</a>
+      <button id="logoutBtnMobile" class="btn btn-ghost btn-sm">Logout</button>
+    </div>
+  </nav>
+
+  <main class="dashboard">
+
+    <!-- Stats bar -->
+    <div class="glass-card stats-bar">
+      <div class="sbar-item">
+        <span class="sbar-val" id="statTotal">—</span>
+        <span class="sbar-label">Total</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statPending">—</span>
+        <span class="sbar-label">Pending</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statCompleted">—</span>
+        <span class="sbar-label">Completed</span>
+      </div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val accent" id="statVolume">—</span>
+        <span class="sbar-label">Total Volume</span>
+      </div>
+    </div>
+
+    <!-- Receipts table -->
+    <div class="glass-card" style="padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1.25rem;border-bottom:1px solid var(--glass-border)">
+        <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">Trade Receipts</span>
+        <button id="reconcileReceipts" class="btn btn-ghost btn-sm">Check Receipts</button>
+      </div>
+      <div id="reconcileResult" style="display:none;padding:.55rem 1.25rem;border-bottom:1px solid var(--glass-border);color:var(--text-muted);font:.7rem var(--mono)"></div>
+      <div class="receipt-toolbar">
+        <label class="receipt-filter search"><span>Search</span><input id="receiptSearch" type="search" placeholder="Trade, receipt, buyer, seller, status…" autocomplete="off"></label>
+        <label class="receipt-filter date"><span>From</span><input id="dateFrom" type="date"></label>
+        <label class="receipt-filter date"><span>To</span><input id="dateTo" type="date"></label>
+        <button id="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
+        <span id="filterCount" class="filter-count"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table receipts-table" style="min-width:700px">
+          <thead>
+            <tr>
+              <th>Trade ID</th>
+              <th>Seller</th>
+              <th style="text-align:right">Total</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Completed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="receiptsBody">
+            <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button id="loadMoreReceipts" class="btn btn-ghost btn-sm" style="display:none;width:100%;border-radius:0;padding:.75rem">Load more receipts</button>
+    </div>
+
+  </main>
+
+  <script>
+    let allReceipts = [];
+    let totalReceipts = 0;
+    let receiptLoading = false;
+    let receiptReloadPending = false;
+    const receiptLimit = 20;
+
+    function fmt(n) {
+      return n == null ? '—' : '$' + Number(n).toLocaleString();
+    }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+    function statusLabel(s) {
+      return s === 'completed' ? 'Completed' : s === 'cancelled' ? 'Cancelled' : 'Pending';
+    }
+    function statusPill(s, id) {
+      return `<span class="status-pill ${s}" data-id="${id}"><span class="status-dot"></span>${statusLabel(s)}</span>`;
+    }
+
+    function receiptParams(offset) {
+      const params = new URLSearchParams({ limit: receiptLimit, offset });
+      const query = document.getElementById('receiptSearch').value.trim();
+      if (query) params.set('q', query);
+      if (document.getElementById('dateFrom').value) params.set('from', document.getElementById('dateFrom').value);
+      if (document.getElementById('dateTo').value) params.set('to', document.getElementById('dateTo').value);
+      return params;
+    }
+
+    async function load(reset = true) {
+      if (receiptLoading) { if (reset) receiptReloadPending = true; return; }
+      receiptLoading = true;
+      const offset = reset ? 0 : allReceipts.length;
+      const loadMore = document.getElementById('loadMoreReceipts');
+      loadMore.textContent = 'Loading...';
+      try {
+        const res = await fetch('/admin/api/receipts?' + receiptParams(offset));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        allReceipts = reset ? data.receipts : allReceipts.concat(data.receipts);
+        totalReceipts = data.total;
+        renderReceipts(data.totals);
+      } catch (error) {
+        document.getElementById('receiptsBody').innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load receipts: ${error.message}</td></tr>`;
+      } finally {
+        receiptLoading = false;
+        loadMore.textContent = 'Load more receipts';
+        if (receiptReloadPending) { receiptReloadPending = false; load(true); }
+      }
+    }
+
+    function updateStats(totals) {
+      document.getElementById('statTotal').textContent     = totals.total;
+      document.getElementById('statPending').textContent   = totals.pending;
+      document.getElementById('statCompleted').textContent = totals.completed;
+      document.getElementById('statVolume').textContent    = fmt(totals.volume);
+    }
+
+    function renderReceipts(totals) {
+      const rows = allReceipts;
+      updateStats(totals);
+      document.getElementById('filterCount').textContent = `${rows.length} of ${totalReceipts}`;
+      document.getElementById('loadMoreReceipts').style.display = rows.length < totalReceipts ? 'block' : 'none';
+
+      const tbody = document.getElementById('receiptsBody');
+      if (!rows.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${totalReceipts ? 'No receipts match these filters.' : 'No receipts found.'}</td></tr>`; return; }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr data-id="${r.id}">
+          <td><span class="mono" style="font-size:.82rem">#${r.trade_id}</span></td>
+          <td style="font-size:.875rem">${r.buyer_name || `Player #${r.buyer_id}` || '—'}</td>
+          <td style="text-align:right"><span class="total-val">${fmt(r.total_value)}</span></td>
+          <td>${statusPill(r.status, r.id)}</td>
+          <td class="date-cell">${fmtDate(r.created_at)}</td>
+          <td class="date-cell" id="completed-${r.id}">${fmtDate(r.completed_at)}</td>
+          <td style="text-align:right">
+            <a href="/receipt/${r.short_id || r.id}" target="_blank" class="view-link">View →</a>
+          </td>
+        </tr>`).join('');
+    }
+
+    let searchTimer = null;
+    document.getElementById('receiptSearch').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => load(true), 250);
+    });
+    document.getElementById('dateFrom').addEventListener('change', () => load(true));
+    document.getElementById('dateTo').addEventListener('change', () => load(true));
+    document.getElementById('clearFilters').addEventListener('click', () => {
+      document.getElementById('receiptSearch').value = '';
+      document.getElementById('dateFrom').value = '';
+      document.getElementById('dateTo').value = '';
+      load(true);
+    });
+
+    document.getElementById('reconcileReceipts').addEventListener('click', async () => {
+      const button = document.getElementById('reconcileReceipts');
+      const result = document.getElementById('reconcileResult');
+      button.disabled = true;
+      button.textContent = 'Checking...';
+      result.style.display = 'none';
+      try {
+        const response = await fetch('/admin/api/receipts/reconcile', { method: 'POST' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        await load();
+        const changes = [];
+        if (data.pending) changes.push(`${data.pending} receipt${data.pending === 1 ? '' : 's'} reset to In Progress during the grace period`);
+        if (data.cancelled) changes.push(`${data.cancelled} unmatched pending receipt${data.cancelled === 1 ? '' : 's'} cancelled`);
+        if (data.completed) changes.push(`${data.completed} matched receipt${data.completed === 1 ? '' : 's'} completed`);
+        result.textContent = changes.length ? changes.join('; ') + '.' : 'All receipt statuses already match Inventory Monitor.';
+        result.style.color = data.cancelled ? '#fbbf24' : '#4ade80';
+      } catch (error) {
+        result.textContent = `Receipt check failed: ${error.message}`;
+        result.style.color = '#f87171';
+      } finally {
+        result.style.display = 'block';
+        button.disabled = false;
+        button.textContent = 'Check Receipts';
+      }
+    });
+
+    // --- Floating status menu ---
+    const floatMenu = document.getElementById('statusFloatMenu');
+    let activePill = null;
+
+    function openMenu(pill) {
+      activePill = pill;
+      const rect = pill.getBoundingClientRect();
+      floatMenu.style.top  = (rect.bottom + 4) + 'px';
+      floatMenu.style.left = rect.left + 'px';
+      floatMenu.classList.add('open');
+    }
+
+    function closeMenu() {
+      floatMenu.classList.remove('open');
+      activePill = null;
+    }
+
+    document.getElementById('receiptsBody').addEventListener('click', e => {
+      const pill = e.target.closest('.status-pill');
+      if (pill) {
+        e.stopPropagation();
+        if (activePill === pill) { closeMenu(); return; }
+        openMenu(pill);
+      }
+    });
+
+    floatMenu.addEventListener('click', async e => {
+      const item = e.target.closest('.status-menu-item');
+      if (!item || !activePill) return;
+
+      const newStatus = item.dataset.val;
+      const id = activePill.dataset.id;
+      closeMenu();
+
+      const res = await fetch(`/admin/api/receipts/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to update status (' + res.status + '): ' + (err.error || 'unknown'));
+        return;
+      }
+      const updated = await res.json();
+      const index = allReceipts.findIndex(receipt => String(receipt.id) === String(id));
+      if (index !== -1) allReceipts[index] = { ...allReceipts[index], ...updated };
+      await load(true);
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#statusFloatMenu') && !e.target.closest('.status-pill')) closeMenu();
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      location.href = '/admin';
+    });
+    document.getElementById('logoutBtnMobile')?.addEventListener('click', async () => {
+      await fetch('/admin/logout', { method: 'POST' });
+      location.href = '/admin';
+    });
+
+    // Mobile nav burger
+    document.getElementById('navBurger').addEventListener('click', () => {
+      document.getElementById('navDropdown').classList.toggle('open');
+    });
+
+    document.getElementById('loadMoreReceipts').addEventListener('click', () => load(false));
+    if ('IntersectionObserver' in window) {
+      const receiptObserver = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting) && allReceipts.length < totalReceipts) load(false);
+      }, { rootMargin: '300px' });
+      receiptObserver.observe(document.getElementById('loadMoreReceipts'));
+    }
+
+    load();
+  </script>
+</body>
+</html>

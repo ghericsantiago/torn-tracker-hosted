@@ -22,7 +22,11 @@
     <div class="nav-inner">
       <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Item Tracker</span>
       <div class="nav-right">
-        <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">Auto-Refresh: Off</button>
+        <div class="tz-toggle">
+          <button class="tz-btn active" data-tz="tct">TCT</button>
+          <button class="tz-btn" data-tz="local">Local</button>
+        </div>
+        <span id="timeDisplay" class="time-display desk-only"></span>
       </div>
     </div>
   </nav>
@@ -31,47 +35,63 @@
 
     <!-- LEFT SIDEBAR: Filters -->
     <aside class="sidebar-left">
-
       <div class="glass-card sidebar-section item-search-card">
         <div class="section-title">Item</div>
         <div class="search-wrap">
           <input id="itemSearch" type="text" placeholder="Search item name…" autocomplete="off" />
           <div id="autocomplete" class="autocomplete hidden"></div>
         </div>
-        <div class="field-row">
-          <label>Item ID</label>
-          <input id="itemIdInput" type="number" placeholder="e.g. 206" />
-        </div>
-      </div>
 
-      <div class="glass-card sidebar-section">
-        <div class="section-title">Date Range</div>
-        <div class="field-row">
-          <label>From</label>
-          <input id="startDate" type="date" />
+        <!-- Nav row: date toggle + ‹ Apply › -->
+        <div class="ctrl-row nav-row">
+          <button id="dateToggle" class="btn btn-ghost btn-sm desk-only">&#x2699; Date</button>
+          <div class="ctrl-spacer"></div>
+          <button id="prevDay" class="day-nav-btn">&#x2039;</button>
+          <button id="applyFilters" class="btn btn-primary btn-sm">Apply</button>
+          <button id="nextDay" class="day-nav-btn">&#x203A;</button>
         </div>
-        <div class="field-row">
-          <label>To</label>
-          <input id="endDate" type="date" />
-        </div>
-        <div class="day-nav">
-          <button id="prevDay" class="btn btn-ghost btn-sm">← Prev</button>
-          <button id="nextDay" class="btn btn-ghost btn-sm">Next →</button>
-        </div>
-        <div class="field-row">
-          <label>Start Time</label>
-          <input id="startTime" type="time" value="00:00" />
-        </div>
-        <div class="field-row">
-          <label>End Time</label>
-          <input id="endTime" type="time" value="23:59" />
-        </div>
-        <div class="btn-row">
-          <button id="applyFilters" class="btn btn-primary btn-sm btn-full">Apply</button>
-          <button id="resetFilters" class="btn btn-ghost btn-sm btn-full">Reset</button>
-        </div>
-      </div>
 
+        <!-- Mobile accordion header -->
+        <div id="dateToggleMob" class="mob-dt-hdr">
+          <span class="mob-dt-title">&#x25C8; DATE / TIME</span>
+          <span class="mob-dt-arrow">&#x25BC;</span>
+        </div>
+
+        <!-- Collapsible date/time section -->
+        <div id="dateCollapse" class="date-collapse">
+          <div class="date-field-group">
+            <div class="date-field">
+              <label class="field-lbl">From</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="date-field">
+              <label class="field-lbl">To</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+          <div class="date-field-group">
+            <div class="date-field">
+              <label class="field-lbl">Start</label>
+              <input id="startTime" type="time" value="00:00" />
+            </div>
+            <div class="date-field">
+              <label class="field-lbl">End</label>
+              <input id="endTime" type="time" value="23:59" />
+            </div>
+          </div>
+          <div class="date-reset-row">
+            <button id="resetFilters" class="btn btn-ghost btn-sm">Reset</button>
+          </div>
+        </div>
+
+        <!-- Drawer shortcuts -->
+        <div class="ctrl-row drawer-shortcuts">
+          <button id="recoBtn" class="btn btn-ghost btn-sm">&#x1F4C8; Auto</button>
+          <button id="bestBtn" class="btn btn-ghost btn-sm">Best Items</button>
+          <button id="calcBtn" class="btn btn-ghost btn-sm">Calculator</button>
+        </div>
+
+      </div>
     </aside>
 
     <!-- MAIN: Chart -->
@@ -83,21 +103,31 @@
             <span class="item-name" id="displayName">Select an item</span>
             <span class="item-price" id="displayPrice"></span>
           </div>
-          <div class="timeframe-btns">
-            <button class="tf-btn" data-tf="1m">1m</button>
-            <button class="tf-btn" data-tf="5m">5m</button>
-            <button class="tf-btn" data-tf="15m">15m</button>
-            <button class="tf-btn active" data-tf="30m">30m</button>
-            <button class="tf-btn" data-tf="1h">1h</button>
-            <button class="tf-btn" data-tf="day">1D</button>
-          </div>
         </div>
 
-        <div class="chart-type-tabs">
-          <button class="ct-btn active" data-ct="line">Line</button>
-          <button class="ct-btn" data-ct="bar">Bar</button>
-          <button class="ct-btn" data-ct="scatter">Scatter</button>
-          <button class="ct-btn" data-ct="candlestick">Candlestick</button>
+        <div class="summary-bar">
+          <div class="summary-tile gold"><div class="stile-lbl">Avg Price</div><div class="stile-val" id="sAvg">—</div></div>
+          <div class="summary-tile green"><div class="stile-lbl">Min</div><div class="stile-val" id="sMin">—</div></div>
+          <div class="summary-tile red"><div class="stile-lbl">Max</div><div class="stile-val" id="sMax">—</div></div>
+          <div class="summary-tile green"><div class="stile-lbl">Rec Buy</div><div class="stile-val" id="sBuy">—</div></div>
+          <div class="summary-tile blue"><div class="stile-lbl">Rec Sell</div><div class="stile-val" id="sSell">—</div></div>
+        </div>
+
+        <div class="chart-tabs-row">
+          <div class="chart-type-tabs">
+            <button class="ct-btn active" data-ct="line">Line</button>
+            <button class="ct-btn" data-ct="bar">Bar</button>
+            <button class="ct-btn" data-ct="scatter">Scatter</button>
+            <button class="ct-btn" data-ct="candlestick">Candlestick</button>
+          </div>
+          <div class="drawer-btns">
+            <button class="tf-btn" data-tf="day">1D</button>
+            <button class="tf-btn" data-tf="1h">1H</button>
+            <button class="tf-btn active" data-tf="30m">30M</button>
+            <button class="tf-btn" data-tf="15m">15M</button>
+            <button class="tf-btn" data-tf="5m">5M</button>
+            <button class="tf-btn" data-tf="1m">1M</button>
+          </div>
         </div>
 
         <div class="chart-area">
@@ -106,8 +136,11 @@
           <div id="chartStatus" class="chart-status">Select an item to view market data</div>
         </div>
 
+        <div id="clickHint" class="click-hint" style="display:none">Click once → set Buy price · Click again → set Sell price · 3rd click resets</div>
+
         <div class="chart-footer">
           <button id="toggleTable" class="btn btn-ghost btn-sm">Show Data Table</button>
+          <button id="autoRefreshToggle" class="btn btn-ghost btn-sm">&#x21BB; Auto</button>
         </div>
 
         <div id="dataTable" class="data-table hidden">
@@ -122,53 +155,73 @@
 
     </main>
 
-    <!-- RIGHT SIDEBAR: Calculator + Best Items -->
-    <aside class="sidebar-right">
+  </div>
 
-      <div class="glass-card sidebar-section">
-        <div class="section-title">Profit Calculator</div>
-        <div class="field-row">
-          <label>Buy Price ($)</label>
-          <input id="buyPrice" type="number" step="0.01" min="0" placeholder="0.00" />
-        </div>
-        <div class="field-row">
-          <label>Transaction Fee (%)</label>
-          <input id="txFee" type="number" step="0.01" min="0" max="100" value="5" />
-        </div>
-        <div class="field-row">
-          <label>Target Sell Price ($)</label>
-          <input id="targetPrice" type="number" step="0.01" min="0" placeholder="Auto break-even" />
-        </div>
-        <div class="calc-results">
-          <div class="calc-row"><span>Fee Amount</span><span id="feeAmount">$0.00</span></div>
-          <div class="calc-row"><span>Total Cost</span><span id="totalCost">$0.00</span></div>
-          <div class="calc-row profit-row">
-            <span>Profit</span>
-            <span id="profitAmount" class="neutral">$0.00</span>
-          </div>
-          <div class="calc-row profit-row">
-            <span>Margin</span>
-            <span id="profitPct" class="neutral">0%</span>
-          </div>
-        </div>
-        <button id="resetCalc" class="btn btn-ghost btn-sm btn-full">Reset</button>
+  <!-- ── Drawers ── -->
+  <div id="calcDrawer" class="drawer">
+    <div class="drawer-hdr">
+      <span class="drawer-title">Profit Calculator</span>
+      <button class="drawer-close" data-drawer="calcDrawer">&#x2715;</button>
+    </div>
+    <div class="drawer-body">
+      <div class="field-row">
+        <label>Buy Price ($)</label>
+        <input id="buyPrice" type="number" step="0.01" min="0" placeholder="0.00" />
       </div>
-
-      <div class="glass-card sidebar-section">
-        <div class="best-items-title">
-          <div class="section-title">Best Items to Buy</div>
-          <button id="refreshBestBtn" class="btn-refresh" title="Refresh">↻</button>
-        </div>
-        <div class="best-items-header">
-          <span class="bi-sort" data-col="name">Item <span class="bi-sort-icon">↕</span></span>
-          <span class="bi-sort" data-col="net_profit">Profit <span class="bi-sort-icon">↕</span></span>
-          <span class="bi-sort" data-col="margin_pct">Margin <span class="bi-sort-icon">↕</span></span>
-          <span class="bi-sort" data-col="confidence_pct">Conf <span class="bi-sort-icon">↕</span></span>
-        </div>
-        <div id="bestItemsList"><div class="loading-msg">Loading…</div></div>
+      <div class="field-row">
+        <label>Transaction Fee (%)</label>
+        <input id="txFee" type="number" step="0.01" min="0" max="100" value="5" />
       </div>
+      <div class="field-row">
+        <label>Target Sell Price ($)</label>
+        <input id="targetPrice" type="number" step="0.01" min="0" placeholder="Auto break-even" />
+      </div>
+      <div class="calc-results">
+        <div class="calc-row"><span>Fee Amount</span><span id="feeAmount">$0.00</span></div>
+        <div class="calc-row"><span>Total Cost</span><span id="totalCost">$0.00</span></div>
+        <div class="calc-row profit-row"><span>Profit</span><span id="profitAmount" class="neutral">$0.00</span></div>
+        <div class="calc-row profit-row"><span>Margin</span><span id="profitPct" class="neutral">0%</span></div>
+      </div>
+      <button id="resetCalc" class="btn btn-ghost btn-sm btn-full">Reset</button>
+      <div class="calc-auto-row">
+        <span class="calc-auto-lbl">Auto-open on fill</span>
+        <button id="calcAutoOpen" class="btn btn-ghost btn-sm active">On</button>
+      </div>
+      <div id="calcState" style="font-family:var(--mono);font-size:0.65rem;color:var(--accent);margin-top:0.5rem;min-height:1rem;text-align:center"></div>
+    </div>
+  </div>
 
-    </aside>
+  <div id="bestDrawer" class="drawer">
+    <div class="drawer-hdr">
+      <span class="drawer-title">Best Items to Buy</span>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <button id="refreshBestBtn" class="btn-refresh" title="Refresh">&#x21BB;</button>
+        <button class="drawer-close" data-drawer="bestDrawer">&#x2715;</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+        <label style="font-family:var(--mono);font-size:0.65rem;color:var(--text-muted)">Fee %</label>
+        <input id="txFeeDrawer" type="number" style="width:60px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:6px;padding:3px 7px;color:var(--text);font-size:0.78rem;outline:none" value="5" min="0" max="100" step="0.1" />
+      </div>
+      <div class="best-items-header">
+        <span class="bi-sort" data-col="name">Item <span class="bi-sort-icon">↕</span></span>
+        <span class="bi-sort" data-col="net_profit">Profit <span class="bi-sort-icon">↕</span></span>
+        <span class="bi-sort" data-col="margin_pct">Margin <span class="bi-sort-icon">↕</span></span>
+        <span class="bi-sort" data-col="confidence_pct">Conf <span class="bi-sort-icon">↕</span></span>
+      </div>
+      <div id="bestItemsList"><div class="loading-msg">Loading…</div></div>
+    </div>
+  </div>
+
+  <div id="recoDrawer" class="drawer">
+    <div class="drawer-hdr">
+      <span class="drawer-title">&#x1F4C8; Auto Buy/Sell Recommendation</span>
+      <button class="drawer-close" data-drawer="recoDrawer">&#x2715;</button>
+    </div>
+    <div class="drawer-body" id="recoBody">
+      <div class="reco-status">Load item data to see recommendations.</div>
+    </div>
   </div>
 
   <script src="app.js"></script>

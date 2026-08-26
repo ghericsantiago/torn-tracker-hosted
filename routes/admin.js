@@ -5,18 +5,20 @@ const db      = require('../db');
 const { syncItem } = require('../services/sync');
 const { fetchAllTornItems } = require('../services/torn');
 const { cleanupOldRecords } = require('../scheduler');
+const { reconcileReceiptStatuses } = require('../services/receipt-reconciliation');
 
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
 
-function requireAuth(req, res, next) {
-  if (req.session && req.session.authenticated) return next();
-  res.redirect('/admin');
-}
+const requireAuth = require('../middleware/auth');
 
 // Login page
 router.get('/', (req, res) => {
-  if (req.session && req.session.authenticated) return res.redirect('/admin/dashboard');
+  if (req.session && req.session.authenticated) {
+    const next = req.session.returnTo || '/admin/dashboard';
+    delete req.session.returnTo;
+    return res.redirect(next);
+  }
   res.sendFile('index.html', { root: 'public/admin' });
 });
 
@@ -27,7 +29,9 @@ router.post('/login', async (req, res) => {
   const passMatch = await bcrypt.compare(password, req.app.locals.adminHash);
   if (userMatch && passMatch) {
     req.session.authenticated = true;
-    return res.json({ ok: true });
+    const next = req.session.returnTo || '/admin/dashboard';
+    delete req.session.returnTo;
+    return res.json({ ok: true, next });
   }
   res.status(401).json({ error: 'Invalid credentials' });
 });
@@ -42,7 +46,85 @@ router.get('/dashboard', requireAuth, (req, res) => {
   res.sendFile('dashboard.html', { root: 'public/admin' });
 });
 
+router.get('/receipts', requireAuth, (req, res) => {
+  res.sendFile('receipts.html', { root: 'public/admin' });
+});
+
 // --- Admin API (all require auth) ---
+
+router.get('/api/receipts', requireAuth, async (req, res) => {
+  try {
+    const reconciled = await reconcileReceiptStatuses();
+    const paginated = req.query.limit != null;
+    const limit = paginated ? Math.min(100, Math.max(1, Number(req.query.limit) || 20)) : 1000000;
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const q = String(req.query.q || '').trim();
+    const from = req.query.from || null;
+    const to = req.query.to || null;
+    const filter = `WHERE ($1='' OR CONCAT_WS(' ',trade_id,id,short_id,status,buyer_name,buyer_id,seller_name,seller_id) ILIKE '%'||$1||'%')
+      AND ($2::date IS NULL OR created_at >= $2::date)
+      AND ($3::date IS NULL OR created_at < $3::date + INTERVAL '1 day')`;
+    const [listResult, totalsResult] = await Promise.all([
+      db.query(
+        `SELECT id, short_id, trade_id, status, buyer_name, buyer_id, seller_name, seller_id,
+                total_value, created_at, completed_at
+         FROM trade_receipts ${filter} ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
+        [q, from, to, limit, offset]
+      ),
+      db.query(
+        `SELECT COUNT(*)::int total,
+                COUNT(*) FILTER (WHERE status='pending')::int pending,
+                COUNT(*) FILTER (WHERE status='completed')::int completed,
+                COUNT(*) FILTER (WHERE status='cancelled')::int cancelled,
+                COALESCE(SUM(total_value),0) volume
+         FROM trade_receipts ${filter}`,
+        [q, from, to]
+      ),
+    ]);
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) {
+      console.log(`[receipts] Reconciled receipts: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+      res.set('X-Auto-Pending-Receipts', String(reconciled.pending.length));
+      res.set('X-Auto-Cancelled-Receipts', String(reconciled.cancelled.length));
+      res.set('X-Auto-Completed-Receipts', String(reconciled.completed.length));
+    }
+    if (!paginated) return res.json(listResult.rows);
+    const totals = totalsResult.rows[0];
+    res.json({ receipts: listResult.rows, total: totals.total, totals, limit, offset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/api/receipts/reconcile', requireAuth, async (_req, res) => {
+  try {
+    const reconciled = await reconcileReceiptStatuses();
+    if (reconciled.pending.length || reconciled.cancelled.length || reconciled.completed.length) console.log(`[receipts] Manual reconciliation: ${reconciled.pending.length} pending, ${reconciled.cancelled.length} cancelled, ${reconciled.completed.length} completed`);
+    res.json({
+      ok: true,
+      pending: reconciled.pending.length,
+      cancelled: reconciled.cancelled.length,
+      completed: reconciled.completed.length,
+      cancelled_trade_ids: reconciled.cancelled.map(row => String(row.trade_id)),
+      completed_trade_ids: reconciled.completed.map(row => String(row.trade_id)),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.patch('/api/receipts/:id/status', requireAuth, async (req, res) => {
+  const { status } = req.body;
+  if (!['pending', 'completed', 'cancelled'].includes(status))
+    return res.status(400).json({ error: 'Invalid status' });
+  try {
+    const { rows } = await db.query(
+      `UPDATE trade_receipts
+       SET status = $1::text,
+           completed_at = CASE WHEN $1::text = 'completed' THEN COALESCE(completed_at, NOW()) ELSE NULL END,
+           auto_cancelled = FALSE
+       WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // List all items (including inactive)
 router.get('/api/items', requireAuth, async (req, res) => {
@@ -50,12 +132,17 @@ router.get('/api/items', requireAuth, async (req, res) => {
     const { rows } = await db.query(`
       SELECT
         mi.*,
-        (SELECT price FROM item_market WHERE item_id = mi.torn_item_id
-         ORDER BY created_at DESC LIMIT 1) AS latest_price,
-        (SELECT created_at FROM item_market WHERE item_id = mi.torn_item_id
-         ORDER BY created_at DESC LIMIT 1) AS price_at,
-        (SELECT COUNT(*) FROM item_market WHERE item_id = mi.torn_item_id) AS record_count
+        latest.price       AS latest_price,
+        latest.created_at  AS price_at,
+        latest.type        AS item_type
       FROM monitored_items mi
+      LEFT JOIN LATERAL (
+        SELECT price, created_at, type
+        FROM item_market
+        WHERE item_id = mi.torn_item_id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON TRUE
       ORDER BY mi.created_at DESC
     `);
     res.json(rows);
@@ -66,15 +153,16 @@ router.get('/api/items', requireAuth, async (req, res) => {
 
 // Add item
 router.post('/api/items', requireAuth, async (req, res) => {
-  const { torn_item_id, name, api_key } = req.body;
+  const { torn_item_id, name, api_key, priority } = req.body;
   if (!torn_item_id || !api_key) return res.status(400).json({ error: 'torn_item_id and api_key are required' });
+  const p = priority !== undefined ? Math.min(6, Math.max(1, parseInt(priority))) : 4;
   try {
     const { rows } = await db.query(
-      `INSERT INTO monitored_items (torn_item_id, name, api_key)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (torn_item_id) DO UPDATE SET name = COALESCE(EXCLUDED.name, monitored_items.name), api_key = EXCLUDED.api_key, is_active = TRUE
+      `INSERT INTO monitored_items (torn_item_id, name, api_key, priority)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (torn_item_id) DO UPDATE SET name = COALESCE(EXCLUDED.name, monitored_items.name), api_key = EXCLUDED.api_key, priority = EXCLUDED.priority, is_active = TRUE
        RETURNING *`,
-      [parseInt(torn_item_id), name ? name.trim() : null, api_key.trim()]
+      [parseInt(torn_item_id), name ? name.trim() : null, api_key.trim(), p]
     );
     res.json(rows[0]);
   } catch (err) {
@@ -85,12 +173,13 @@ router.post('/api/items', requireAuth, async (req, res) => {
 // Update item (toggle active, change api_key)
 router.put('/api/items/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { is_active, api_key } = req.body;
+  const { is_active, api_key, priority } = req.body;
   try {
     const updates = [];
     const params = [];
     if (is_active !== undefined) { params.push(is_active); updates.push(`is_active = $${params.length}`); }
     if (api_key)                 { params.push(api_key.trim()); updates.push(`api_key = $${params.length}`); }
+    if (priority !== undefined)  { params.push(Math.min(6, Math.max(1, parseInt(priority)))); updates.push(`priority = $${params.length}`); }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
     params.push(id);
     const { rows } = await db.query(
@@ -113,12 +202,33 @@ router.delete('/api/items/:id', requireAuth, async (req, res) => {
   }
 });
 
-// Manual sync
+// Bulk delete items
+router.post('/api/items/bulk-delete', requireAuth, async (req, res) => {
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ids required' });
+  try {
+    const { rowCount } = await db.query(
+      'DELETE FROM monitored_items WHERE id = ANY($1::int[])',
+      [ids]
+    );
+    res.json({ ok: true, deleted: rowCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual sync — always resets error state so deactivated items can retry
 router.post('/api/items/:id/sync', requireAuth, async (req, res) => {
   try {
+    await db.query(
+      `UPDATE monitored_items SET is_active = TRUE, retry_count = 0,
+       last_error = NULL, last_error_date = NULL WHERE id = $1`,
+      [req.params.id]
+    );
     const { rows } = await db.query('SELECT * FROM monitored_items WHERE id = $1', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Item not found' });
     const result = await syncItem(rows[0]);
+    if (result.error) return res.status(502).json(result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -187,15 +297,17 @@ router.post('/api/sync-items', requireAuth, async (req, res) => {
     const apiKey = sRows[0].value;
     const items  = await fetchAllTornItems(apiKey);
 
-    // Bulk upsert in batches of 200 (keeps SQLite under 999-param limit)
+    // Bulk upsert in batches of 200 (keeps param count manageable)
     const BATCH = 200;
     for (let i = 0; i < items.length; i += BATCH) {
       const batch  = items.slice(i, i + BATCH);
-      const vals   = batch.map((_, j) => `($${j * 3 + 1}, $${j * 3 + 2}, $${j * 3 + 3})`).join(', ');
-      const params = batch.flatMap(item => [item.id, item.name, item.type]);
+      const vals   = batch.map((_, j) => `($${j * 4 + 1}, $${j * 4 + 2}, $${j * 4 + 3}, $${j * 4 + 4})`).join(', ');
+      const params = batch.flatMap(item => [item.id, item.name, item.type, item.market_price ?? null]);
       await db.query(
-        `INSERT INTO torn_items (id, name, type) VALUES ${vals}
-         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type`,
+        `INSERT INTO torn_items (id, name, type, market_price) VALUES ${vals}
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name, type = EXCLUDED.type,
+           market_price = EXCLUDED.market_price, updated_at = NOW()`,
         params
       );
     }
@@ -245,13 +357,34 @@ router.get('/api/torn-items', requireAuth, async (req, res) => {
   }
 });
 
+// Daily records history (grouped by UTC day, limited to retention window)
+router.get('/api/stats/records-history', requireAuth, async (req, res) => {
+  try {
+    const { rows: sRows } = await db.query(
+      `SELECT value FROM settings WHERE key = 'retention_days'`
+    );
+    const days = parseInt(sRows[0]?.value) || 30;
+    const interval = days > 0 ? `${days} days` : '90 days';
+    const { rows } = await db.query(
+      `SELECT DATE(created_at) AS day, COUNT(*) AS count
+       FROM item_market
+       WHERE created_at >= NOW() - INTERVAL '${interval}'
+       GROUP BY day
+       ORDER BY day ASC`
+    );
+    res.json({ rows, days: days > 0 ? days : null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Stats
 router.get('/api/stats', requireAuth, async (req, res) => {
   try {
     const [totals, records] = await Promise.all([
       db.query(`SELECT
-        SUM(CASE WHEN is_active  = 1 THEN 1 ELSE 0 END) AS active,
-        SUM(CASE WHEN is_active != 1 THEN 1 ELSE 0 END) AS inactive,
+        SUM(CASE WHEN is_active = TRUE     THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN is_active IS NOT TRUE THEN 1 ELSE 0 END) AS inactive,
         SUM(CASE WHEN last_error IS NOT NULL THEN 1 ELSE 0 END) AS errors,
         MAX(last_sync) AS last_sync
         FROM monitored_items`),

@@ -50,7 +50,8 @@
         }),
       });
       if (res.ok) {
-        window.location.href = '/admin/dashboard';
+        const j = await res.json();
+        window.location.href = j.next || '/admin/dashboard';
       } else {
         err.classList.remove('hidden');
         btn.disabled = false;

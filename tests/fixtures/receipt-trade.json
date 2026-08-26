@@ -1,0 +1,30 @@
+{
+  "trade": {
+    "user": {
+      "id": 1111111,
+      "name": "FixtureSeller"
+    },
+    "trader": {
+      "id": 2222222,
+      "name": "PoorMe"
+    },
+    "items": [
+      {
+        "type": "Item",
+        "user_id": 1111111,
+        "details": {
+          "id": 206,
+          "amount": 2
+        }
+      },
+      {
+        "type": "Item",
+        "user_id": 1111111,
+        "details": {
+          "id": 258,
+          "amount": 1
+        }
+      }
+    ]
+  }
+}

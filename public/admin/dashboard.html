@@ -15,78 +15,125 @@
     <div class="nav-inner">
       <span class="nav-brand"><span class="mono accent">&gt;_</span> Torn Tracker</span>
       <div class="nav-right">
-        <a href="/" target="_blank" class="btn btn-ghost btn-sm">View Client</a>
-        <button id="settingsBtn" class="btn btn-ghost btn-sm">⚙ Settings</button>
-        <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
+        <a href="/" target="_blank" class="btn btn-ghost btn-sm mobile-hide">View Client</a>
+        <a href="/admin/trade" class="btn btn-ghost btn-sm mobile-hide">Trade Admin</a>
+        <a href="/admin/inventory" class="btn btn-ghost btn-sm mobile-hide">Inventory</a>
+        <button id="settingsBtn" class="btn btn-ghost btn-sm mobile-hide">⚙ Settings</button>
+        <button id="logoutBtn" class="btn btn-ghost btn-sm mobile-hide">Logout</button>
+        <button class="nav-burger" id="navBurger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
+    </div>
+    <div class="nav-dropdown" id="navDropdown">
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm">View Client</a>
+      <a href="/admin/trade" class="btn btn-ghost btn-sm">Trade Admin</a>
+      <a href="/admin/inventory" class="btn btn-ghost btn-sm">Inventory</a>
+      <button id="settingsBtnMobile" class="btn btn-ghost btn-sm">⚙ Settings</button>
+      <button id="logoutBtnMobile" class="btn btn-ghost btn-sm">Logout</button>
     </div>
   </nav>
 
   <main class="dashboard">
 
-    <!-- Stats row -->
-    <div class="stats-row">
-      <div class="glass-card stat-card">
-        <div class="stat-value" id="statActive">—</div>
-        <div class="stat-label">Active Items</div>
+    <!-- Stats bar -->
+    <div class="glass-card stats-bar">
+      <div class="sbar-item">
+        <span class="sbar-val" id="statActive">—</span>
+        <span class="sbar-label">Active</span>
       </div>
-      <div class="glass-card stat-card clickable" id="filterInactiveCard">
-        <div class="stat-value" id="statInactive">—</div>
-        <div class="stat-label">Inactive</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item clickable" id="filterInactiveCard">
+        <span class="sbar-val" id="statInactive">—</span>
+        <span class="sbar-label">Inactive</span>
       </div>
-      <div class="glass-card stat-card clickable" id="filterErrorCard">
-        <div class="stat-value error-color" id="statErrors">—</div>
-        <div class="stat-label">Errors</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item clickable" id="filterErrorCard">
+        <span class="sbar-val error-color" id="statErrors">—</span>
+        <span class="sbar-label">Errors</span>
       </div>
-      <div class="glass-card stat-card">
-        <div class="stat-value" id="statRecords">—</div>
-        <div class="stat-label">Total Records</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val" id="statRecords">—</span>
+        <span class="sbar-label">Records</span>
       </div>
-      <div class="glass-card stat-card">
-        <div class="stat-value mono" id="statLastSync">—</div>
-        <div class="stat-label">Last Sync</div>
+      <div class="sbar-sep"></div>
+      <div class="sbar-item">
+        <span class="sbar-val mono" id="statLastSync" style="font-size:.72rem">—</span>
+        <span class="sbar-label">Last Sync</span>
       </div>
     </div>
 
-    <div class="dashboard-grid">
-
-      <!-- Add item form -->
-      <div class="glass-card add-card">
-        <h2>Add Item to Monitor</h2>
+    <!-- Add item drawer -->
+    <div class="glass-card add-drawer" id="addDrawer">
+      <div class="add-drawer-inner">
         <form id="addForm">
-          <div class="field">
-            <label>Torn API Key</label>
-            <input id="addApiKey" type="text" placeholder="Your Torn API key" required />
-          </div>
-          <div class="field">
-            <label>Item Name</label>
-            <div class="ac-wrap">
-              <input id="addItemSearch" type="text" placeholder="Search by name…" autocomplete="off" />
-              <div id="addItemAc" class="ac-dropdown hidden"></div>
+          <div class="add-form-fields">
+            <div class="field">
+              <label>API Key</label>
+              <input id="addApiKey" type="text" placeholder="Your Torn API key" required />
             </div>
-            <div id="selectedChips" class="selected-chips"></div>
+            <div class="field">
+              <label>Item Name</label>
+              <div class="ac-wrap">
+                <input id="addItemSearch" type="text" placeholder="Search by name…" autocomplete="off" />
+                <div id="addItemAc" class="ac-dropdown hidden"></div>
+              </div>
+            </div>
+            <div class="field" style="flex:0 0 auto">
+              <label>Priority</label>
+              <select id="addPriority" class="priority-select" style="font-size:13px;padding:6px 8px;width:100%">
+                <option value="1">P1 · 1m</option>
+                <option value="2">P2 · 5m</option>
+                <option value="3">P3 · 15m</option>
+                <option value="4" selected>P4 · 30m</option>
+                <option value="5">P5 · 1h</option>
+                <option value="6">P6 · 1d</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:.5rem">
+              <div id="addError" class="error-msg hidden" style="flex:1"></div>
+              <button type="submit" class="btn btn-primary btn-sm">Add Item</button>
+            </div>
           </div>
-          <div id="addError" class="error-msg hidden"></div>
-          <button type="submit" class="btn btn-primary">Add Item</button>
+          <div id="selectedChips" class="selected-chips"></div>
         </form>
       </div>
+    </div>
 
-      <!-- Items table -->
-      <div class="glass-card table-card">
-        <div class="table-header">
+    <!-- Items table (full width) -->
+    <div class="glass-card table-card">
+      <div class="table-header">
           <h2>Monitored Items</h2>
           <div class="table-controls">
-            <input id="tableSearch" type="text" placeholder="Search by ID or name…" class="table-search" />
+            <input id="tableSearch" type="text" placeholder="Search…" class="table-search" />
+            <div id="bulkBar" style="display:none;align-items:center;gap:.5rem">
+              <select id="bulkPrioritySelect" class="priority-select" style="font-size:12px;padding:4px 6px">
+                <option value="">Set priority…</option>
+                <option value="1">P1 · 1m</option>
+                <option value="2">P2 · 5m</option>
+                <option value="3">P3 · 15m</option>
+                <option value="4">P4 · 30m</option>
+                <option value="5">P5 · 1h</option>
+                <option value="6">P6 · 1d</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="bulkPriorityBtn">Apply to selected (<span id="bulkPriorityCount">0</span>)</button>
+              <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="color:var(--error);border-color:var(--error)">Delete selected (<span id="bulkDeleteCount">0</span>)</button>
+            </div>
             <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+            <button class="btn btn-ghost btn-sm" id="addToggleBtn">＋ Add</button>
           </div>
         </div>
         <div class="table-wrap">
           <table id="itemsTable">
             <thead>
               <tr>
+                <th style="width:32px;text-align:center"><input type="checkbox" id="selectAll" title="Select all"></th>
                 <th class="sortable" data-col="torn_item_id">Item ID <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="name">Name <span class="sort-icon">↕</span></th>
+                <th class="sortable" data-col="item_type">Category <span class="sort-icon">↕</span></th>
                 <th>Status</th>
+                <th class="sortable" data-col="priority">Priority <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="latest_price">Latest Price <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="last_sync">Last Sync <span class="sort-icon">↕</span></th>
                 <th class="sortable" data-col="retry_count">Retries <span class="sort-icon">↕</span></th>
@@ -95,14 +142,12 @@
               </tr>
             </thead>
             <tbody id="itemsBody">
-              <tr><td colspan="8" class="loading-cell">Loading…</td></tr>
+              <tr><td colspan="11" class="loading-cell">Loading…</td></tr>
             </tbody>
           </table>
         </div>
         <div class="pagination" id="pagination"></div>
       </div>
-
-    </div>
 
     <!-- Setup modal (forced on first login) -->
     <div id="setupModal" class="modal hidden">
@@ -158,6 +203,29 @@
           </div>
           <span class="sync-time" id="cleanupTime"></span>
         </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Records History</div>
+          <p class="settings-desc">Daily records added over the retention window.</p>
+          <button id="viewRecordsChartBtn" class="btn btn-ghost btn-sm">View Chart</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Records history chart modal -->
+    <div id="recordsChartModal" class="modal hidden">
+      <div class="modal-overlay" id="recordsChartOverlay"></div>
+      <div class="glass-card modal-card" style="max-width:660px;width:96vw">
+        <div class="modal-header">
+          <h3>Daily Records Added</h3>
+          <button class="btn-close" id="closeRecordsChart">&times;</button>
+        </div>
+        <div style="position:relative;height:280px;margin-top:.5rem">
+          <canvas id="recordsChartCanvas"></canvas>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:.75rem" id="recordsChartMeta"></p>
       </div>
     </div>
 
@@ -175,6 +243,31 @@
 
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
+  <script>
+    // Burger menu
+    document.getElementById('navBurger').addEventListener('click', () => document.body.classList.toggle('nav-open'));
+    document.addEventListener('click', e => { if (!e.target.closest('.nav')) document.body.classList.remove('nav-open'); });
+    // Mobile duplicates wire to same handlers as desktop
+    document.getElementById('settingsBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('settingsBtn').click(); });
+    document.getElementById('logoutBtnMobile').addEventListener('click', () => { document.body.classList.remove('nav-open'); document.getElementById('logoutBtn').click(); });
+    // Add drawer toggle — restore overflow:visible after open so ac-dropdown isn't clipped
+    (function() {
+      const drawer = document.getElementById('addDrawer');
+      document.getElementById('addToggleBtn').addEventListener('click', () => {
+        if (drawer.classList.contains('open')) {
+          drawer.style.overflow = 'hidden';
+          drawer.classList.remove('open');
+        } else {
+          drawer.classList.add('open');
+          drawer.addEventListener('transitionend', function handler() {
+            drawer.removeEventListener('transitionend', handler);
+            if (drawer.classList.contains('open')) drawer.style.overflow = 'visible';
+          });
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

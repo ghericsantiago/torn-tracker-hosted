@@ -165,7 +165,63 @@
   let statusFilter = null; // null | 'inactive' | 'error'
   let tablePage   = 0;
   const PAGE_SIZE = 20;
-  const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count']);
+  const NUMERIC   = new Set(['torn_item_id', 'latest_price', 'retry_count', 'record_count', 'priority']);
+  const selectedIds = new Set();
+
+  const bulkBar         = document.getElementById('bulkBar');
+  const bulkDeleteBtn   = document.getElementById('bulkDeleteBtn');
+  const bulkDeleteCount = document.getElementById('bulkDeleteCount');
+  const bulkPriorityBtn   = document.getElementById('bulkPriorityBtn');
+  const bulkPriorityCount = document.getElementById('bulkPriorityCount');
+  const bulkPrioritySel   = document.getElementById('bulkPrioritySelect');
+  const selectAllCb     = document.getElementById('selectAll');
+
+  function updateBulkBar() {
+    const n = selectedIds.size;
+    bulkBar.style.display = n > 0 ? 'flex' : 'none';
+    bulkDeleteCount.textContent  = n;
+    bulkPriorityCount.textContent = n;
+    if (selectAllCb) {
+      const pageIds = [...document.querySelectorAll('.row-check')].map(c => Number(c.dataset.id));
+      selectAllCb.checked       = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+      selectAllCb.indeterminate = pageIds.some(id => selectedIds.has(id)) && !selectAllCb.checked;
+    }
+  }
+
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', () => {
+      document.querySelectorAll('.row-check').forEach(cb => {
+        const id = Number(cb.dataset.id);
+        if (selectAllCb.checked) { selectedIds.add(id); cb.checked = true; }
+        else                     { selectedIds.delete(id); cb.checked = false; }
+      });
+      updateBulkBar();
+    });
+  }
+
+  bulkPriorityBtn.addEventListener('click', async () => {
+    const p = Number(bulkPrioritySel.value);
+    if (!p) { bulkPrioritySel.focus(); return; }
+    const ids = [...selectedIds];
+    bulkPriorityBtn.disabled = true;
+    await Promise.all(ids.map(id => api(`/admin/api/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ priority: p }),
+    })));
+    bulkPrioritySel.value = '';
+    bulkPriorityBtn.disabled = false;
+    await loadItems();
+  });
+
+  bulkDeleteBtn.addEventListener('click', async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} item(s) and all their market data?`)) return;
+    await api('/admin/api/items/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+    selectedIds.clear();
+    updateBulkBar();
+    await refresh();
+  });
 
   function setStatusFilter(type) {
     statusFilter = statusFilter === type ? null : type;
@@ -193,7 +249,8 @@
     let filtered = allItems;
     if (q) filtered = filtered.filter(i =>
       String(i.torn_item_id).includes(q) ||
-      (i.name || '').toLowerCase().includes(q)
+      (i.name || '').toLowerCase().includes(q) ||
+      (i.item_type || '').toLowerCase().includes(q)
     );
     if (statusFilter === 'inactive') filtered = filtered.filter(i => !i.is_active);
     if (statusFilter === 'error')    filtered = filtered.filter(i => !!i.last_error);
@@ -227,14 +284,24 @@
     return `<span class="mono" style="font-size:0.75rem">${new Date(t).toLocaleString()}</span>`;
   }
 
+  const PRIORITY_LABELS = ['', 'P1 · 1m', 'P2 · 5m', 'P3 · 15m', 'P4 · 30m', 'P5 · 1h', 'P6 · 1d'];
+  function priorityLabel(p) { return PRIORITY_LABELS[p] || `P${p}`; }
+
   function renderTablePage(page, total, totalPages) {
     const tbody = document.getElementById('itemsBody');
     tbody.innerHTML = page.length
       ? page.map(item => `
           <tr data-id="${item.id}">
+            <td style="text-align:center"><input type="checkbox" class="row-check" data-id="${item.id}" ${selectedIds.has(item.id) ? 'checked' : ''}></td>
             <td class="mono" style="color:var(--text-dim)">${item.torn_item_id}</td>
             <td>${item.name || '<span style="color:var(--text-muted)">Pending…</span>'}</td>
+            <td style="color:var(--text-dim);font-size:11px">${item.item_type || '<span style="color:var(--text-muted)">—</span>'}</td>
             <td>${badge(item)}</td>
+            <td>
+              <select class="priority-select" data-id="${item.id}" title="Sync frequency">
+                ${[1,2,3,4,5,6].map(p => `<option value="${p}" ${(item.priority||4)===p?'selected':''}>${priorityLabel(p)}</option>`).join('')}
+              </select>
+            </td>
             <td>${fmtPrice(item.latest_price)}</td>
             <td>${fmtTime(item.last_sync)}</td>
             <td class="mono" style="color:${item.retry_count > 3 ? 'var(--error)' : 'var(--text-dim)'}">${item.retry_count}</td>
@@ -251,7 +318,26 @@
               </div>
             </td>
           </tr>`).join('')
-      : `<tr><td colspan="8" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+      : `<tr><td colspan="11" class="loading-cell">${tableFilter ? 'No items match your search.' : 'No items yet — add one.'}</td></tr>`;
+
+    // wire row checkboxes after render
+    tbody.querySelectorAll('.row-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = Number(cb.dataset.id);
+        if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+        updateBulkBar();
+      });
+    });
+
+    // wire priority selects after render
+    tbody.querySelectorAll('.priority-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        await api(`/admin/api/items/${sel.dataset.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ priority: Number(sel.value) }),
+        });
+      });
+    });
 
     const pag = document.getElementById('pagination');
     if (totalPages <= 1) {
@@ -437,9 +523,10 @@
   // ── Add item(s) ──
   document.getElementById('addForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const err    = document.getElementById('addError');
-    const apiKey = document.getElementById('addApiKey').value;
-    const items  = [...selectedItems.values()];
+    const err      = document.getElementById('addError');
+    const apiKey   = document.getElementById('addApiKey').value;
+    const priority = Number(document.getElementById('addPriority').value) || 4;
+    const items    = [...selectedItems.values()];
     err.classList.add('hidden');
 
     if (!items.length) {
@@ -456,7 +543,7 @@
       btn.textContent = `Adding ${item.name}…`;
       const res = await api('/admin/api/items', {
         method: 'POST',
-        body: JSON.stringify({ torn_item_id: item.id, name: item.name, api_key: apiKey }),
+        body: JSON.stringify({ torn_item_id: item.id, name: item.name, api_key: apiKey, priority }),
       });
       if (res && res.ok) added++;
       else failed++;
@@ -479,6 +566,80 @@
 
   async function refresh() {
     await Promise.all([loadStats(), loadItems()]);
+  }
+
+  // ── Records history chart ──
+  let recordsChart = null;
+
+  document.getElementById('viewRecordsChartBtn').addEventListener('click', async () => {
+    document.getElementById('settingsModal').classList.add('hidden');
+    document.getElementById('recordsChartModal').classList.remove('hidden');
+    await loadRecordsChart();
+  });
+
+  document.getElementById('closeRecordsChart').addEventListener('click', () => {
+    document.getElementById('recordsChartModal').classList.add('hidden');
+  });
+  document.getElementById('recordsChartOverlay').addEventListener('click', () => {
+    document.getElementById('recordsChartModal').classList.add('hidden');
+  });
+
+  async function loadRecordsChart() {
+    const meta = document.getElementById('recordsChartMeta');
+    meta.textContent = 'Loading…';
+    const res = await api('/admin/api/stats/records-history');
+    if (!res || !res.ok) { meta.textContent = 'Failed to load data.'; return; }
+    const { rows, days } = await res.json();
+
+    const labels = rows.map(r => new Date(r.day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    const data   = rows.map(r => Number(r.count));
+    const total  = data.reduce((s, v) => s + v, 0);
+    meta.textContent = `${total.toLocaleString()} total records over ${days ? `last ${days} days` : 'all time'} · ${rows.length} days with data`;
+
+    const ctx = document.getElementById('recordsChartCanvas').getContext('2d');
+    if (recordsChart) {
+      recordsChart.data.labels   = labels;
+      recordsChart.data.datasets[0].data = data;
+      recordsChart.update('none');
+      return;
+    }
+    recordsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Records added',
+          data,
+          backgroundColor: 'rgba(110,231,247,0.25)',
+          borderColor:     '#6ee7f7',
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${Number(ctx.parsed.y).toLocaleString()} records`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 14, maxRotation: 45 },
+            grid:  { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            ticks: { color: '#64748b', callback: v => Number(v).toLocaleString() },
+            grid:  { color: 'rgba(255,255,255,0.06)' },
+            beginAtZero: true,
+          },
+        },
+      },
+    });
   }
 
   // Auto-refresh every 30s

@@ -1,0 +1,463 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #07080f;
+  --glass-bg:     rgba(255,255,255,0.035);
+  --glass-border: rgba(255,255,255,0.07);
+  --glass-hover:  rgba(255,255,255,0.06);
+  --accent:       #6ee7f7;
+  --accent-dim:   rgba(110,231,247,0.12);
+  --error:        #f87171;
+  --success:      #4ade80;
+  --warn:         #fbbf24;
+  --text:         #e2e8f0;
+  --text-muted:   #64748b;
+  --text-dim:     #94a3b8;
+  --mono:         'JetBrains Mono', monospace;
+  --sans:         'Space Grotesk', sans-serif;
+  --radius:       14px;
+  --tr:           0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.accent { color: var(--accent); }
+.mono   { font-family: var(--mono); }
+.muted  { color: var(--text-muted); }
+.hidden { display: none !important; }
+
+/* ── Glass ── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.55rem 1.2rem; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500; font-family: var(--sans);
+  cursor: pointer; border: none; text-decoration: none;
+  transition: all var(--tr);
+}
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--glass-border); }
+.btn-ghost:hover { background: var(--glass-hover); color: var(--text); }
+.btn-sm { padding: 0.35rem 0.85rem; font-size: 0.8rem; }
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(7,8,15,0.85); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0 2rem;
+}
+.nav-inner {
+  max-width: 860px; margin: 0 auto; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand {
+  font-weight: 700; font-size: 1rem; letter-spacing: -0.01em;
+  text-decoration: none; color: var(--text);
+}
+.nav-right { display: flex; gap: 0.75rem; align-items: center; }
+
+/* ── Page layout ── */
+.receipt-page {
+  max-width: 860px; margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex; flex-direction: column; gap: 0.85rem;
+}
+
+/* ── Skeleton ── */
+.skel-card { padding: 1.25rem 1.5rem; }
+.skel-card.tall { height: 220px; }
+.skel-line {
+  height: 1rem; border-radius: 6px;
+  background: rgba(255,255,255,0.06);
+  margin-bottom: 0.65rem;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.skel-line.thin { height: 0.65rem; }
+.skel-line.w40  { width: 40%; }
+.skel-line.w60  { width: 60%; }
+@keyframes shimmer {
+  0%,100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* ── Error ── */
+.error-card {
+  padding: 2rem; text-align: center;
+  color: var(--text-muted);
+}
+.error-icon { font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--warn); }
+
+/* ── Receipt header card ── */
+.receipt-header-card { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.9rem; }
+
+.receipt-meta-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+}
+.receipt-id-block { display: flex; flex-direction: column; gap: 0.15rem; }
+.receipt-label {
+  font-size: 0.68rem; font-family: var(--mono);
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);
+}
+.receipt-trade-id { font-size: 1.3rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
+
+/* Status pill */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.3rem 0.75rem; border-radius: 20px;
+  font-size: 0.78rem; font-weight: 600; font-family: var(--mono);
+  flex-shrink: 0;
+}
+.status-pill.pending {
+  background: rgba(110,231,247,0.1); border: 1px solid rgba(110,231,247,0.25); color: var(--accent);
+}
+.status-pill.completed {
+  background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: var(--success);
+}
+.status-pill.cancelled {
+  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: #f87171;
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.pending .status-dot {
+  background: var(--accent);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.completed .status-dot { background: var(--success); }
+.cancelled .status-dot { background: #f87171; }
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* Parties */
+.receipt-parties { display: flex; align-items: center; gap: 0.75rem; }
+.party-block { display: flex; flex-direction: column; gap: 0.1rem; }
+.party-label {
+  font-size: 0.65rem; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text-muted);
+}
+.party-name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.party-arrow { color: var(--text-muted); font-size: 1.1rem; }
+
+/* Timestamps */
+.receipt-timestamps { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ts-label { font-size: 0.72rem; color: var(--text-muted); }
+.ts-val   { font-size: 0.72rem; color: var(--text-dim); }
+.ts-sep   { color: var(--glass-border); }
+
+/* ── Items card ── */
+.items-card { overflow: hidden; padding: 0 0 0.5rem; }
+.items-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+.items-title { font-size: 0.88rem; font-weight: 600; }
+.items-count { font-size: 0.72rem; color: var(--text-muted); }
+
+.table-wrap { overflow-x: auto; }
+.receipt-table { width: 100%; border-collapse: collapse; }
+.receipt-table thead th {
+  text-align: left; padding: 0.6rem 0.85rem;
+  font-family: var(--mono); font-size: 0.68rem;
+  text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--text-muted); border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+.receipt-table tbody td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
+  vertical-align: middle; font-size: 0.875rem;
+}
+.receipt-table tbody tr:last-child td { border-bottom: 1px solid var(--glass-border); }
+.receipt-table tbody tr:hover td { background: rgba(255,255,255,0.018); }
+.col-num { text-align: right; }
+.price-cell { font-family: var(--mono); color: var(--accent); }
+.total-cell { font-weight: 600; }
+
+.receipt-table tfoot .total-row td { padding: 0.75rem 0.85rem; }
+.total-label { text-align: right; font-size: 0.78rem; color: var(--text-muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+.total-value { font-size: 1.05rem; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+
+/* Item cell */
+.item-cell { display: flex; align-items: center; gap: 0.6rem; }
+.item-icon { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; border-radius: 4px; }
+.item-name { font-size: 0.875rem; }
+.item-name-row { display: flex; align-items: center; gap: 0.35rem; }
+.item-type { font-size: 0.7rem; color: var(--text-muted); }
+.receipt-chart-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.55rem; height: 1.35rem; padding: 0;
+  border: 1px solid rgba(110,231,247,.28); border-radius: 4px;
+  background: rgba(110,231,247,.09); color: var(--accent);
+  font-size: .72rem; line-height: 1; cursor: pointer;
+}
+.receipt-chart-btn:hover { background: rgba(110,231,247,.2); }
+.receipt-chart-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pct-badge {
+  display: inline-block; margin-left: 0.35rem;
+  padding: 0.1rem 0.35rem; border-radius: 4px;
+  background: rgba(110,231,247,0.08); border: 1px solid rgba(110,231,247,0.15);
+  font-size: 0.68rem; font-family: var(--mono); color: var(--accent);
+}
+.not-listed {
+  display: inline-block; margin-left: 0.35rem;
+  font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono);
+  font-style: italic;
+}
+.adjust-badge {
+  display: inline-block; margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem; border-radius: 4px;
+  font-size: 0.68rem; font-family: var(--mono); font-weight: 600;
+}
+.adjust-badge.discount {
+  background: rgba(74,222,128,.12);
+  border: 1px solid rgba(74,222,128,.3);
+  color: #4ade80;
+}
+.adjust-badge.markup {
+  background: rgba(248,113,113,.12);
+  border: 1px solid rgba(248,113,113,.3);
+  color: #f87171;
+}
+.protection-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-left: 0.35rem;
+  border: 1px solid rgba(248,113,113,.35);
+  border-radius: 50%;
+  background: rgba(248,113,113,.1);
+  color: var(--error);
+  cursor: help;
+  flex: 0 0 auto;
+}
+.protection-shield {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: rgba(248,113,113,.16);
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.receipt-help-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: min(360px, 85vw);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 7px;
+  background: #151722;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.protection-help:focus-visible {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+/* ── Explanation card ── */
+.explain-card { padding: 0.85rem 1.25rem; }
+.explain-title {
+  font-size: 0.72rem; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text-muted); margin-bottom: 0.5rem;
+}
+.explain-body strong { color: var(--text); font-weight: 600; }
+.calc-list { display: grid; gap: 0.35rem; }
+.calc-row {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+  padding: 0.35rem 0.5rem; border-radius: 7px;
+  background: rgba(248,113,113,.045); border: 1px solid rgba(248,113,113,.12);
+  font-family: var(--mono); font-size: 0.75rem;
+}
+.calc-shield {
+  width: 0.9rem; height: 0.9rem; flex: 0 0 auto;
+  fill: rgba(248,113,113,.14); stroke: var(--error); stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.calc-help { width: 1.2rem; height: 1.2rem; margin-left: 0; }
+.calc-item { min-width: 6.5rem; font-family: var(--sans); }
+.calc-step { display: inline-flex; align-items: baseline; gap: 0.3rem; color: var(--text-dim); white-space: nowrap; }
+.calc-step small { color: var(--text-muted); font: 0.6rem var(--mono); text-transform: uppercase; }
+.calc-step.support { color: var(--warn); }
+.calc-step.offer { color: var(--accent); font-weight: 600; }
+.calc-arrow { color: var(--text-muted); }
+.calc-was { color: var(--text-muted); font-size: 0.66rem; text-decoration: line-through; white-space: nowrap; }
+.rule-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.45rem; }
+.rule-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.18rem 0.45rem; border-radius: 5px;
+  background: rgba(110,231,247,.06); border: 1px solid rgba(110,231,247,.12);
+  color: var(--text-dim); font-size: 0.7rem;
+}
+.rule-chip strong { color: var(--accent); font-family: var(--mono); }
+.rule-chip.muted, .rule-chip.muted strong { color: var(--text-muted); }
+
+/* Market-history chart */
+body.chart-open { overflow: hidden; }
+.chart-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem; background: rgba(0,0,0,.72);
+}
+.chart-modal {
+  width: min(700px, 96vw); overflow: hidden;
+  border: 1px solid var(--glass-border); border-radius: 12px;
+  background: #11131d; box-shadow: 0 18px 60px rgba(0,0,0,.65);
+}
+.chart-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  padding: .8rem 1rem; border-bottom: 1px solid var(--glass-border);
+}
+.chart-title { color: var(--accent); font-weight: 700; }
+.chart-meta { color: var(--text-muted); font: .68rem var(--mono); margin-top: .1rem; }
+.chart-close {
+  border: 0; background: transparent; color: var(--text-muted);
+  font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+.chart-close:hover { color: var(--text); }
+.chart-wrap { position: relative; height: 330px; padding: .75rem 1rem .35rem; }
+.chart-message {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(17,19,29,.75); color: var(--text-muted); font-size: .8rem;
+}
+.chart-note {
+  padding: .55rem 1rem .75rem; color: var(--text-muted);
+  border-top: 1px solid var(--glass-border); font-size: .7rem;
+}
+
+@media (max-width: 600px) {
+  .nav { padding: 0 1rem; }
+  .receipt-page { padding: 0.65rem 0.65rem; gap: 0.5rem; }
+
+  /* Compact header card */
+  .receipt-header-card { padding: 0.85rem 1rem; gap: 0.6rem; }
+  .receipt-trade-id { font-size: 1.05rem; }
+
+  /* Parties: keep horizontal, tighten gap */
+  .receipt-parties { gap: 0.5rem; flex-wrap: wrap; }
+  .party-name { font-size: 0.88rem; }
+
+  /* Timestamps: smaller text */
+  .ts-label, .ts-val { font-size: 0.66rem; }
+
+  /* Items card */
+  .items-card-header { padding: 0.6rem 0.85rem; }
+  .items-title { font-size: 0.82rem; }
+
+  /* Card-per-item layout — show all columns without horizontal scroll */
+  .table-wrap { overflow-x: visible; }
+  .receipt-table,
+  .receipt-table tbody,
+  .receipt-table tfoot { display: block; }
+  .receipt-table thead { display: none; }
+
+  .receipt-table tbody tr {
+    display: block;
+    padding: 0.4rem 0.85rem;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .receipt-table tbody tr:last-child td { border-bottom: none; }
+  .receipt-table tbody tr:hover td { background: transparent; }
+
+  /* Item name — full width, no label needed */
+  .receipt-table tbody td:nth-child(1) {
+    display: block;
+    padding: 0 0 0.22rem 0;
+    border: none;
+  }
+
+  /* Qty, Market Price, Our Price, Line Total — label on left, value on right */
+  .receipt-table tbody td:nth-child(2),
+  .receipt-table tbody td:nth-child(3),
+  .receipt-table tbody td:nth-child(4),
+  .receipt-table tbody td:nth-child(5) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.04rem 0;
+    border: none;
+    font-size: 0.78rem;
+    text-align: left !important;
+  }
+
+  .receipt-table tbody td:nth-child(2)::before,
+  .receipt-table tbody td:nth-child(3)::before,
+  .receipt-table tbody td:nth-child(4)::before,
+  .receipt-table tbody td:nth-child(5)::before {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+  }
+  .receipt-table tbody td:nth-child(2)::before { content: "Qty"; }
+  .receipt-table tbody td:nth-child(3)::before { content: "Market Price"; }
+  .receipt-table tbody td:nth-child(4)::before { content: "Our Price"; }
+
+  /* Badge before price on mobile */
+  .receipt-table tbody td:nth-child(4) .price-val-wrap {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .receipt-table tbody td:nth-child(5)::before { content: "Line Total"; }
+
+  /* Smaller item icons, hide type to save height */
+  .item-icon { width: 22px; height: 22px; }
+  .item-name { font-size: 0.8rem; }
+  .chart-wrap { height: 280px; padding: .5rem; }
+  .chart-header { padding: .7rem .8rem; }
+  .chart-note { padding: .5rem .8rem .65rem; }
+  .item-type { display: none; }
+
+  /* Total footer row — label + value side by side */
+  .receipt-table tfoot .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.85rem;
+  }
+  .receipt-table tfoot .total-row td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+  .receipt-table tfoot .total-row td:nth-child(2) { text-align: right; }
+
+  /* Explanation card */
+  .explain-card { padding: 0.75rem 1rem; }
+  .calc-row { gap: 0.3rem; font-size: 0.7rem; }
+  .calc-item { min-width: calc(100% - 1.4rem); }
+  .calc-arrow { display: none; }
+}
