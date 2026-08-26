@@ -768,7 +768,7 @@
   function hospitalSecondsRemaining() {
     try {
       const initData = window.topBannerInitData;
-      if (initData?.user?.state?.status !== 'hospital') return 0;
+      if (initData?.user?.state?.status && initData.user.state.status !== 'hospital') return 0;
     } catch (_) {}
     const header = document.getElementById('topHeaderBanner');
     if (!header) return null;
@@ -948,7 +948,7 @@
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
@@ -982,6 +982,7 @@
     const state = document.getElementById('tta-state');
     const priceNow = document.getElementById('tta-price-now');
     const skip = document.getElementById('tta-skip');
+    const bloodbagStatus = document.getElementById('tta-bloodbag-status');
     if (!toggle || !state || !priceNow || !skip) return;
     toggle.textContent = settings.enabled ? 'Automation: ON' : 'Automation: OFF';
     toggle.classList.toggle('on', settings.enabled);
@@ -995,6 +996,24 @@
     state.title = label;
     priceNow.style.display = settings.enabled && ['waiting', 'waiting_for_adjustment'].includes(job?.stage) ? '' : 'none';
     skip.style.display = settings.enabled && job ? '' : 'none';
+    if (bloodbagStatus) {
+      const bbSaved = readJson(BLOODBAG_KEY, null);
+      const remaining = hospitalSecondsRemaining();
+      const triggerSecs = Math.max(1, Number(settings.bloodBagTriggerMinutes) || 5) * 60;
+      if (bbSaved) {
+        bloodbagStatus.textContent = 'Blood bag: navigating to armory...';
+        bloodbagStatus.style.cssText = 'display:inline;color:#f4b942;font-weight:bold';
+      } else if (settings.enabled && remaining !== null && remaining > 0 && remaining <= triggerSecs) {
+        bloodbagStatus.textContent = 'Blood bag: triggered!';
+        bloodbagStatus.style.cssText = 'display:inline;color:#f4b942;font-weight:bold';
+      } else if (settings.enabled && remaining !== null && remaining > 0) {
+        const mins = Math.ceil(remaining / 60);
+        bloodbagStatus.textContent = `Hospital: ${mins}m left (bag at ${settings.bloodBagTriggerMinutes}m)`;
+        bloodbagStatus.style.cssText = 'display:inline;color:#aab2ba';
+      } else {
+        bloodbagStatus.style.display = 'none';
+      }
+    }
   }
 
   GM_registerMenuCommand('Trade Automation Settings', openSettings);
