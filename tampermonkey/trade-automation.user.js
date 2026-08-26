@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.8.0
+// @version      2.9.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -11,7 +11,6 @@
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
 // @connect      api.torn.com
-// @require      https://cdn.socket.io/4.8.3/socket.io.min.js
 // @connect      itrade.devs.surf
 // @connect      localhost
 // @connect      127.0.0.1
@@ -907,6 +906,7 @@
     const guard = readJson(NAV_KEY, null);
     if (guard?.target === location.hash.replace(/^#\/?/, '')) GM_setValue(NAV_KEY, '');
     renderStatus();
+    remoteStateReport();
     if (!settings.enabled || busy) return;
     busy = true;
     try {
@@ -1133,66 +1133,39 @@
   `;
   document.head.appendChild(style);
 
-  // ── Remote control via Socket.IO (real-time) with REST fallback ──────────────
-  let tradeSocket = null;
-
-  function executeRemoteCommand(cmd) {
-    if (cmd === 'skip') {
-      const job = getJob();
-      if (job) { deferLockedTrade(job.tradeId); navigateTrade(); }
-    }
-  }
-
-  function initTradeSocket() {
-    if (tradeSocket) return;
-    if (typeof io === 'undefined') return;
-    const url = pricingServer(getSettings());
-    try {
-      tradeSocket = io(url, { transports: ['websocket', 'polling'], reconnectionDelay: 3000 });
-      tradeSocket.on('connect', () => {
-        tradeSocket.emit('trade:join', 'trade-scripts', RECEIPT_TOKEN);
-        remoteStateReport(); // push current state immediately on connect
-      });
-      tradeSocket.on('trade:command', (cmd) => {
-        if (cmd?.action) executeRemoteCommand(cmd.action);
-      });
-      tradeSocket.on('connect_error', () => {}); // silent — REST fallback handles it
-    } catch (_) {}
-  }
+  // ── Remote control (GM_xmlhttpRequest bypasses Torn CSP) ─────────────────────
+  let lastRemoteReport = 0;
 
   function remoteStateReport() {
-    const settings = getSettings();
-    if (!settings.enabled) return;
+    const now = Date.now();
+    if (now - lastRemoteReport < 2000) return; // at most once per 2 s
+    lastRemoteReport = now;
     const job = getJob();
     const state = job
-      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '' }
-      : { tradeId: null, stage: 'idle', error: '' };
-    if (tradeSocket?.connected) {
-      tradeSocket.emit('trade:state', state, RECEIPT_TOKEN);
-      return;
-    }
-    // REST fallback when socket is not connected
+      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: getSettings().enabled }
+      : { tradeId: null, stage: 'idle', error: '', enabled: getSettings().enabled };
     GM_xmlhttpRequest({
       method: 'PUT',
-      url: `${pricingServer(settings)}/api/trade/state`,
+      url: `${pricingServer()}/api/trade/state`,
       headers: { 'Content-Type': 'application/json', 'X-Receipt-Token': RECEIPT_TOKEN },
       data: JSON.stringify(state),
+      timeout: 8000,
     });
   }
 
   function remoteCommandPoll() {
-    if (tradeSocket?.connected) return; // socket handles it; skip REST poll
-    const settings = getSettings();
-    if (!settings.enabled) return;
     GM_xmlhttpRequest({
       method: 'GET',
-      url: `${pricingServer(settings)}/api/trade/command?_=${Date.now()}`,
+      url: `${pricingServer()}/api/trade/command?_=${Date.now()}`,
       headers: { 'X-Receipt-Token': RECEIPT_TOKEN },
-      timeout: 10000,
+      timeout: 8000,
       onload: (response) => {
         try {
           const { command } = JSON.parse(response.responseText);
-          if (command) executeRemoteCommand(command);
+          if (command === 'skip') {
+            const job = getJob();
+            if (job) { deferLockedTrade(job.tradeId); navigateTrade(); }
+          }
         } catch (_) {}
       },
     });
@@ -1200,10 +1173,8 @@
 
   GM_deleteValue('tta_completed_trades_v1');
   injectUi();
-  initTradeSocket();
   setInterval(tick, TICK_MS);
-  setInterval(remoteStateReport, 5000);
-  setInterval(remoteCommandPoll, 3000);
+  setInterval(remoteCommandPoll, 2000);
   window.addEventListener('hashchange', () => setTimeout(tick, 500));
   tick();
 })();
