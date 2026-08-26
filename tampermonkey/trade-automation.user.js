@@ -544,7 +544,9 @@
         navigateTrade();
         return;
       }
-      if (tradeLogHasComment(settings.thankYouMessage)) {
+      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+      const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
+      if (!wasDeclined && tradeLogHasComment(settings.thankYouMessage)) {
         saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
