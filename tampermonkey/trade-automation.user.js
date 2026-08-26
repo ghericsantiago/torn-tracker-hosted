@@ -504,7 +504,7 @@
         delete completed[String(oldest.id)];
         writeJson(DONE_KEY, completed);
       }
-      saveJob({ tradeId: oldest.id, stage: 'opening', startedAt: Date.now() });
+      saveJob({ tradeId: oldest.id, stage: oldest.reopened ? 'reopened' : 'opening', startedAt: Date.now() });
       navigateTrade('view', oldest.id);
       return;
     }
@@ -536,6 +536,31 @@
 
     if (['receipt_posted', 'add_money'].includes(job.stage)
       && restartPricingIfItemsChanged(job)) return;
+
+    if (job.stage === 'reopened') {
+      if (!findCommentControl()) return;
+      if (tradeLogShowsAccepted()) {
+        completeJob(job.tradeId);
+        navigateTrade();
+        return;
+      }
+      if (tradeLogHasComment(settings.thankYouMessage)) {
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        return;
+      }
+      const now = Date.now();
+      const itemSignature = counterpartItemSignature();
+      saveJob({
+        ...job,
+        stage: 'waiting',
+        defaultDeadline: now + ITEM_SETTLE_MS,
+        deadline: now + ITEM_SETTLE_MS,
+        itemSignature,
+        itemDetected: Boolean(itemSignature),
+        error: '',
+      });
+      return;
+    }
 
     if (job.stage === 'opening') {
       if (!findCommentControl()) return;
@@ -852,7 +877,7 @@
             delete completed[String(apiTrade.id)];
             writeJson(DONE_KEY, completed);
           }
-          job = { tradeId: String(apiTrade.id), stage: 'opening', startedAt: Date.now() };
+          job = { tradeId: String(apiTrade.id), stage: apiTrade.reopened ? 'reopened' : 'opening', startedAt: Date.now() };
           saveJob(job);
           if (location.pathname.toLowerCase() !== '/trade.php') {
             location.assign(`${location.origin}/trade.php#step=view&ID=${encodeURIComponent(apiTrade.id)}`);
