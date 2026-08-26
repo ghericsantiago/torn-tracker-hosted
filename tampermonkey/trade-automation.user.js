@@ -845,6 +845,26 @@
         });
         return;
       }
+      // Check for counterpart acceptance after we entered awaiting_accept.
+      // tradeLogShowsAccepted() only checks the newest message; a Torn system
+      // message may appear above it after both accept, so we search all entries.
+      const selfId = currentUserId();
+      const newestMsg = allMessages[0];
+      ttaLog(`#${job.tradeId} [awaiting_accept] newest log msg: "${newestMsg ? newestMsg.textContent.trim().slice(0, 80) : '(none)'}"`);
+      const counterpartAccepted = allMessages.some(el => {
+        if (!/\bthe trade was accepted by\b/i.test(el.textContent)) return false;
+        const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+          .match(/[?&]XID=(\d+)/i)?.[1] || '';
+        if (selfId && authorId && authorId === selfId) return false;
+        const ts = parseMsgTimestamp(el);
+        return ts === null || ts >= awaitingAcceptAt;
+      });
+      if (counterpartAccepted) {
+        ttaLog(`#${job.tradeId} [awaiting_accept] counterpart accepted → complete`);
+        completeJob(job.tradeId);
+        navigateTrade();
+        return;
+      }
       if (pageShowsWeAccepted()) {
         ttaLog(`#${job.tradeId} [awaiting_accept] we already accepted, waiting for counterpart → trades list`);
         navigateTrade();
