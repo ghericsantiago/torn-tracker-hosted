@@ -551,7 +551,7 @@
       return;
     }
 
-    if (['receipt_posted', 'add_money'].includes(job.stage)
+    if (['receipt_posted', 'add_money', 'awaiting_accept'].includes(job.stage)
       && restartPricingIfItemsChanged(job)) return;
 
     if (job.stage === 'reopened') {
@@ -762,6 +762,22 @@
     }
 
     if (job.stage === 'awaiting_accept') {
+      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+      const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
+      if (wasDeclined) {
+        const now = Date.now();
+        const sig = counterpartItemSignature();
+        saveJob({
+          ...job,
+          stage: 'waiting',
+          defaultDeadline: now + ITEM_SETTLE_MS,
+          deadline: now + ITEM_SETTLE_MS,
+          itemSignature: sig,
+          itemDetected: Boolean(sig),
+          error: '',
+        });
+        return;
+      }
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
