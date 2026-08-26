@@ -176,14 +176,29 @@
   }
 
   function tradeLogShowsAccepted() {
-    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
-    if (!messages.length) return false;
-    const latest = messages[0];
-    if (!/\bthe trade was accepted by\b/i.test(latest.textContent)) return false;
     const selfId = currentUserId();
-    const authorId = latest.querySelector('a[href*="profiles.php?XID="]')?.href
-      .match(/[?&]XID=(\d+)/i)?.[1] || '';
-    return !(selfId && authorId && authorId === selfId);
+    return [...document.querySelectorAll('.log li .msg, .trade-log li .msg')].some(el => {
+      if (!/\bthe trade was accepted by\b/i.test(el.textContent)) return false;
+      const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+        .match(/[?&]XID=(\d+)/i)?.[1] || '';
+      return !(selfId && authorId && authorId === selfId);
+    });
+  }
+
+  function tradeWasDeclinedAfterSelfAccepted() {
+    const selfId = currentUserId();
+    const msgs = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
+    const selfAcceptIdx = msgs.findIndex(el => {
+      if (!/\bthe trade was accepted by\b/i.test(el.textContent)) return false;
+      const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+        .match(/[?&]XID=(\d+)/i)?.[1] || '';
+      return selfId && authorId && authorId === selfId;
+    });
+    if (selfAcceptIdx === -1) return false;
+    // DOM is newest-first; a lower index means a newer entry
+    return msgs.slice(0, selfAcceptIdx).some(el =>
+      /\bthe trade was declined by\b/i.test(el.textContent)
+    );
   }
 
   function pageShowsWeAccepted() {
@@ -333,7 +348,7 @@
   function tradeLogHasComment(message) {
     const expected = normalize(message);
     const selfId = currentUserId();
-    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')].some(element => {
+    return [...document.querySelectorAll('.log li .msg, .trade-log li .msg')].some(element => {
       if (!/\bsays:\s*/i.test(element.textContent)) return false;
       const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
         .match(/[?&]XID=(\d+)/i)?.[1] || '';
@@ -346,7 +361,7 @@
   function latestCounterpartMessageIs(text) {
     const expected = normalize(text);
     const selfId = currentUserId();
-    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
+    const messages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')]
       .filter(el => /\bsays:\s*/i.test(el.textContent));
     // DOM is newest-first; find the first entry that belongs to the counterpart
     const latest = messages.find(el => {
@@ -364,7 +379,7 @@
     const sideItems = [...document.querySelectorAll('.trade-cont .user.right > ul.cont > li.color2 .name:not(.inactive)')]
       .map(element => normalize(element.textContent))
       .filter(text => text && !/^no items? in trade$/.test(text));
-    const additions = [...document.querySelectorAll('.log .msg, .trade-log .msg')]
+    const additions = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')]
       .filter(element => /\badded\s+\d+x\s+.+\s+to the trade\b/i.test(element.textContent))
       .filter(element => {
         const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
@@ -580,7 +595,7 @@
         saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
-      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+      const allMessages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
       const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
       const currentSignature = counterpartItemSignature();
       const itemsUnchanged = job.lastAcceptedItemSignature
@@ -777,6 +792,11 @@
     }
 
     if (job.stage === 'awaiting_accept') {
+      // Counterpart declined after we already accepted — restart pricing
+      if (tradeWasDeclinedAfterSelfAccepted()) {
+        saveJob({ ...job, stage: 'waiting', acceptanceInvalidated: true, error: '' });
+        return;
+      }
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
