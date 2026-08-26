@@ -32,6 +32,9 @@
   const TICK_MS = 1000;
   const NAV_GUARD_MS = 60000;
   const ITEM_SETTLE_MS = 10000;
+  const AUTO_SKIP_MS = 2 * 60 * 1000; // 2 minutes
+  // Stages the script should complete quickly; auto-skip if stuck longer than AUTO_SKIP_MS
+  const AUTO_SKIP_STAGES = new Set(['opening', 'pricing', 'receipt_posted', 'add_money', 'returning', 'thank_posted', 'reopened']);
   const BLOODBAG_KEY = 'tta_bloodbag_v1';
   const BLOODBAG_ITEM_ID = '734'; // fallback; overridden by settings.bloodBagItemId
   const BLOODBAG_OPTIONS = [
@@ -914,6 +917,13 @@
     renderStatus();
     remoteStateReport();
     if (!settings.enabled || busy) return;
+    // Auto-skip if stuck in an action stage for more than 2 minutes
+    const stuckJob = getJob();
+    if (stuckJob && AUTO_SKIP_STAGES.has(stuckJob.stage) && stuckJob.stageChangedAt && Date.now() - stuckJob.stageChangedAt > AUTO_SKIP_MS) {
+      deferLockedTrade(stuckJob.tradeId);
+      navigateTrade();
+      return;
+    }
     busy = true;
     try {
       let job = getJob();
