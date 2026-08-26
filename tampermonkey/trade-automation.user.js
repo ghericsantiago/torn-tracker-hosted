@@ -376,6 +376,17 @@
     return [...sideItems, ...additions].sort().join('|');
   }
 
+  function parseMsgTimestamp(msgEl) {
+    const dateEl = msgEl.parentElement?.querySelector('.date');
+    if (!dateEl) return null;
+    const m = dateEl.textContent.match(/(\d{2}):(\d{2}):(\d{2})\s*-\s*(\d{2})\/(\d{2})\/(\d{2})/);
+    if (!m) return null;
+    const d = new Date();
+    d.setFullYear(2000 + parseInt(m[6]), parseInt(m[5]) - 1, parseInt(m[4]));
+    d.setHours(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]), 0);
+    return d.getTime();
+  }
+
   function restartPricingIfItemsChanged(job) {
     if (!job?.pricedItemSignature) return false;
     const itemSignature = counterpartItemSignature();
@@ -579,7 +590,7 @@
       }
       if (pageShowsWeAccepted()) {
         ttaLog(`#${job.tradeId} [reopened] page shows we already accepted → awaiting_accept`);
-        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
         return;
       }
       const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
@@ -590,7 +601,7 @@
         : false;
       if (!wasDeclined && itemsUnchanged && tradeLogHasComment(settings.thankYouMessage)) {
         ttaLog(`#${job.tradeId} [reopened] no decline, items unchanged, thank-you present → awaiting_accept (skip re-price)`);
-        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
         return;
       }
       ttaLog(`#${job.tradeId} [reopened] wasDeclined=${wasDeclined} itemsUnchanged=${itemsUnchanged} → restart waiting (re-price)`);
@@ -761,7 +772,7 @@
     if (job.stage === 'receipt_posted' || job.stage === 'add_money') {
       if (pageShowsWeAccepted()) {
         ttaLog(`#${job.tradeId} [${job.stage}] page shows we already accepted → awaiting_accept`);
-        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
         return;
       }
       if (job.stage === 'receipt_posted' && Date.now() - job.receiptPostedAt < 2000) return;
@@ -791,28 +802,26 @@
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 1000);
-      saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+      saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
       return;
     }
 
     if (job.stage === 'awaiting_accept') {
-      // Only count a decline as actionable if it appears NEWER than our most recent
-      // thank-you post. The log is newest-first so lower index = newer message.
-      // An old decline (higher index than thank-you) means we already re-priced for it.
+      // Only restart if a decline appears AFTER we entered awaiting_accept.
+      // Each message has a .date sibling with "HH:MM:SS - DD/MM/YY"; we parse
+      // that and compare to awaitingAcceptAt (ms epoch stored in the job).
+      // This is immune to Torn spam-filtering duplicate thank-you submissions
+      // which causes the DOM to show only the original (older) thank-you.
+      const awaitingAcceptAt = job.awaitingAcceptAt || 0;
       const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
-      const selfId = currentUserId();
-      const thankYouNorm = normalize(settings.thankYouMessage);
-      const thankIdx = allMessages.findIndex(el => {
-        const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
-          .match(/[?&]XID=(\d+)/i)?.[1] || '';
-        const isSelf = selfId && authorId && authorId === selfId;
-        const body = normalize(el.textContent.replace(/^.*?\bsays:\s*/i, ''));
-        return isSelf && body === thankYouNorm;
+      const declineAfterEntry = allMessages.some(el => {
+        if (!/\bthe trade was declined by\b/i.test(el.textContent)) return false;
+        const ts = parseMsgTimestamp(el);
+        ttaLog(`#${job.tradeId} [awaiting_accept] decline msg ts=${ts ? new Date(ts).toTimeString().slice(0,8) : 'n/a'} enteredAt=${new Date(awaitingAcceptAt).toTimeString().slice(0,8)}`);
+        return ts !== null && ts >= awaitingAcceptAt;
       });
-      const messagesToCheckForDecline = thankIdx === -1 ? allMessages : allMessages.slice(0, thankIdx);
-      const wasDeclined = messagesToCheckForDecline.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
-      if (wasDeclined) {
-        ttaLog(`#${job.tradeId} [awaiting_accept] decline found after our thank-you (thankIdx=${thankIdx}) → restart waiting`);
+      if (declineAfterEntry) {
+        ttaLog(`#${job.tradeId} [awaiting_accept] new decline (after entry) → restart waiting`);
         const now = Date.now();
         const sig = counterpartItemSignature();
         saveJob({
@@ -826,7 +835,7 @@
         });
         return;
       }
-      ttaLog(`#${job.tradeId} [awaiting_accept] no post-thank-you decline (thankIdx=${thankIdx}), highlighting accept button`);
+      ttaLog(`#${job.tradeId} [awaiting_accept] no new decline detected, highlighting accept button`);
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
@@ -892,7 +901,7 @@
       return;
     }
     if (normalize(document.body.textContent).includes('one party has already accepted it')) {
-      saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+      saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
       navigateTrade('view', job.tradeId);
       return;
     }
