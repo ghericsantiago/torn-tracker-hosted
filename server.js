@@ -53,6 +53,32 @@ app.put('/api/sync', (req, res) => {
   res.json(syncStore);
 });
 
+// ── Trade remote-control endpoints ───────────────────────────────────────────
+// Shared between the Tampermonkey script (GM_xmlhttpRequest) and the mobile
+// control page (via Socket.IO).  Authenticated with the same receipt token.
+const TRADE_CTRL_TOKEN = process.env.RECEIPT_TOKEN || '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
+const tradeCtrl = { command: null, state: { stage: 'idle', tradeId: null, error: '' } };
+
+function requireTradeToken(req, res, next) {
+  const token = req.headers['x-receipt-token'] || req.query.token;
+  if (token === TRADE_CTRL_TOKEN) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
+// Script polls this every few seconds; the command is consumed (cleared) on read
+app.get('/api/trade/command', requireTradeToken, (req, res) => {
+  const command = tradeCtrl.command;
+  tradeCtrl.command = null;
+  res.json({ command });
+});
+
+// Script pushes its current job state here; server fans it out via Socket.IO
+app.put('/api/trade/state', requireTradeToken, (req, res) => {
+  tradeCtrl.state = { ...req.body, updatedAt: Date.now() };
+  io.to('trade-admins').emit('trade:state', tradeCtrl.state);
+  res.json({ ok: true });
+});
+
 // Start server
 const server = http.createServer(app);
 
@@ -84,6 +110,27 @@ io.on('connection', (socket) => {
     // Broadcast to all OTHER clients so they receive real-time updates
     socket.broadcast.emit('sync:update', sections);
     console.log(`[sync] saved sections: ${Object.keys(sections).join(', ')}`);
+  });
+
+  // ── Trade remote-control events ─────────────────────────────────────────
+  // Mobile control page joins 'trade-admins' to receive live state updates
+  // and issue commands.
+  socket.on('trade:join', (role, auth) => {
+    if (auth !== TRADE_CTRL_TOKEN) return;
+    if (role === 'trade-admins') {
+      socket.join('trade-admins');
+      socket.emit('trade:state', tradeCtrl.state);
+    }
+  });
+
+  // Mobile control page sends a command (e.g. { action: 'skip' })
+  socket.on('trade:command', (cmd, auth) => {
+    if (auth !== TRADE_CTRL_TOKEN) return;
+    if (!cmd || !['skip'].includes(cmd.action)) return;
+    tradeCtrl.command = cmd.action;
+    console.log(`[trade] command issued via socket: ${cmd.action}`);
+    // Acknowledge back to the sender so the UI can confirm
+    socket.emit('trade:command-ack', { action: cmd.action, issuedAt: Date.now() });
   });
 
   socket.on('disconnect', () => {

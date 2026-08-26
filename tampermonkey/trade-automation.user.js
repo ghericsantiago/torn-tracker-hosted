@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.6.1
+// @version      2.7.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -1132,9 +1132,49 @@
   `;
   document.head.appendChild(style);
 
+  function remoteStateReport() {
+    const settings = getSettings();
+    if (!settings.enabled) return;
+    const job = getJob();
+    const state = job
+      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '' }
+      : { tradeId: null, stage: 'idle', error: '' };
+    GM_xmlhttpRequest({
+      method: 'PUT',
+      url: `${pricingServer(settings)}/api/trade/state`,
+      headers: { 'Content-Type': 'application/json', 'X-Receipt-Token': RECEIPT_TOKEN },
+      data: JSON.stringify(state),
+    });
+  }
+
+  function remoteCommandPoll() {
+    const settings = getSettings();
+    if (!settings.enabled) return;
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: `${pricingServer(settings)}/api/trade/command?_=${Date.now()}`,
+      headers: { 'X-Receipt-Token': RECEIPT_TOKEN },
+      timeout: 10000,
+      onload: (response) => {
+        try {
+          const { command } = JSON.parse(response.responseText);
+          if (command === 'skip') {
+            const job = getJob();
+            if (job) {
+              deferLockedTrade(job.tradeId);
+              navigateTrade();
+            }
+          }
+        } catch (_) {}
+      },
+    });
+  }
+
   GM_deleteValue('tta_completed_trades_v1');
   injectUi();
   setInterval(tick, TICK_MS);
+  setInterval(remoteStateReport, 5000);
+  setInterval(remoteCommandPoll, 3000);
   window.addEventListener('hashchange', () => setTimeout(tick, 500));
   tick();
 })();

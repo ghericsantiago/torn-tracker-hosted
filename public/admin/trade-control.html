@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Trade Remote Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0e1215;
+      color: #dde2e8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+    h1 { font-size: 1.2rem; color: #aab4bf; letter-spacing: 0.04em; text-transform: uppercase; }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #1a2028;
+      border: 1px solid #2e3740;
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .row { display: flex; justify-content: space-between; align-items: center; }
+    .label { font-size: 0.78rem; color: #7a8896; text-transform: uppercase; letter-spacing: 0.05em; }
+    .value { font-size: 1rem; font-weight: 600; color: #e8edf2; }
+    .value.idle { color: #556070; }
+    .value.error { color: #e07070; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge.idle      { background: #252d36; color: #556070; }
+    .badge.waiting   { background: #1e3448; color: #5aabef; }
+    .badge.pricing   { background: #1e3332; color: #4dd4ac; }
+    .badge.posted    { background: #2a2a1e; color: #d4be4d; }
+    .badge.money     { background: #1e2e1e; color: #6dcc6d; }
+    .badge.accept    { background: #2e261e; color: #e8a84d; }
+    .badge.complete  { background: #1e2e1e; color: #4dcc7e; }
+    .badge.error     { background: #2e1e1e; color: #e07070; }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #3a4550;
+      flex-shrink: 0;
+    }
+    .status-dot.connected { background: #3acc7e; box-shadow: 0 0 6px #3acc7e88; }
+    .status-dot.disconnected { background: #cc4444; }
+    .conn-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #667788; }
+    .btn-skip {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: #c0392b;
+      color: #fff;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-skip:active { transform: scale(0.97); background: #a93226; }
+    .btn-skip:disabled { background: #2e3740; color: #556070; cursor: not-allowed; transform: none; }
+    .feedback {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #5aabef;
+      min-height: 1.2em;
+      transition: opacity 0.3s;
+    }
+    .feedback.fade { opacity: 0; }
+    #token-form {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #token-form input {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #2e3740;
+      background: #1a2028;
+      color: #dde2e8;
+      font-size: 1rem;
+      width: 100%;
+    }
+    #token-form button {
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #1e4070;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .updated-at { font-size: 0.72rem; color: #445060; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Trade Remote Control</h1>
+
+  <div id="token-form" style="display:none">
+    <p style="font-size:0.85rem;color:#7a8896">Enter your receipt token to connect</p>
+    <input id="token-input" type="password" placeholder="Receipt token" autocomplete="off">
+    <button id="token-submit">Connect</button>
+  </div>
+
+  <div class="card" id="state-card" style="display:none">
+    <div class="conn-row">
+      <div class="status-dot" id="conn-dot"></div>
+      <span id="conn-label">Connecting…</span>
+    </div>
+    <div class="row">
+      <span class="label">Trade</span>
+      <span class="value" id="trade-id">—</span>
+    </div>
+    <div class="row">
+      <span class="label">Stage</span>
+      <span class="badge idle" id="stage-badge">idle</span>
+    </div>
+    <div class="row" id="error-row" style="display:none">
+      <span class="label">Error</span>
+      <span class="value error" id="trade-error"></span>
+    </div>
+    <div class="updated-at" id="updated-at"></div>
+  </div>
+
+  <div style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px" id="controls" style="display:none">
+    <button class="btn-skip" id="btn-skip" disabled>Skip Trade</button>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const TOKEN_KEY = 'trade_ctrl_token';
+    let socket = null;
+    let currentStage = 'idle';
+    let feedbackTimer = null;
+
+    function savedToken() {
+      return localStorage.getItem(TOKEN_KEY) || '';
+    }
+
+    function showFeedback(text, color = '#5aabef') {
+      const el = document.getElementById('feedback');
+      el.style.color = color;
+      el.style.opacity = '1';
+      el.textContent = text;
+      clearTimeout(feedbackTimer);
+      feedbackTimer = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+    }
+
+    const STAGE_CLASS = {
+      idle: 'idle',
+      opening: 'waiting', waiting: 'waiting', waiting_for_items: 'waiting',
+      waiting_for_adjustment: 'waiting', pricing: 'pricing',
+      receipt_posted: 'posted', add_money: 'money', returning: 'money',
+      thank_posted: 'accept', awaiting_accept: 'accept',
+      complete: 'complete', reopened: 'waiting',
+    };
+
+    function applyState(state) {
+      currentStage = state.stage || 'idle';
+      const tradeId = document.getElementById('trade-id');
+      const badge = document.getElementById('stage-badge');
+      const errorRow = document.getElementById('error-row');
+      const errorEl = document.getElementById('trade-error');
+      const updatedAt = document.getElementById('updated-at');
+      const skipBtn = document.getElementById('btn-skip');
+
+      tradeId.textContent = state.tradeId ? `#${state.tradeId}` : '—';
+      tradeId.className = 'value' + (state.tradeId ? '' : ' idle');
+
+      const cls = STAGE_CLASS[currentStage] || 'idle';
+      badge.className = `badge ${cls}`;
+      badge.textContent = currentStage.replace(/_/g, ' ');
+
+      if (state.error) {
+        errorRow.style.display = '';
+        errorEl.textContent = state.error;
+      } else {
+        errorRow.style.display = 'none';
+      }
+
+      if (state.updatedAt) {
+        const d = new Date(state.updatedAt);
+        updatedAt.textContent = `Updated ${d.toLocaleTimeString()}`;
+      }
+
+      skipBtn.disabled = !state.tradeId || currentStage === 'idle';
+    }
+
+    function connect(token) {
+      if (socket) socket.disconnect();
+
+      socket = io({ transports: ['websocket', 'polling'] });
+
+      const dot = document.getElementById('conn-dot');
+      const label = document.getElementById('conn-label');
+      const skipBtn = document.getElementById('btn-skip');
+
+      socket.on('connect', () => {
+        dot.className = 'status-dot connected';
+        label.textContent = 'Connected';
+        socket.emit('trade:join', 'trade-admins', token);
+      });
+
+      socket.on('disconnect', () => {
+        dot.className = 'status-dot disconnected';
+        label.textContent = 'Disconnected — reconnecting…';
+        skipBtn.disabled = true;
+      });
+
+      socket.on('trade:state', (state) => {
+        applyState(state);
+      });
+
+      socket.on('trade:command-ack', (data) => {
+        showFeedback(`Skip command sent (${new Date(data.issuedAt).toLocaleTimeString()})`, '#6dcc6d');
+      });
+    }
+
+    document.getElementById('btn-skip').addEventListener('click', () => {
+      if (!socket?.connected) return;
+      const token = savedToken();
+      socket.emit('trade:command', { action: 'skip' }, token);
+      showFeedback('Sending skip command…', '#d4be4d');
+    });
+
+    document.getElementById('token-submit').addEventListener('click', () => {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) return;
+      localStorage.setItem(TOKEN_KEY, token);
+      document.getElementById('token-form').style.display = 'none';
+      document.getElementById('state-card').style.display = '';
+      document.getElementById('controls').style.display = '';
+      connect(token);
+    });
+
+    // Auto-connect if token already saved
+    const existing = savedToken();
+    if (existing) {
+      document.getElementById('state-card').style.display = '';
+      document.getElementById('controls').style.display = '';
+      connect(existing);
+    } else {
+      document.getElementById('token-form').style.display = '';
+    }
+  </script>
+</body>
+</html>
