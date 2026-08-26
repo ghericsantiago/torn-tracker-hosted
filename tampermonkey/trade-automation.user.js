@@ -530,6 +530,16 @@
 
   async function handleList(settings, job) {
     if (job) {
+      if (job.stage === 'awaiting_accept') {
+        // We already accepted; waiting for counterpart. Stay on the list and
+        // only visit the trade every 30 s to check for acceptance or decline.
+        const checkInterval = 30000;
+        if (Date.now() - (job.lastAcceptCheckAt || 0) < checkInterval) return;
+        ttaLog(`#${job.tradeId} [awaiting_accept] checking trade for counterpart response`);
+        saveJob({ ...job, lastAcceptCheckAt: Date.now() });
+        navigateTrade('view', job.tradeId);
+        return;
+      }
       navigateTrade(job.stage === 'add_money' ? 'addmoney' : 'view', job.tradeId);
       return;
     }
@@ -1188,7 +1198,14 @@
     if (job?.stage === 'waiting') label += ` (${Math.max(0, Math.ceil((job.deadline - Date.now()) / 1000))}s)`;
     if (job?.stage === 'waiting_for_items') label += ' - waiting for items';
     if (job?.stage === 'waiting_for_adjustment') label += ` - only ${money(job.availableCash)} available; waiting for adjusted items`;
-    if (job?.stage === 'awaiting_accept') label += ' - click both Torn ACCEPT buttons';
+    if (job?.stage === 'awaiting_accept') {
+      const secsUntilCheck = job.lastAcceptCheckAt
+        ? Math.max(0, Math.ceil((job.lastAcceptCheckAt + 30000 - Date.now()) / 1000))
+        : 0;
+      label += secsUntilCheck > 0
+        ? ` - waiting for counterpart (check in ${secsUntilCheck}s)`
+        : ' - click both Torn ACCEPT buttons';
+    }
     if (job?.error) label += ` - ${job.error}`;
     state.textContent = label;
     state.title = label;
