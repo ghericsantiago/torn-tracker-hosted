@@ -125,9 +125,12 @@
     const completed = readJson(DONE_KEY, {});
     const now = Date.now();
     const cutoff = now - (30 * 24 * 60 * 60 * 1000);
-    completed[String(tradeId)] = now;
+    const job = getJob();
+    completed[String(tradeId)] = { at: now, itemSignature: job?.pricedItemSignature || '' };
     Object.keys(completed).forEach(id => {
-      if (Number(completed[id]) < cutoff) delete completed[id];
+      const entry = completed[id];
+      const entryTime = typeof entry === 'number' ? entry : (entry?.at || 0);
+      if (entryTime < cutoff) delete completed[id];
     });
     writeJson(DONE_KEY, completed);
     clearJob(tradeId);
@@ -499,12 +502,15 @@
     }
     const oldest = findOldestTrade();
     if (oldest) {
+      let lastAcceptedItemSignature = '';
       if (oldest.reopened) {
         const completed = readJson(DONE_KEY, {});
+        const entry = completed[String(oldest.id)];
+        lastAcceptedItemSignature = typeof entry === 'object' ? (entry?.itemSignature || '') : '';
         delete completed[String(oldest.id)];
         writeJson(DONE_KEY, completed);
       }
-      saveJob({ tradeId: oldest.id, stage: oldest.reopened ? 'reopened' : 'opening', startedAt: Date.now() });
+      saveJob({ tradeId: oldest.id, stage: oldest.reopened ? 'reopened' : 'opening', startedAt: Date.now(), lastAcceptedItemSignature });
       navigateTrade('view', oldest.id);
       return;
     }
@@ -546,19 +552,22 @@
       }
       const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
       const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
-      if (!wasDeclined && tradeLogHasComment(settings.thankYouMessage)) {
+      const currentSignature = counterpartItemSignature();
+      const itemsUnchanged = job.lastAcceptedItemSignature
+        ? currentSignature === job.lastAcceptedItemSignature
+        : false;
+      if (!wasDeclined && itemsUnchanged && tradeLogHasComment(settings.thankYouMessage)) {
         saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
       const now = Date.now();
-      const itemSignature = counterpartItemSignature();
       saveJob({
         ...job,
         stage: 'waiting',
         defaultDeadline: now + ITEM_SETTLE_MS,
         deadline: now + ITEM_SETTLE_MS,
-        itemSignature,
-        itemDetected: Boolean(itemSignature),
+        itemSignature: currentSignature,
+        itemDetected: Boolean(currentSignature),
         error: '',
       });
       return;
@@ -874,12 +883,15 @@
       if (!job) {
         const apiTrade = await pollOldestOpenTrade(settings);
         if (apiTrade) {
+          let lastAcceptedItemSignature = '';
           if (apiTrade.reopened) {
             const completed = readJson(DONE_KEY, {});
+            const entry = completed[String(apiTrade.id)];
+            lastAcceptedItemSignature = typeof entry === 'object' ? (entry?.itemSignature || '') : '';
             delete completed[String(apiTrade.id)];
             writeJson(DONE_KEY, completed);
           }
-          job = { tradeId: String(apiTrade.id), stage: apiTrade.reopened ? 'reopened' : 'opening', startedAt: Date.now() };
+          job = { tradeId: String(apiTrade.id), stage: apiTrade.reopened ? 'reopened' : 'opening', startedAt: Date.now(), lastAcceptedItemSignature };
           saveJob(job);
           if (location.pathname.toLowerCase() !== '/trade.php') {
             location.assign(`${location.origin}/trade.php#step=view&ID=${encodeURIComponent(apiTrade.id)}`);
