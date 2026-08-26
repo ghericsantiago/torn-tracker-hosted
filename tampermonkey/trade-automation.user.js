@@ -47,15 +47,6 @@
   ];
   const HOSPITAL_TRIGGER_SECS = 300;
   const BLOODBAG_TIMEOUT_MS = 30000;
-  const MAX_LOG_ENTRIES = 200;
-
-  const ttaLogs = [];
-  function ttaLog(msg) {
-    const now = new Date();
-    const ts = now.toTimeString().slice(0, 8);
-    ttaLogs.push(`[${ts}] ${msg}`);
-    if (ttaLogs.length > MAX_LOG_ENTRIES) ttaLogs.shift();
-  }
 
   const DEFAULTS = {
     enabled: false,
@@ -131,7 +122,6 @@
   }
 
   function completeJob(tradeId) {
-    ttaLog(`#${tradeId} marking complete`);
     const completed = readJson(DONE_KEY, {});
     const now = Date.now();
     const cutoff = now - (30 * 24 * 60 * 60 * 1000);
@@ -177,7 +167,7 @@
   }
 
   function tradeLogShowsAccepted() {
-    const messages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
+    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
     if (!messages.length) return false;
     const latest = messages[0];
     if (!/\bthe trade was accepted by\b/i.test(latest.textContent)) return false;
@@ -334,7 +324,7 @@
   function tradeLogHasComment(message) {
     const expected = normalize(message);
     const selfId = currentUserId();
-    return [...document.querySelectorAll('.log li .msg, .trade-log li .msg')].some(element => {
+    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')].some(element => {
       if (!/\bsays:\s*/i.test(element.textContent)) return false;
       const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
         .match(/[?&]XID=(\d+)/i)?.[1] || '';
@@ -347,7 +337,7 @@
   function latestCounterpartMessageIs(text) {
     const expected = normalize(text);
     const selfId = currentUserId();
-    const messages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')]
+    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
       .filter(el => /\bsays:\s*/i.test(el.textContent));
     // DOM is newest-first; find the first entry that belongs to the counterpart
     const latest = messages.find(el => {
@@ -376,22 +366,10 @@
     return [...sideItems, ...additions].sort().join('|');
   }
 
-  function parseMsgTimestamp(msgEl) {
-    const dateEl = msgEl.parentElement?.querySelector('.date');
-    if (!dateEl) return null;
-    const m = dateEl.textContent.match(/(\d{2}):(\d{2}):(\d{2})\s*-\s*(\d{2})\/(\d{2})\/(\d{2})/);
-    if (!m) return null;
-    const d = new Date();
-    d.setFullYear(2000 + parseInt(m[6]), parseInt(m[5]) - 1, parseInt(m[4]));
-    d.setHours(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]), 0);
-    return d.getTime();
-  }
-
   function restartPricingIfItemsChanged(job) {
     if (!job?.pricedItemSignature) return false;
     const itemSignature = counterpartItemSignature();
     if (!itemSignature || itemSignature === job.pricedItemSignature) return false;
-    ttaLog(`#${job.tradeId} [${job.stage}] items changed since pricing → restart waiting`);
     const now = Date.now();
     saveJob({
       ...job,
@@ -530,16 +508,6 @@
 
   async function handleList(settings, job) {
     if (job) {
-      if (job.stage === 'awaiting_accept') {
-        // We already accepted; waiting for counterpart. Stay on the list and
-        // only visit the trade every 30 s to check for acceptance or decline.
-        const checkInterval = 30000;
-        if (Date.now() - (job.lastAcceptCheckAt || 0) < checkInterval) return;
-        ttaLog(`#${job.tradeId} [awaiting_accept] checking trade for counterpart response`);
-        saveJob({ ...job, lastAcceptCheckAt: Date.now() });
-        navigateTrade('view', job.tradeId);
-        return;
-      }
       navigateTrade(job.stage === 'add_money' ? 'addmoney' : 'view', job.tradeId);
       return;
     }
@@ -552,9 +520,6 @@
         lastAcceptedItemSignature = typeof entry === 'object' ? (entry?.itemSignature || '') : '';
         delete completed[String(oldest.id)];
         writeJson(DONE_KEY, completed);
-        ttaLog(`#${oldest.id} picked up as reopened trade (lastItemSig=${lastAcceptedItemSignature ? 'set' : 'none'})`);
-      } else {
-        ttaLog(`#${oldest.id} picked up as new trade → opening`);
       }
       saveJob({ tradeId: oldest.id, stage: oldest.reopened ? 'reopened' : 'opening', startedAt: Date.now(), lastAcceptedItemSignature });
       navigateTrade('view', oldest.id);
@@ -581,40 +546,35 @@
     }
 
     if (tradeLogShowsAccepted() || latestCounterpartMessageIs(settings.thankYouMessage)) {
-      ttaLog(`#${job.tradeId} [${job.stage}] trade log shows accepted or counterpart sent thank-you → complete`);
       completeJob(job.tradeId);
       navigateTrade();
       return;
     }
 
-    if (['receipt_posted', 'add_money', 'awaiting_accept'].includes(job.stage)
+    if (['receipt_posted', 'add_money'].includes(job.stage)
       && restartPricingIfItemsChanged(job)) return;
 
     if (job.stage === 'reopened') {
       if (!findCommentControl()) return;
       if (tradeLogShowsAccepted()) {
-        ttaLog(`#${job.tradeId} [reopened] trade log shows accepted → complete`);
         completeJob(job.tradeId);
         navigateTrade();
         return;
       }
       if (pageShowsWeAccepted()) {
-        ttaLog(`#${job.tradeId} [reopened] page shows we already accepted → awaiting_accept`);
-        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
-      const allMessages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
+      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
       const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
       const currentSignature = counterpartItemSignature();
       const itemsUnchanged = job.lastAcceptedItemSignature
         ? currentSignature === job.lastAcceptedItemSignature
         : false;
       if (!wasDeclined && itemsUnchanged && tradeLogHasComment(settings.thankYouMessage)) {
-        ttaLog(`#${job.tradeId} [reopened] no decline, items unchanged, thank-you present → awaiting_accept (skip re-price)`);
-        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
-      ttaLog(`#${job.tradeId} [reopened] wasDeclined=${wasDeclined} itemsUnchanged=${itemsUnchanged} → restart waiting (re-price)`);
       const now = Date.now();
       saveJob({
         ...job,
@@ -633,7 +593,6 @@
       const now = Date.now();
       const itemSignature = counterpartItemSignature();
       const defaultDeadline = now + (settings.waitSeconds * 1000);
-      ttaLog(`#${job.tradeId} [opening] posting request message, itemSig=${itemSignature ? 'yes' : 'none'}`);
       const next = {
         ...job,
         stage: 'waiting',
@@ -653,7 +612,6 @@
       const defaultDeadline = Number(job.defaultDeadline) || Number(job.deadline) || (now + settings.waitSeconds * 1000);
       const itemSignature = counterpartItemSignature();
       if (itemSignature && itemSignature !== job.itemSignature) {
-        ttaLog(`#${job.tradeId} [waiting] items changed, resetting settle timer`);
         saveJob({
           ...job,
           defaultDeadline,
@@ -665,7 +623,6 @@
         return;
       }
       if (Date.now() < job.deadline) return;
-      ttaLog(`#${job.tradeId} [waiting] deadline passed → pricing`);
       saveJob({ ...job, stage: 'pricing', error: '' });
       job = getJob();
     }
@@ -673,7 +630,6 @@
     if (job.stage === 'waiting_for_items') {
       const itemSignature = counterpartItemSignature();
       if (!itemSignature) return;
-      ttaLog(`#${job.tradeId} [waiting_for_items] items appeared (sig=${itemSignature.slice(0,20)}…) → waiting`);
       const now = Date.now();
       saveJob({
         ...job,
@@ -690,7 +646,6 @@
     if (job.stage === 'waiting_for_adjustment') {
       const itemSignature = counterpartItemSignature();
       if (!itemSignature || itemSignature === job.itemSignature) return;
-      ttaLog(`#${job.tradeId} [waiting_for_adjustment] items changed → waiting`);
       const now = Date.now();
       saveJob({
         ...job,
@@ -708,10 +663,8 @@
       // Wait for Torn's asynchronously rendered comment form before creating
       // anything server-side, otherwise a retry could create two receipts.
       if (!findCommentControl()) return;
-      ttaLog(`#${job.tradeId} [pricing] requesting receipt preview`);
       let preview = await previewReceipt(job, settings);
       if (!preview) {
-        ttaLog(`#${job.tradeId} [pricing] no items found → waiting_for_items`);
         saveJob({
           ...job,
           stage: 'waiting_for_items',
@@ -723,7 +676,6 @@
       const total = Math.round(Number(preview.total) || 0);
       const cash = cashOnHand();
       if (cash != null && total > cash) {
-        ttaLog(`#${job.tradeId} [pricing] insufficient cash (have ${cash}, need ${total}) → waiting_for_adjustment`);
         const message = settings.insufficientCashMessage
           .replaceAll('{cash}', money(cash))
           .replaceAll('{total}', money(total))
@@ -740,7 +692,6 @@
         if (!submitComment(message, next)) throw new Error('Comment form not found');
         return;
       }
-      ttaLog(`#${job.tradeId} [pricing] creating receipt (total=${total})`);
       const receipt = await createReceipt(job, preview, settings);
       const receiptServerUrl = pricingServer(settings);
       const receiptUrl = `${receiptServerUrl}${receipt.url}`;
@@ -760,7 +711,6 @@
         .replaceAll('{unlistedCount}', String(unlistedItems.length))
         .replaceAll('{protectedCount}', String(protectedItems.length))
         .replaceAll('{tradeId}', String(job.tradeId));
-      ttaLog(`#${job.tradeId} [pricing] posting receipt comment → receipt_posted`);
       const next = {
         ...job,
         stage: 'receipt_posted',
@@ -781,19 +731,16 @@
 
     if (job.stage === 'receipt_posted' || job.stage === 'add_money') {
       if (pageShowsWeAccepted()) {
-        ttaLog(`#${job.tradeId} [${job.stage}] page shows we already accepted → awaiting_accept`);
-        saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
         return;
       }
       if (job.stage === 'receipt_posted' && Date.now() - job.receiptPostedAt < 2000) return;
       if (Number(job.total) <= 0) {
-        ttaLog(`#${job.tradeId} [${job.stage}] total=0, no money to add → returning`);
         saveJob({ ...job, stage: 'returning', error: '' });
         return;
       }
       const addMoney = document.querySelector('a[href*="step=addmoney"][href*="ID="]');
       if (!addMoney) return;
-      ttaLog(`#${job.tradeId} [${job.stage}] navigating to addmoney`);
       saveJob({ ...job, stage: 'add_money', error: '' });
       navigateTrade('addmoney', job.tradeId);
       return;
@@ -801,76 +748,20 @@
 
     if (job.stage === 'returning') {
       if (!findCommentControl()) return;
-      ttaLog(`#${job.tradeId} [returning] posting thank-you → thank_posted`);
       const next = { ...job, stage: 'thank_posted', error: '' };
       if (!submitComment(settings.thankYouMessage, next)) throw new Error('Comment form not found');
       return;
     }
 
     if (job.stage === 'thank_posted') {
-      ttaLog(`#${job.tradeId} [thank_posted] → awaiting_accept, scheduling auto-click`);
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 1000);
-      saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
-      return;
+      saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+      job = getJob();
     }
 
     if (job.stage === 'awaiting_accept') {
-      // Only restart if a decline appears AFTER we entered awaiting_accept.
-      // Each message has a .date sibling with "HH:MM:SS - DD/MM/YY"; we parse
-      // that and compare to awaitingAcceptAt (ms epoch stored in the job).
-      // This is immune to Torn spam-filtering duplicate thank-you submissions
-      // which causes the DOM to show only the original (older) thank-you.
-      const awaitingAcceptAt = job.awaitingAcceptAt || 0;
-      const allMessages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
-      const declineAfterEntry = allMessages.some(el => {
-        if (!/\bthe trade was declined by\b/i.test(el.textContent)) return false;
-        const ts = parseMsgTimestamp(el);
-        ttaLog(`#${job.tradeId} [awaiting_accept] decline msg ts=${ts ? new Date(ts).toTimeString().slice(0,8) : 'n/a'} enteredAt=${new Date(awaitingAcceptAt).toTimeString().slice(0,8)}`);
-        return ts !== null && ts >= awaitingAcceptAt;
-      });
-      if (declineAfterEntry) {
-        ttaLog(`#${job.tradeId} [awaiting_accept] new decline (after entry) → restart waiting`);
-        const now = Date.now();
-        const sig = counterpartItemSignature();
-        saveJob({
-          ...job,
-          stage: 'waiting',
-          defaultDeadline: now + ITEM_SETTLE_MS,
-          deadline: now + ITEM_SETTLE_MS,
-          itemSignature: sig,
-          itemDetected: Boolean(sig),
-          error: '',
-        });
-        return;
-      }
-      // Check for counterpart acceptance after we entered awaiting_accept.
-      // tradeLogShowsAccepted() only checks the newest message; a Torn system
-      // message may appear above it after both accept, so we search all entries.
-      const selfId = currentUserId();
-      const newestMsg = allMessages[0];
-      ttaLog(`#${job.tradeId} [awaiting_accept] newest log msg: "${newestMsg ? newestMsg.textContent.trim().slice(0, 80) : '(none)'}"`);
-      const counterpartAccepted = allMessages.some(el => {
-        if (!/\bthe trade was accepted by\b/i.test(el.textContent)) return false;
-        const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
-          .match(/[?&]XID=(\d+)/i)?.[1] || '';
-        if (selfId && authorId && authorId === selfId) return false;
-        const ts = parseMsgTimestamp(el);
-        return ts === null || ts >= awaitingAcceptAt;
-      });
-      if (counterpartAccepted) {
-        ttaLog(`#${job.tradeId} [awaiting_accept] counterpart accepted → complete`);
-        completeJob(job.tradeId);
-        navigateTrade();
-        return;
-      }
-      if (pageShowsWeAccepted()) {
-        ttaLog(`#${job.tradeId} [awaiting_accept] we already accepted, waiting for counterpart → trades list`);
-        navigateTrade();
-        return;
-      }
-      ttaLog(`#${job.tradeId} [awaiting_accept] no new decline detected, highlighting accept button`);
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
@@ -909,7 +800,6 @@
   async function handleAcceptRoute(job, route) {
     if (!job || String(job.tradeId) !== String(route.id) || job.stage !== 'awaiting_accept') return;
     if (route.step === 'accept2') {
-      ttaLog(`#${job.tradeId} [accept2] both parties accepted → complete`);
       if (job.receiptId) {
         try {
           await gmPost(`${job.receiptServerUrl || pricingServer()}/api/receipt/${job.receiptId}/complete`, {});
@@ -920,7 +810,6 @@
       navigateTrade();
       return;
     }
-    ttaLog(`#${job.tradeId} [accept] first accept clicked`);
     highlightAcceptControl();
   }
 
@@ -936,7 +825,7 @@
       return;
     }
     if (normalize(document.body.textContent).includes('one party has already accepted it')) {
-      saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
+      saveJob({ ...job, stage: 'awaiting_accept', error: '' });
       navigateTrade('view', job.tradeId);
       return;
     }
@@ -1056,29 +945,6 @@
     }
   }
 
-  function openLogs() {
-    document.getElementById('tta-modal')?.remove();
-    const modal = document.createElement('div');
-    modal.id = 'tta-modal';
-    const text = ttaLogs.length ? [...ttaLogs].reverse().join('\n') : '(no log entries yet)';
-    modal.innerHTML = `<div class="tta-dialog" style="width:min(700px,calc(100vw - 30px))">
-      <h3>Script Log</h3>
-      <textarea id="tta-log-text" readonly style="min-height:300px;font-family:monospace;font-size:11px;white-space:pre">${text.replace(/</g,'&lt;')}</textarea>
-      <div class="tta-actions"><button id="tta-log-copy">Copy All</button><button id="tta-log-clear">Clear</button><button id="tta-log-close">Close</button></div>
-    </div>`;
-    document.body.appendChild(modal);
-    modal.querySelector('#tta-log-copy').addEventListener('click', () => {
-      const ta = modal.querySelector('#tta-log-text');
-      ta.select();
-      document.execCommand('copy');
-      modal.querySelector('#tta-log-copy').textContent = 'Copied!';
-      setTimeout(() => { modal.querySelector('#tta-log-copy') && (modal.querySelector('#tta-log-copy').textContent = 'Copy All'); }, 1500);
-    });
-    modal.querySelector('#tta-log-clear').addEventListener('click', () => { ttaLogs.length = 0; modal.remove(); });
-    modal.querySelector('#tta-log-close').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-  }
-
   function openSettings() {
     document.getElementById('tta-modal')?.remove();
     const settings = getSettings();
@@ -1175,7 +1041,7 @@
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-logs" type="button">Logs</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
@@ -1185,7 +1051,6 @@
       tick();
     });
     panel.querySelector('#tta-settings').addEventListener('click', openSettings);
-    panel.querySelector('#tta-logs').addEventListener('click', openLogs);
     panel.querySelector('#tta-price-now').addEventListener('click', () => {
       const job = getJob();
       if (!job || !['waiting', 'waiting_for_adjustment'].includes(job.stage)) return;
@@ -1218,14 +1083,7 @@
     if (job?.stage === 'waiting') label += ` (${Math.max(0, Math.ceil((job.deadline - Date.now()) / 1000))}s)`;
     if (job?.stage === 'waiting_for_items') label += ' - waiting for items';
     if (job?.stage === 'waiting_for_adjustment') label += ` - only ${money(job.availableCash)} available; waiting for adjusted items`;
-    if (job?.stage === 'awaiting_accept') {
-      const secsUntilCheck = job.lastAcceptCheckAt
-        ? Math.max(0, Math.ceil((job.lastAcceptCheckAt + 30000 - Date.now()) / 1000))
-        : 0;
-      label += secsUntilCheck > 0
-        ? ` - waiting for counterpart (check in ${secsUntilCheck}s)`
-        : ' - click both Torn ACCEPT buttons';
-    }
+    if (job?.stage === 'awaiting_accept') label += ' - click both Torn ACCEPT buttons';
     if (job?.error) label += ` - ${job.error}`;
     state.textContent = label;
     state.title = label;
