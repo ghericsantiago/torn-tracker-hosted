@@ -150,6 +150,11 @@
       && pageText.includes('the goods will be returned to you within 15 minutes');
   }
 
+  function tradeLogShowsAccepted() {
+    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
+      .some(el => /\bthe trade was accepted by\b/i.test(el.textContent));
+  }
+
   function parseHash() {
     const params = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
     return { step: params.get('step') || '', id: params.get('ID') || '' };
@@ -482,6 +487,12 @@
 
     if (pageShowsLockedTrade() && ['opening', 'waiting', 'waiting_for_items', 'waiting_for_adjustment', 'pricing', 'receipt_posted', 'add_money'].includes(job.stage)) {
       deferLockedTrade(job.tradeId);
+      navigateTrade();
+      return;
+    }
+
+    if (tradeLogShowsAccepted()) {
+      completeJob(job.tradeId);
       navigateTrade();
       return;
     }
