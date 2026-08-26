@@ -760,6 +760,11 @@
       navigateTrade();
       return;
     }
+    if (pageShowsLockedTrade()) {
+      deferLockedTrade(job.tradeId);
+      navigateTrade();
+      return;
+    }
     const form = document.querySelector('.init-trade.add-money form[action*="addmoney2"]');
     const visible = form?.querySelector('input.input-money[type="text"]');
     const hidden = form?.querySelector('input.input-money[type="hidden"][name="amount"]');
