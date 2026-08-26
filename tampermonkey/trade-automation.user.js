@@ -292,9 +292,13 @@
     const data = await gmGet(url);
     const completed = readJson(DONE_KEY, {});
     const locked = activeLockedTrades();
-    return (Array.isArray(data.trades) ? data.trades : [])
-      .filter(trade => trade?.id && !completed[String(trade.id)] && !locked[String(trade.id)])
-      .sort((a, b) => Number(a.expires_at || Infinity) - Number(b.expires_at || Infinity))[0] || null;
+    const eligible = (Array.isArray(data.trades) ? data.trades : [])
+      .filter(trade => trade?.id && !locked[String(trade.id)]);
+    const pending = eligible.filter(t => !completed[String(t.id)]);
+    const sorted = arr => arr.sort((a, b) => Number(a.expires_at || Infinity) - Number(b.expires_at || Infinity));
+    if (pending.length) return sorted(pending)[0];
+    const reopened = eligible.filter(t => completed[String(t.id)]);
+    return reopened.length ? { ...sorted(reopened)[0], reopened: true } : null;
   }
 
   function currentUserId() {
@@ -408,13 +412,12 @@
       .map(row => {
         const link = row.querySelector('a[href*="step=view"][href*="ID="]');
         const id = link?.href.match(/[?&#]ID=(\d+)/i)?.[1];
-        return id && !completed[String(id)] && !locked[String(id)]
-          ? { row, link, id, expires: expirySeconds(row) }
-          : null;
+        if (!id || locked[String(id)]) return null;
+        return { row, link, id, expires: expirySeconds(row), reopened: Boolean(completed[String(id)]) };
       })
       .filter(Boolean);
     candidates.sort((a, b) => a.expires - b.expires);
-    return candidates[0] || null;
+    return candidates.find(c => !c.reopened) || candidates.find(c => c.reopened) || null;
   }
 
   function pendingTradeAlert() {
@@ -496,6 +499,11 @@
     }
     const oldest = findOldestTrade();
     if (oldest) {
+      if (oldest.reopened) {
+        const completed = readJson(DONE_KEY, {});
+        delete completed[String(oldest.id)];
+        writeJson(DONE_KEY, completed);
+      }
       saveJob({ tradeId: oldest.id, stage: 'opening', startedAt: Date.now() });
       navigateTrade('view', oldest.id);
       return;
@@ -839,6 +847,11 @@
       if (!job) {
         const apiTrade = await pollOldestOpenTrade(settings);
         if (apiTrade) {
+          if (apiTrade.reopened) {
+            const completed = readJson(DONE_KEY, {});
+            delete completed[String(apiTrade.id)];
+            writeJson(DONE_KEY, completed);
+          }
           job = { tradeId: String(apiTrade.id), stage: 'opening', startedAt: Date.now() };
           saveJob(job);
           if (location.pathname.toLowerCase() !== '/trade.php') {
