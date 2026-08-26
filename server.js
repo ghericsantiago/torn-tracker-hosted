@@ -133,7 +133,7 @@ io.on('connection', (socket) => {
   // Mobile sends a command → push directly to scripts + store for REST fallback
   socket.on('trade:command', (cmd, auth) => {
     if (auth !== TRADE_CTRL_TOKEN) return;
-    if (!cmd || !['skip'].includes(cmd.action)) return;
+    if (!cmd || !['skip', 'toggle'].includes(cmd.action)) return;
     tradeCtrl.command = cmd.action; // REST polling fallback
     io.to('trade-scripts').emit('trade:command', cmd); // real-time push
     console.log(`[trade] command: ${cmd.action}`);

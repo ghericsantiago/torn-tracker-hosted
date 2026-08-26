@@ -114,6 +114,10 @@
   }
 
   function saveJob(job) {
+    const prev = getJob();
+    if (!job.stageChangedAt || (prev && prev.stage !== job.stage)) {
+      job = { ...job, stageChangedAt: Date.now() };
+    }
     writeJson(JOB_KEY, job);
     renderStatus();
   }
@@ -1212,8 +1216,8 @@
     const job = getJob();
     const settings = getSettings();
     const state = job
-      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: settings.enabled, traderName: counterpartName() }
-      : { tradeId: null, stage: 'idle', error: '', enabled: settings.enabled, traderName: '' };
+      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: settings.enabled, traderName: counterpartName(), startedAt: job.startedAt || null, stageChangedAt: job.stageChangedAt || null }
+      : { tradeId: null, stage: 'idle', error: '', enabled: settings.enabled, traderName: '', startedAt: null, stageChangedAt: null };
     GM_xmlhttpRequest({
       method: 'PUT',
       url: `${pricingServer(settings)}/api/trade/state`,
@@ -1242,6 +1246,12 @@
           if (command === 'skip') {
             const job = getJob();
             if (job) { deferLockedTrade(job.tradeId); navigateTrade(); }
+          } else if (command === 'toggle') {
+            const s = getSettings();
+            s.enabled = !s.enabled;
+            saveSettings(s);
+            renderStatus();
+            tick();
           }
         } catch (_) {}
       },

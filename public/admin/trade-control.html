@@ -73,6 +73,15 @@
     }
     .btn-skip:active   { transform:scale(0.97);background:#a93226 }
     .btn-skip:disabled { background:#2e3740;color:#556070;cursor:not-allowed;transform:none }
+    .btn-toggle {
+      width: 100%; padding: 14px; font-size: 1rem; font-weight: 700;
+      border: none; border-radius: 12px; cursor: pointer; color: #fff;
+      background: #2e3740; transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-toggle.on  { background: #176b39; }
+    .btn-toggle.off { background: #2e3740; }
+    .btn-toggle:active { transform: scale(0.97); }
     .btn-link {
       background: none; border: none; color: #4a6a8a;
       font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0;
@@ -133,11 +142,20 @@
       <span class="label">Stage</span>
       <span class="badge idle" id="stage-badge">idle</span>
     </div>
+    <div class="row">
+      <span class="label">On trade</span>
+      <span class="value dim" id="trade-duration">—</span>
+    </div>
+    <div class="row">
+      <span class="label">In stage</span>
+      <span class="value dim" id="stage-duration">—</span>
+    </div>
     <div class="row hidden" id="error-row">
       <span class="label">Error</span>
       <span class="value err" id="trade-error"></span>
     </div>
     <div class="updated" id="updated-at">Waiting for first update…</div>
+    <button class="btn-toggle" id="btn-toggle">Automation: —</button>
     <button class="btn-skip" id="btn-skip" disabled>Skip Trade</button>
     <div class="feedback" id="feedback"></div>
   </div>
@@ -145,17 +163,41 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const TOKEN_KEY = 'trade_ctrl_token';
-    let socket = null, feedbackTimer = null, lastStateAt = 0;
+    let socket = null, feedbackTimer = null, lastStateAt = 0, lastState = null;
 
-    // Live "X s ago" counter
+    function formatDur(ms) {
+      if (!ms || ms < 0) return '—';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      return `${m}m ${s % 60}s`;
+    }
+
+    // Live counters — update every second
     setInterval(() => {
-      if (!lastStateAt) return;
-      const s = Math.round((Date.now() - lastStateAt) / 1000);
-      const stale = s > 10;
-      const el = document.getElementById('updated-at');
-      if (el) {
-        el.textContent = s < 5 ? 'Just updated' : `Last update: ${s}s ago`;
-        el.style.color = stale ? '#e05555' : '#445060';
+      const now = Date.now();
+      if (lastStateAt) {
+        const age = Math.round((now - lastStateAt) / 1000);
+        const el = document.getElementById('updated-at');
+        if (el) {
+          el.textContent = age < 5 ? 'Just updated' : `Last update: ${age}s ago`;
+          el.style.color = age > 10 ? '#e05555' : '#445060';
+        }
+      }
+      if (lastState) {
+        const tradeDur = document.getElementById('trade-duration');
+        const stageDur = document.getElementById('stage-duration');
+        if (tradeDur) {
+          const dur = lastState.startedAt ? now - lastState.startedAt : null;
+          tradeDur.textContent = dur ? formatDur(dur) : '—';
+          tradeDur.style.color = dur && dur > 10 * 60 * 1000 ? '#e05555' : '#e8edf2';
+        }
+        if (stageDur) {
+          const dur = lastState.stageChangedAt ? now - lastState.stageChangedAt : null;
+          stageDur.textContent = dur ? formatDur(dur) : '—';
+          // Turn red if stuck in same stage for more than 3 minutes
+          stageDur.style.color = dur && dur > 3 * 60 * 1000 ? '#e05555' : '#e8edf2';
+        }
       }
     }, 1000);
 
@@ -193,12 +235,20 @@
     };
 
     function applyState(state) {
+      lastState = state;
       const stage = state.stage || 'idle';
       const nameEl = document.getElementById('trader-name');
       nameEl.textContent = state.traderName || '—';
       nameEl.className = 'value' + (state.traderName ? '' : ' dim');
       document.getElementById('trade-id').textContent = state.tradeId ? `#${state.tradeId}` : '—';
       document.getElementById('trade-id').className = 'value' + (state.tradeId ? '' : ' dim');
+      // Automation toggle button
+      const tog = document.getElementById('btn-toggle');
+      if (tog) {
+        const on = !!state.enabled;
+        tog.textContent = on ? 'Automation: ON' : 'Automation: OFF';
+        tog.className = 'btn-toggle ' + (on ? 'on' : 'off');
+      }
 
       const badge = document.getElementById('stage-badge');
       badge.className = 'badge ' + (STAGE_CLS[stage] || 'idle');
@@ -253,6 +303,12 @@
     }
 
     // ── events ─────────────────────────────────────────────────────────────
+    document.getElementById('btn-toggle').addEventListener('click', () => {
+      if (!socket?.connected) return;
+      socket.emit('trade:command', { action: 'toggle' }, getToken());
+      showFeedback('Toggling automation…', '#5aabef');
+    });
+
     document.getElementById('btn-skip').addEventListener('click', () => {
       if (!socket?.connected) return;
       socket.emit('trade:command', { action: 'skip' }, getToken());
