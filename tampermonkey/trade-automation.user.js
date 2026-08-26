@@ -792,7 +792,7 @@
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 1000);
       saveJob({ ...job, stage: 'awaiting_accept', error: '' });
-      job = getJob();
+      return;
     }
 
     if (job.stage === 'awaiting_accept') {
