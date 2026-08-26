@@ -1,0 +1,478 @@
+{
+  "items": [
+    {
+      "id": 66,
+      "name": "Morphine",
+      "description": "Known on the street as Miss Emma, Morphine is a potent opiate painkiller whose addictive qualities are less than ladylike. With one shot, you'll be taken on a high-speed trip to your happy place, a pleasant destination where your leg is in one piece and your face is no longer mangled beyond repair.",
+      "effect": "Reduces hospital time by 70 mins and restores 15% life. Increases medical cooldown by 20 mins.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/66/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": {
+          "country": "Torn",
+          "name": "Pharmacy"
+        },
+        "shops": [
+          {
+            "country": "Torn",
+            "shop": "Pharmacy",
+            "buy_price": 20000,
+            "sell_price": 10000
+          }
+        ],
+        "buy_price": 20000,
+        "sell_price": 10000,
+        "market_price": 14191
+      },
+      "circulation": 39960213,
+      "details": null
+    },
+    {
+      "id": 67,
+      "name": "First Aid Kit",
+      "description": "This comprehensive collection of medical necessities contains everything you need to treat burns, blood loss, and broken bones. Whether you're bleeding out on the battlefield or you've slipped in the bath and sat on a shampoo bottle, you'll be back on your feet in moments.",
+      "effect": "Reduces hospital time by 40 minutes and restores 10% life. Increases medical cooldown by 15 mins.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/67/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": {
+          "country": "Torn",
+          "name": "Pharmacy"
+        },
+        "shops": [
+          {
+            "country": "Torn",
+            "shop": "Pharmacy",
+            "buy_price": 15000,
+            "sell_price": 7500
+          }
+        ],
+        "buy_price": 15000,
+        "sell_price": 7500,
+        "market_price": 10420
+      },
+      "circulation": 28301187,
+      "details": null
+    },
+    {
+      "id": 68,
+      "name": "Small First Aid Kit",
+      "description": "A small medical kit containing bandages, gauze, and antiseptic wipes. There's not enough in here to put someone's guts back in, but you'll have no problem patching up a minor flesh-wound or a nasty boo-boo on your knee.",
+      "effect": "Reduces hospital time by 20 minutes and restores 5% life. Increases medical cooldown by 10 mins.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/68/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": {
+          "country": "Torn",
+          "name": "Pharmacy"
+        },
+        "shops": [
+          {
+            "country": "Torn",
+            "shop": "Pharmacy",
+            "buy_price": 7500,
+            "sell_price": 3750
+          }
+        ],
+        "buy_price": 7500,
+        "sell_price": 3750,
+        "market_price": 5080
+      },
+      "circulation": 38911996,
+      "details": null
+    },
+    {
+      "id": 361,
+      "name": "Neumune Tablet",
+      "description": "Neumune, an androstenediol, was introduced as a radiation countermeasure by the US Armed Forces Radiobiology Research Institute and has begun production in Switzerland.  Neumune is in Investigational New Drug (IND) status and Phase I trials have been performed.",
+      "effect": "Reduces radiation hospital time by 3 hours and radiation effect by 12 hours. Increases medical cooldown by 3 hours.",
+      "requirement": "Must be under the effect of radiation poisoning.",
+      "image": "https://www.torn.com/images/items/361/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": {
+          "country": "Torn",
+          "name": "Pharmacy"
+        },
+        "shops": [
+          {
+            "country": "Switzerland",
+            "shop": "General Store",
+            "buy_price": 900000,
+            "sell_price": 700000
+          },
+          {
+            "country": "Torn",
+            "shop": "Pharmacy",
+            "buy_price": null,
+            "sell_price": 700000
+          }
+        ],
+        "buy_price": 900000,
+        "sell_price": 700000,
+        "market_price": 1611158
+      },
+      "circulation": 234356,
+      "details": null
+    },
+    {
+      "id": 699,
+      "name": "Antidote",
+      "description": "This antidote has varying results in reversing the effects of the TCX-59 pathological agent. It will have a far higher chance of success against underdeveloped strains of the virus. Please see enclosed notes before use.",
+      "effect": null,
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/699/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 0
+      },
+      "circulation": 1109,
+      "details": null
+    },
+    {
+      "id": 731,
+      "name": "Empty Blood Bag",
+      "description": "An empty blood transfusion bag ready to be filled.",
+      "effect": "Produces a blood bag of your type. Reduces life by 30%. Increases medical cooldown by 1 hour.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/731/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": {
+          "country": "Torn",
+          "name": "Pharmacy"
+        },
+        "shops": [
+          {
+            "country": "Torn",
+            "shop": "Pharmacy",
+            "buy_price": 15000,
+            "sell_price": 11250
+          }
+        ],
+        "buy_price": 15000,
+        "sell_price": 11250,
+        "market_price": 16210
+      },
+      "circulation": 20302360,
+      "details": null
+    },
+    {
+      "id": 732,
+      "name": "Blood Bag : A+",
+      "description": "A blood bag filled with type A+ blood. Compatible with recipients in group A+ and AB+. Approximately 35.7% of people have this blood type, which is roughly equivalent to the proportion of your home's daily water use consumed by your toilet.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/732/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 16188
+      },
+      "circulation": 11905000,
+      "details": null
+    },
+    {
+      "id": 733,
+      "name": "Blood Bag : A-",
+      "description": "A blood bag filled with type A- blood. Compatible with recipients in groups A-, A+, AB- and AB+. About 6.3% of the world's population shares this blood type, closely matching the percentage of children worldwide who are engaged in child labor.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/733/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 17914
+      },
+      "circulation": 3397247,
+      "details": null
+    },
+    {
+      "id": 734,
+      "name": "Blood Bag : B+",
+      "description": "A blood bag filled with type B+ blood. Compatible with recipients in group B+ and AB+. 8.5% of human beings contain this type of blood, and this directly correlates with the number of solitaire games that are said to be unwinnable.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/734/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 17296
+      },
+      "circulation": 3655338,
+      "details": null
+    },
+    {
+      "id": 735,
+      "name": "Blood Bag : B-",
+      "description": "A blood bag filled with type B- blood. Compatible with recipients in groups B-, B+, AB- and AB+. The percentage of people with B- blood is 1.5%, which is also the reported accuracy level for the statistics posted in these blood bag item descriptions.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/735/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 20217
+      },
+      "circulation": 1447874,
+      "details": null
+    },
+    {
+      "id": 736,
+      "name": "Blood Bag : AB+",
+      "description": "A blood bag filled with type AB+ blood. Only compatible with recipients in group AB+. This rare type is found in just 3.4% of the population, a figure that closely matches the percentage of annual boat deaths caused by people pissing over the side.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/736/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 17008
+      },
+      "circulation": 1816332,
+      "details": null
+    },
+    {
+      "id": 737,
+      "name": "Blood Bag : AB-",
+      "description": "A blood bag filled with type AB- blood. Compatible with recipients in group AB- and AB+. This rare blood type is found in just 0.6% of the population, a percentage that also represents the estimated proportion of people who hold a world record",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/737/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 22002
+      },
+      "circulation": 958390,
+      "details": null
+    },
+    {
+      "id": 738,
+      "name": "Blood Bag : O+",
+      "description": "A blood bag filled with type O+ blood. Compatible with recipients in groups O+, A+, B+ and AB+. 37.4% of all blood is O+, and this is close to the percentage of pet owners who don't sleep in bed with their pets.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/738/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 16705
+      },
+      "circulation": 13562460,
+      "details": null
+    },
+    {
+      "id": 739,
+      "name": "Blood Bag : O-",
+      "description": "A blood bag filled with type O- blood. Compatible with recipients in any blood group. Only 6.6% of humans possess this blood type, which is about the same as the proportion of people who believe in witchcraft.",
+      "effect": "Reduces hospital time by 120 mins and restores 30% life. Increases medical cooldown by 30 mins.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/739/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 20101
+      },
+      "circulation": 4128120,
+      "details": null
+    },
+    {
+      "id": 796,
+      "name": "Felovax",
+      "description": "Felovax is a vaccine for cats against the Feline Immunodeficiency Virus. You are now safe from Cat AIDS.",
+      "effect": "Treats Feline Immunodeficiency Virus.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/796/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": false,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 0
+      },
+      "circulation": 547,
+      "details": null
+    },
+    {
+      "id": 797,
+      "name": "Zylkene",
+      "description": "Zylkene is a stress reducing drug mostly prescribed to dogs.",
+      "effect": "Reduces stress in canines.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/797/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": false,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 0
+      },
+      "circulation": 517,
+      "details": null
+    },
+    {
+      "id": 804,
+      "name": "Duke's Herpes Medication",
+      "description": "This packet may or may not contain herpes medication, but Duke takes them anyway.",
+      "effect": null,
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/804/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": false,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 0
+      },
+      "circulation": 58838,
+      "details": null
+    },
+    {
+      "id": 1012,
+      "name": "Blood Bag : Irradiated",
+      "description": "A blood bag filled with irradiated blood. This glow-in-the-dark blood type is found in 100% of people who have just held their thumb up to judge the proximity of a mushroom cloud. ",
+      "effect": "Causes low-level radiation poisoning. Increases medical cooldown by 30 mins.\nUsed by the Cleaner role during the Clinical Precision scenario.",
+      "requirement": "Requires the Intravenous Therapy education course.",
+      "image": "https://www.torn.com/images/items/1012/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": false,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 30116
+      },
+      "circulation": 402757,
+      "details": null
+    },
+    {
+      "id": 1363,
+      "name": "Ipecac Syrup",
+      "description": "Rollercoasters, spinning in circles, a bad gyro from Kebabish Palace, the only takeout in town with a negative hygiene rating. There are many things that can make a person vomit, but none so convenient as Ipecac Syrup. Extracted from the root of the Carapichea ipecacuanha plant, this swift acting emetic is guaranteed to tempt your lunch back up your gullet within seconds. Watch in nauseous amazement as beans, soup, and precious bolognese magically reappear before your eyes and down your shirt with a just quick swig of syrup of ipecac.",
+      "effect": "Increases hospital time to 60-90 mins. Increases medical cooldown by 30 mins.\nUsed by the Assassin role during the Dish It Out scenario.",
+      "requirement": null,
+      "image": "https://www.torn.com/images/items/1363/large.png",
+      "type": "Medical",
+      "sub_type": null,
+      "is_masked": false,
+      "is_tradable": true,
+      "is_found_in_city": true,
+      "value": {
+        "vendor": null,
+        "shops": [],
+        "buy_price": null,
+        "sell_price": null,
+        "market_price": 40760
+      },
+      "circulation": 4069102,
+      "details": null
+    }
+  ]
+}

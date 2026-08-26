@@ -33,7 +33,18 @@
   const NAV_GUARD_MS = 60000;
   const ITEM_SETTLE_MS = 10000;
   const BLOODBAG_KEY = 'tta_bloodbag_v1';
-  const BLOODBAG_ITEM_ID = '734';
+  const BLOODBAG_ITEM_ID = '734'; // fallback; overridden by settings.bloodBagItemId
+  const BLOODBAG_OPTIONS = [
+    { id: '732', label: 'Blood Bag : A+' },
+    { id: '733', label: 'Blood Bag : A-' },
+    { id: '734', label: 'Blood Bag : B+' },
+    { id: '735', label: 'Blood Bag : B-' },
+    { id: '736', label: 'Blood Bag : AB+' },
+    { id: '737', label: 'Blood Bag : AB-' },
+    { id: '738', label: 'Blood Bag : O+' },
+    { id: '739', label: 'Blood Bag : O-' },
+    { id: '1012', label: 'Blood Bag : Irradiated' },
+  ];
   const HOSPITAL_TRIGGER_SECS = 300;
   const BLOODBAG_TIMEOUT_MS = 30000;
 
@@ -44,6 +55,7 @@
     apiPollSeconds: 30,
     waitSeconds: 60,
     bloodBagTriggerMinutes: 5,
+    bloodBagItemId: '734',
     pricingServerUrl: DEFAULT_APP_URL,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
@@ -790,7 +802,8 @@
       location.assign(`${location.origin}/trade.php`);
       return;
     }
-    const bloodBag = document.querySelector(`div.item[data-id="${BLOODBAG_ITEM_ID}"]`);
+    const itemId = String(getSettings().bloodBagItemId || BLOODBAG_ITEM_ID);
+    const bloodBag = document.querySelector(`div.item[data-id="${itemId}"]`);
     if (!bloodBag) return;
     GM_setValue(BLOODBAG_KEY, '');
     bloodBag.click();
@@ -861,6 +874,11 @@
         <label>Use blood bag when hospital time is under <small>(minutes)</small>
           <input id="tta-bloodbag-trigger" type="number" min="1" max="60" value="${settings.bloodBagTriggerMinutes}">
         </label>
+        <label>Blood bag type to use
+          <select id="tta-bloodbag-type">
+            ${BLOODBAG_OPTIONS.map(o => `<option value="${o.id}"${o.id === String(settings.bloodBagItemId || BLOODBAG_ITEM_ID) ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
+          </select>
+        </label>
         <label>Pricing server URL <small>(use http://localhost:3001 for local testing)</small>
           <input id="tta-server-url" type="url" value="${escapeHtml(settings.pricingServerUrl)}">
         </label>
@@ -904,6 +922,7 @@
         apiPollSeconds: Math.min(3600, Math.max(15, Number(overlay.querySelector('#tta-api-interval').value) || 30)),
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
         bloodBagTriggerMinutes: Math.min(60, Math.max(1, Number(overlay.querySelector('#tta-bloodbag-trigger').value) || 5)),
+        bloodBagItemId: overlay.querySelector('#tta-bloodbag-type').value || BLOODBAG_ITEM_ID,
         pricingServerUrl: overlay.querySelector('#tta-server-url').value.trim().replace(/\/+$/, '') || DEFAULT_APP_URL,
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
@@ -1000,7 +1019,7 @@
     #tta-panel{position:fixed;right:12px;top:12px;z-index:2147483638;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 24px));padding:8px;border:1px solid #52606d;border-radius:8px;background:#15191dcc;color:#ddd;font:12px Arial,sans-serif;box-shadow:0 3px 16px #0008;backdrop-filter:blur(5px)}
     #tta-panel button{border:1px solid #66717c;border-radius:5px;background:#30363d;color:#eee;padding:5px 8px;cursor:pointer}#tta-panel #tta-toggle.on{border-color:#2e9d59;background:#176b39}#tta-state{min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tta-accept-ready{position:relative!important;z-index:2!important;outline:3px solid #ffd43b!important;box-shadow:0 0 0 5px #ffca2844,0 0 18px 8px #ffd43b99!important;animation:ttaAcceptPulse 1s ease-in-out infinite alternate!important}@keyframes ttaAcceptPulse{from{filter:brightness(1)}to{filter:brightness(1.65)}}
-    #tta-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#000a;font:13px Arial,sans-serif}.tta-dialog{width:min(520px,calc(100vw - 30px));max-height:calc(100vh - 30px);overflow:auto;padding:18px;border:1px solid #59636e;border-radius:9px;background:#20252a;color:#eee;box-shadow:0 10px 40px #000}.tta-dialog h3{margin:0 0 14px}.tta-dialog label{display:block;margin:10px 0 4px}.tta-dialog small{color:#aab2ba}.tta-dialog textarea,.tta-dialog input[type=number],.tta-dialog input[type=password]{box-sizing:border-box;width:100%;margin-top:5px;padding:7px;border:1px solid #606b76;border-radius:4px;background:#11161a;color:#eee}.tta-dialog textarea{min-height:58px;resize:vertical}.tta-dialog .tta-check{display:flex;gap:7px;align-items:center}.tta-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:16px}.tta-action-spacer{flex:1}.tta-actions button{padding:7px 14px;border:1px solid #64707b;border-radius:5px;background:#343b42;color:#fff;cursor:pointer}.tta-actions #tta-reset{border-color:#a85252;background:#6f2929}.tta-actions #tta-save{border-color:#3d9660;background:#247044}
+    #tta-modal{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#000a;font:13px Arial,sans-serif}.tta-dialog{width:min(520px,calc(100vw - 30px));max-height:calc(100vh - 30px);overflow:auto;padding:18px;border:1px solid #59636e;border-radius:9px;background:#20252a;color:#eee;box-shadow:0 10px 40px #000}.tta-dialog h3{margin:0 0 14px}.tta-dialog label{display:block;margin:10px 0 4px}.tta-dialog small{color:#aab2ba}.tta-dialog textarea,.tta-dialog input[type=number],.tta-dialog input[type=password],.tta-dialog select{box-sizing:border-box;width:100%;margin-top:5px;padding:7px;border:1px solid #606b76;border-radius:4px;background:#11161a;color:#eee}.tta-dialog textarea{min-height:58px;resize:vertical}.tta-dialog .tta-check{display:flex;gap:7px;align-items:center}.tta-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:16px}.tta-action-spacer{flex:1}.tta-actions button{padding:7px 14px;border:1px solid #64707b;border-radius:5px;background:#343b42;color:#fff;cursor:pointer}.tta-actions #tta-reset{border-color:#a85252;background:#6f2929}.tta-actions #tta-save{border-color:#3d9660;background:#247044}
   `;
   document.head.appendChild(style);
 
