@@ -526,7 +526,7 @@
       return;
     }
 
-    if (['receipt_posted', 'add_money', 'returning', 'thank_posted', 'awaiting_accept'].includes(job.stage)
+    if (['receipt_posted', 'add_money'].includes(job.stage)
       && restartPricingIfItemsChanged(job)) return;
 
     if (job.stage === 'opening') {
@@ -736,10 +736,6 @@
 
   async function handleAcceptRoute(job, route) {
     if (!job || String(job.tradeId) !== String(route.id) || job.stage !== 'awaiting_accept') return;
-    if (restartPricingIfItemsChanged(job)) {
-      navigateTrade('view', job.tradeId);
-      return;
-    }
     if (route.step === 'accept2') {
       if (job.receiptId) {
         try {
