@@ -1050,7 +1050,7 @@
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><span id="tta-remote" title="Remote sync status">⬤</span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><span id="tta-remote" style="font-size:11px;white-space:nowrap">⬤ …</span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
@@ -1088,9 +1088,9 @@
     const remoteDot = document.getElementById('tta-remote');
     if (!toggle || !state || !priceNow || !skip) return;
     if (remoteDot) {
-      const color = remoteStatus === 'ok' ? '#3acc7e' : remoteStatus === 'error' ? '#e05555' : '#556070';
-      remoteDot.style.cssText = `color:${color};font-size:10px;line-height:1`;
-      remoteDot.title = `Remote sync: ${remoteStatusDetail}`;
+      const color = remoteStatus === 'ok' ? '#3acc7e' : remoteStatus === 'error' ? '#e05555' : '#888';
+      remoteDot.style.color = color;
+      remoteDot.textContent = `⬤ ${remoteStatusDetail}`;
     }
     toggle.textContent = settings.enabled ? 'Automation: ON' : 'Automation: OFF';
     toggle.classList.toggle('on', settings.enabled);
