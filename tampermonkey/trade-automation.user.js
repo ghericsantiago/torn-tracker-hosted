@@ -169,7 +169,17 @@
   function tradeLogShowsAccepted() {
     const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
     if (!messages.length) return false;
-    return /\bthe trade was accepted by\b/i.test(messages[0].textContent);
+    const latest = messages[0];
+    if (!/\bthe trade was accepted by\b/i.test(latest.textContent)) return false;
+    const selfId = currentUserId();
+    const authorId = latest.querySelector('a[href*="profiles.php?XID="]')?.href
+      .match(/[?&]XID=(\d+)/i)?.[1] || '';
+    return !(selfId && authorId && authorId === selfId);
+  }
+
+  function pageShowsWeAccepted() {
+    const text = normalize(document.body.textContent);
+    return text.includes('you have accepted the trade') && text.includes('please wait for the other person to accept');
   }
 
   function parseHash() {
@@ -551,6 +561,10 @@
         navigateTrade();
         return;
       }
+      if (pageShowsWeAccepted()) {
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        return;
+      }
       const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
       const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
       const currentSignature = counterpartItemSignature();
@@ -716,6 +730,10 @@
     }
 
     if (job.stage === 'receipt_posted' || job.stage === 'add_money') {
+      if (pageShowsWeAccepted()) {
+        saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+        return;
+      }
       if (job.stage === 'receipt_posted' && Date.now() - job.receiptPostedAt < 2000) return;
       if (Number(job.total) <= 0) {
         saveJob({ ...job, stage: 'returning', error: '' });
@@ -737,7 +755,7 @@
 
     if (job.stage === 'thank_posted') {
       setTimeout(() => {
-        document.querySelector('.tta-accept-ready').click();
+        if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 1000);
       saveJob({ ...job, stage: 'awaiting_accept', error: '' });
       job = getJob();
@@ -745,7 +763,7 @@
 
     if (job.stage === 'awaiting_accept') {
       setTimeout(() => {
-        document.querySelector('.tta-accept-ready').click();
+        if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
       highlightAcceptControl();
       return;
