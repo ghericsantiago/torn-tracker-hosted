@@ -998,18 +998,9 @@
     skip.style.display = settings.enabled && job ? '' : 'none';
     if (bloodbagStatus) {
       const bbSaved = readJson(BLOODBAG_KEY, null);
-      const remaining = hospitalSecondsRemaining();
-      const triggerSecs = Math.max(1, Number(settings.bloodBagTriggerMinutes) || 5) * 60;
       if (bbSaved) {
-        bloodbagStatus.textContent = 'Blood bag: navigating to armory...';
+        bloodbagStatus.textContent = 'Using blood bag...';
         bloodbagStatus.style.cssText = 'display:inline;color:#f4b942;font-weight:bold';
-      } else if (settings.enabled && remaining !== null && remaining > 0 && remaining <= triggerSecs) {
-        bloodbagStatus.textContent = 'Blood bag: triggered!';
-        bloodbagStatus.style.cssText = 'display:inline;color:#f4b942;font-weight:bold';
-      } else if (settings.enabled && remaining !== null && remaining > 0) {
-        const mins = Math.ceil(remaining / 60);
-        bloodbagStatus.textContent = `Hospital: ${mins}m left (bag at ${settings.bloodBagTriggerMinutes}m)`;
-        bloodbagStatus.style.cssText = 'display:inline;color:#aab2ba';
       } else {
         bloodbagStatus.style.display = 'none';
       }
