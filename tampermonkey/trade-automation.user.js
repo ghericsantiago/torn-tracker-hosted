@@ -806,6 +806,11 @@
       navigateTrade();
       return;
     }
+    if (normalize(document.body.textContent).includes('one party has already accepted it')) {
+      saveJob({ ...job, stage: 'awaiting_accept', error: '' });
+      navigateTrade('view', job.tradeId);
+      return;
+    }
     const form = document.querySelector('.init-trade.add-money form[action*="addmoney2"]');
     const visible = form?.querySelector('input.input-money[type="text"]');
     const hidden = form?.querySelector('input.input-money[type="hidden"][name="amount"]');
