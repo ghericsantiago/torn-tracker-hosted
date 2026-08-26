@@ -835,6 +835,11 @@
         });
         return;
       }
+      if (pageShowsWeAccepted()) {
+        ttaLog(`#${job.tradeId} [awaiting_accept] we already accepted, waiting for counterpart → trades list`);
+        navigateTrade();
+        return;
+      }
       ttaLog(`#${job.tradeId} [awaiting_accept] no new decline detected, highlighting accept button`);
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
