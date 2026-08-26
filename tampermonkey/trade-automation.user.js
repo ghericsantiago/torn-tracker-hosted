@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.5.1
-// @description  Queue current trades, wait for items, create a receipt, and add the quoted money
+// @version      2.6.0
+// @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
+// @match        https://www.torn.com/factions.php*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -31,6 +32,10 @@
   const TICK_MS = 1000;
   const NAV_GUARD_MS = 60000;
   const ITEM_SETTLE_MS = 10000;
+  const BLOODBAG_KEY = 'tta_bloodbag_v1';
+  const BLOODBAG_ITEM_ID = '734';
+  const HOSPITAL_TRIGGER_SECS = 300;
+  const BLOODBAG_TIMEOUT_MS = 30000;
 
   const DEFAULTS = {
     enabled: false,
@@ -656,7 +661,7 @@
     if (job.stage === 'awaiting_accept') {
       setTimeout(() => {
         document.querySelector('.tta-accept-ready').click();
-      }, 8000);
+      }, 13000);
       highlightAcceptControl();
       return;
     }
@@ -736,6 +741,45 @@
     submit.click();
   }
 
+  function hospitalSecondsRemaining() {
+    const header = document.getElementById('topHeaderBanner');
+    if (!header) return null;
+    const stamp = Number(header.dataset.hospital || 0);
+    if (!stamp) return null;
+    let serverNow;
+    try { serverNow = window.topBannerInitData?.serverState?.currentTime; } catch (_) {}
+    const now = serverNow || Math.floor(Date.now() / 1000);
+    const remaining = stamp - now;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  function checkHospitalBloodBag(settings) {
+    if (!settings.enabled) return false;
+    const remaining = hospitalSecondsRemaining();
+    if (remaining === null || remaining <= 0 || remaining > HOSPITAL_TRIGGER_SECS) return false;
+    const stamp = Number(document.getElementById('topHeaderBanner')?.dataset.hospital || 0);
+    const saved = readJson(BLOODBAG_KEY, null);
+    if (saved?.stamp === stamp) return false;
+    writeJson(BLOODBAG_KEY, { stamp, at: Date.now() });
+    location.assign(`${location.origin}/factions.php?step=your`);
+    return true;
+  }
+
+  async function handleFactionArmory() {
+    const saved = readJson(BLOODBAG_KEY, null);
+    if (!saved) return;
+    if (Date.now() - saved.at > BLOODBAG_TIMEOUT_MS) {
+      GM_setValue(BLOODBAG_KEY, '');
+      location.assign(`${location.origin}/trade.php`);
+      return;
+    }
+    const bloodBag = document.querySelector(`div.item[data-id="${BLOODBAG_ITEM_ID}"]`);
+    if (!bloodBag) return;
+    GM_setValue(BLOODBAG_KEY, '');
+    bloodBag.click();
+    setTimeout(() => location.assign(`${location.origin}/trade.php`), 1500);
+  }
+
   async function tick() {
     const settings = getSettings();
     const guard = readJson(NAV_KEY, null);
@@ -758,7 +802,12 @@
           return;
         }
       }
+      if (location.pathname.toLowerCase() === '/factions.php') {
+        await handleFactionArmory();
+        return;
+      }
       if (handlePendingTradeAlert()) return;
+      if (checkHospitalBloodBag(settings)) return;
       if (location.pathname.toLowerCase() !== '/trade.php') return;
       if (job?.retryAt && Date.now() < job.retryAt) return;
       const route = parseHash();
