@@ -796,10 +796,23 @@
     }
 
     if (job.stage === 'awaiting_accept') {
+      // Only count a decline as actionable if it appears NEWER than our most recent
+      // thank-you post. The log is newest-first so lower index = newer message.
+      // An old decline (higher index than thank-you) means we already re-priced for it.
       const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
-      const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
+      const selfId = currentUserId();
+      const thankYouNorm = normalize(settings.thankYouMessage);
+      const thankIdx = allMessages.findIndex(el => {
+        const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+          .match(/[?&]XID=(\d+)/i)?.[1] || '';
+        const isSelf = selfId && authorId && authorId === selfId;
+        const body = normalize(el.textContent.replace(/^.*?\bsays:\s*/i, ''));
+        return isSelf && body === thankYouNorm;
+      });
+      const messagesToCheckForDecline = thankIdx === -1 ? allMessages : allMessages.slice(0, thankIdx);
+      const wasDeclined = messagesToCheckForDecline.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
       if (wasDeclined) {
-        ttaLog(`#${job.tradeId} [awaiting_accept] trade was declined → restart waiting (re-price)`);
+        ttaLog(`#${job.tradeId} [awaiting_accept] decline found after our thank-you (thankIdx=${thankIdx}) → restart waiting`);
         const now = Date.now();
         const sig = counterpartItemSignature();
         saveJob({
@@ -813,7 +826,7 @@
         });
         return;
       }
-      ttaLog(`#${job.tradeId} [awaiting_accept] highlighting accept button, scheduling auto-click`);
+      ttaLog(`#${job.tradeId} [awaiting_accept] no post-thank-you decline (thankIdx=${thankIdx}), highlighting accept button`);
       setTimeout(() => {
         if (getJob()?.stage === 'awaiting_accept') document.querySelector('.tta-accept-ready')?.click();
       }, 13000);
