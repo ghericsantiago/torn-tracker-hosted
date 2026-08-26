@@ -318,6 +318,20 @@
     });
   }
 
+  function latestCounterpartMessageIs(text) {
+    const expected = normalize(text);
+    const selfId = currentUserId();
+    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
+      .filter(el => /\bsays:\s*/i.test(el.textContent));
+    if (!messages.length) return false;
+    const latest = messages[messages.length - 1];
+    const authorId = latest.querySelector('a[href*="profiles.php?XID="]')?.href
+      .match(/[?&]XID=(\d+)/i)?.[1] || '';
+    if (selfId && authorId && authorId === selfId) return false;
+    const body = normalize(latest.textContent.replace(/^.*?\bsays:\s*/i, ''));
+    return body === expected;
+  }
+
   function counterpartItemSignature() {
     const selfId = currentUserId();
     const sideItems = [...document.querySelectorAll('.trade-cont .user.right > ul.cont > li.color2 .name:not(.inactive)')]
@@ -506,7 +520,7 @@
       return;
     }
 
-    if (tradeLogShowsAccepted()) {
+    if (tradeLogShowsAccepted() || latestCounterpartMessageIs(settings.thankYouMessage)) {
       completeJob(job.tradeId);
       navigateTrade();
       return;
