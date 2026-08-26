@@ -776,7 +776,7 @@
     const saved = readJson(BLOODBAG_KEY, null);
     if (saved?.stamp === stamp) return false;
     writeJson(BLOODBAG_KEY, { stamp, at: Date.now() });
-    location.assign(`${location.origin}/factions.php?step=your`);
+    location.assign(`${location.origin}/factions.php?step=your&type=1#/tab=armoury&start=0&sub=medical`);
     return true;
   }
 
