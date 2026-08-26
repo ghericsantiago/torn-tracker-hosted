@@ -742,6 +742,10 @@
   }
 
   function hospitalSecondsRemaining() {
+    try {
+      const initData = window.topBannerInitData;
+      if (initData?.user?.state?.status !== 'hospital') return 0;
+    } catch (_) {}
     const header = document.getElementById('topHeaderBanner');
     if (!header) return null;
     const stamp = Number(header.dataset.hospital || 0);
