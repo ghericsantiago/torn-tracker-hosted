@@ -68,6 +68,7 @@
 
   let busy = false;
   let lastApiPoll = 0;
+  let remoteStatus = 'idle'; // 'idle' | 'ok' | 'error'
 
   function readJson(key, fallback) {
     try {
@@ -1048,7 +1049,7 @@
     if (document.getElementById('tta-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'tta-panel';
-    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
+    panel.innerHTML = '<button id="tta-toggle" type="button"></button><span id="tta-state"></span><span id="tta-bloodbag-status" style="display:none"></span><span id="tta-remote" title="Remote sync status">⬤</span><button id="tta-price-now" type="button" style="display:none">Price Now</button><button id="tta-skip" type="button" style="display:none">Skip Trade</button><button id="tta-settings" type="button">Settings</button>';
     document.body.appendChild(panel);
     panel.querySelector('#tta-toggle').addEventListener('click', () => {
       const settings = getSettings();
@@ -1083,7 +1084,14 @@
     const priceNow = document.getElementById('tta-price-now');
     const skip = document.getElementById('tta-skip');
     const bloodbagStatus = document.getElementById('tta-bloodbag-status');
+    const remoteDot = document.getElementById('tta-remote');
     if (!toggle || !state || !priceNow || !skip) return;
+    if (remoteDot) {
+      const color = remoteStatus === 'ok' ? '#3acc7e' : remoteStatus === 'error' ? '#e05555' : '#556070';
+      const tip = remoteStatus === 'ok' ? 'Remote sync: OK' : remoteStatus === 'error' ? 'Remote sync: FAILED' : 'Remote sync: waiting…';
+      remoteDot.style.cssText = `color:${color};font-size:10px;line-height:1`;
+      remoteDot.title = tip;
+    }
     toggle.textContent = settings.enabled ? 'Automation: ON' : 'Automation: OFF';
     toggle.classList.toggle('on', settings.enabled);
     let label = job ? `#${job.tradeId}: ${String(job.stage).replace('_', ' ')}` : 'Idle';
@@ -1141,15 +1149,22 @@
     if (now - lastRemoteReport < 2000) return; // at most once per 2 s
     lastRemoteReport = now;
     const job = getJob();
+    const settings = getSettings();
     const state = job
-      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: getSettings().enabled }
-      : { tradeId: null, stage: 'idle', error: '', enabled: getSettings().enabled };
+      ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '', enabled: settings.enabled }
+      : { tradeId: null, stage: 'idle', error: '', enabled: settings.enabled };
     GM_xmlhttpRequest({
       method: 'PUT',
-      url: `${pricingServer()}/api/trade/state`,
+      url: `${pricingServer(settings)}/api/trade/state`,
       headers: { 'Content-Type': 'application/json', 'X-Receipt-Token': RECEIPT_TOKEN },
       data: JSON.stringify(state),
       timeout: 8000,
+      onload: (r) => {
+        remoteStatus = r.status >= 200 && r.status < 300 ? 'ok' : 'error';
+        renderStatus();
+      },
+      onerror: () => { remoteStatus = 'error'; renderStatus(); },
+      ontimeout: () => { remoteStatus = 'error'; renderStatus(); },
     });
   }
 

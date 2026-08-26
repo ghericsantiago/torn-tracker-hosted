@@ -133,7 +133,7 @@
       <span class="label">Error</span>
       <span class="value err" id="trade-error"></span>
     </div>
-    <div class="updated" id="updated-at"></div>
+    <div class="updated" id="updated-at">Waiting for first update…</div>
   </div>
 
   <!-- Controls -->
@@ -146,7 +146,19 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const TOKEN_KEY = 'trade_ctrl_token';
-    let socket = null, feedbackTimer = null;
+    let socket = null, feedbackTimer = null, lastStateAt = 0;
+
+    // Live "X s ago" counter
+    setInterval(() => {
+      if (!lastStateAt) return;
+      const s = Math.round((Date.now() - lastStateAt) / 1000);
+      const stale = s > 10;
+      const el = document.getElementById('updated-at');
+      if (el) {
+        el.textContent = s < 5 ? 'Just updated' : `Last update: ${s}s ago`;
+        el.style.color = stale ? '#e05555' : '#445060';
+      }
+    }, 1000);
 
     // ── token helpers ──────────────────────────────────────────────────────
     function getToken() {
@@ -198,10 +210,7 @@
         errRow.classList.add('hidden');
       }
 
-      if (state.updatedAt) {
-        document.getElementById('updated-at').textContent =
-          'Updated ' + new Date(state.updatedAt).toLocaleTimeString();
-      }
+      lastStateAt = Date.now();
 
       document.getElementById('btn-skip').disabled = !state.tradeId || stage === 'idle';
     }
