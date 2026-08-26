@@ -169,8 +169,7 @@
   function tradeLogShowsAccepted() {
     const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
     if (!messages.length) return false;
-    const latest = messages[messages.length - 1];
-    return /\bthe trade was accepted by\b/i.test(latest.textContent);
+    return /\bthe trade was accepted by\b/i.test(messages[0].textContent);
   }
 
   function parseHash() {
@@ -330,11 +329,13 @@
     const selfId = currentUserId();
     const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
       .filter(el => /\bsays:\s*/i.test(el.textContent));
-    if (!messages.length) return false;
-    const latest = messages[messages.length - 1];
-    const authorId = latest.querySelector('a[href*="profiles.php?XID="]')?.href
-      .match(/[?&]XID=(\d+)/i)?.[1] || '';
-    if (selfId && authorId && authorId === selfId) return false;
+    // DOM is newest-first; find the first entry that belongs to the counterpart
+    const latest = messages.find(el => {
+      const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+        .match(/[?&]XID=(\d+)/i)?.[1] || '';
+      return !(selfId && authorId && authorId === selfId);
+    });
+    if (!latest) return false;
     const body = normalize(latest.textContent.replace(/^.*?\bsays:\s*/i, ''));
     return body === expected;
   }
