@@ -164,8 +164,10 @@
   }
 
   function tradeLogShowsAccepted() {
-    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
-      .some(el => /\bthe trade was accepted by\b/i.test(el.textContent));
+    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+    if (!messages.length) return false;
+    const latest = messages[messages.length - 1];
+    return /\bthe trade was accepted by\b/i.test(latest.textContent);
   }
 
   function parseHash() {
