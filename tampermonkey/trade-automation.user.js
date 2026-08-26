@@ -177,7 +177,7 @@
   }
 
   function tradeLogShowsAccepted() {
-    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+    const messages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
     if (!messages.length) return false;
     const latest = messages[0];
     if (!/\bthe trade was accepted by\b/i.test(latest.textContent)) return false;
@@ -334,7 +334,7 @@
   function tradeLogHasComment(message) {
     const expected = normalize(message);
     const selfId = currentUserId();
-    return [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')].some(element => {
+    return [...document.querySelectorAll('.log li .msg, .trade-log li .msg')].some(element => {
       if (!/\bsays:\s*/i.test(element.textContent)) return false;
       const authorId = element.querySelector('a[href*="profiles.php?XID="]')?.href
         .match(/[?&]XID=(\d+)/i)?.[1] || '';
@@ -347,7 +347,7 @@
   function latestCounterpartMessageIs(text) {
     const expected = normalize(text);
     const selfId = currentUserId();
-    const messages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')]
+    const messages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')]
       .filter(el => /\bsays:\s*/i.test(el.textContent));
     // DOM is newest-first; find the first entry that belongs to the counterpart
     const latest = messages.find(el => {
@@ -593,7 +593,7 @@
         saveJob({ ...job, stage: 'awaiting_accept', awaitingAcceptAt: Date.now(), error: '' });
         return;
       }
-      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+      const allMessages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
       const wasDeclined = allMessages.some(el => /\bthe trade was declined by\b/i.test(el.textContent));
       const currentSignature = counterpartItemSignature();
       const itemsUnchanged = job.lastAcceptedItemSignature
@@ -813,7 +813,7 @@
       // This is immune to Torn spam-filtering duplicate thank-you submissions
       // which causes the DOM to show only the original (older) thank-you.
       const awaitingAcceptAt = job.awaitingAcceptAt || 0;
-      const allMessages = [...document.querySelectorAll('.log .msg, .trade-log .msg, .msg')];
+      const allMessages = [...document.querySelectorAll('.log li .msg, .trade-log li .msg')];
       const declineAfterEntry = allMessages.some(el => {
         if (!/\bthe trade was declined by\b/i.test(el.textContent)) return false;
         const ts = parseMsgTimestamp(el);
