@@ -201,6 +201,16 @@
     );
   }
 
+  function selfHasAcceptedInLog() {
+    const selfId = currentUserId();
+    return [...document.querySelectorAll('.log li .msg, .trade-log li .msg')].some(el => {
+      if (!/\bthe trade was accepted by\b/i.test(el.textContent)) return false;
+      const authorId = el.querySelector('a[href*="profiles.php?XID="]')?.href
+        .match(/[?&]XID=(\d+)/i)?.[1] || '';
+      return selfId && authorId && authorId === selfId;
+    });
+  }
+
   function pageShowsWeAccepted() {
     const text = normalize(document.body.textContent);
     return text.includes('you have accepted the trade') && text.includes('please wait for the other person to accept');
@@ -795,6 +805,16 @@
       // Counterpart declined after we already accepted — restart pricing
       if (tradeWasDeclinedAfterSelfAccepted()) {
         saveJob({ ...job, stage: 'waiting', acceptanceInvalidated: true, error: '' });
+        return;
+      }
+      // We already accepted — nothing left to do on our side; go process other trades
+      if (selfHasAcceptedInLog()) {
+        if (job.receiptId) {
+          try { await gmPost(`${job.receiptServerUrl || pricingServer()}/api/receipt/${job.receiptId}/complete`, {}); } catch (_) {}
+        }
+        saveJob({ ...job, stage: 'complete', error: '' });
+        completeJob(job.tradeId);
+        navigateTrade();
         return;
       }
       setTimeout(() => {
