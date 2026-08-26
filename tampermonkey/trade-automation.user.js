@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.7.0
+// @version      2.8.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -11,6 +11,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
 // @connect      api.torn.com
+// @require      https://cdn.socket.io/4.8.3/socket.io.min.js
 // @connect      itrade.devs.surf
 // @connect      localhost
 // @connect      127.0.0.1
@@ -1132,6 +1133,33 @@
   `;
   document.head.appendChild(style);
 
+  // ── Remote control via Socket.IO (real-time) with REST fallback ──────────────
+  let tradeSocket = null;
+
+  function executeRemoteCommand(cmd) {
+    if (cmd === 'skip') {
+      const job = getJob();
+      if (job) { deferLockedTrade(job.tradeId); navigateTrade(); }
+    }
+  }
+
+  function initTradeSocket() {
+    if (tradeSocket) return;
+    if (typeof io === 'undefined') return;
+    const url = pricingServer(getSettings());
+    try {
+      tradeSocket = io(url, { transports: ['websocket', 'polling'], reconnectionDelay: 3000 });
+      tradeSocket.on('connect', () => {
+        tradeSocket.emit('trade:join', 'trade-scripts', RECEIPT_TOKEN);
+        remoteStateReport(); // push current state immediately on connect
+      });
+      tradeSocket.on('trade:command', (cmd) => {
+        if (cmd?.action) executeRemoteCommand(cmd.action);
+      });
+      tradeSocket.on('connect_error', () => {}); // silent — REST fallback handles it
+    } catch (_) {}
+  }
+
   function remoteStateReport() {
     const settings = getSettings();
     if (!settings.enabled) return;
@@ -1139,6 +1167,11 @@
     const state = job
       ? { tradeId: job.tradeId, stage: job.stage, error: job.error || '' }
       : { tradeId: null, stage: 'idle', error: '' };
+    if (tradeSocket?.connected) {
+      tradeSocket.emit('trade:state', state, RECEIPT_TOKEN);
+      return;
+    }
+    // REST fallback when socket is not connected
     GM_xmlhttpRequest({
       method: 'PUT',
       url: `${pricingServer(settings)}/api/trade/state`,
@@ -1148,6 +1181,7 @@
   }
 
   function remoteCommandPoll() {
+    if (tradeSocket?.connected) return; // socket handles it; skip REST poll
     const settings = getSettings();
     if (!settings.enabled) return;
     GM_xmlhttpRequest({
@@ -1158,13 +1192,7 @@
       onload: (response) => {
         try {
           const { command } = JSON.parse(response.responseText);
-          if (command === 'skip') {
-            const job = getJob();
-            if (job) {
-              deferLockedTrade(job.tradeId);
-              navigateTrade();
-            }
-          }
+          if (command) executeRemoteCommand(command);
         } catch (_) {}
       },
     });
@@ -1172,6 +1200,7 @@
 
   GM_deleteValue('tta_completed_trades_v1');
   injectUi();
+  initTradeSocket();
   setInterval(tick, TICK_MS);
   setInterval(remoteStateReport, 5000);
   setInterval(remoteCommandPoll, 3000);

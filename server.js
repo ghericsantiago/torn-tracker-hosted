@@ -113,23 +113,30 @@ io.on('connection', (socket) => {
   });
 
   // ── Trade remote-control events ─────────────────────────────────────────
-  // Mobile control page joins 'trade-admins' to receive live state updates
-  // and issue commands.
   socket.on('trade:join', (role, auth) => {
     if (auth !== TRADE_CTRL_TOKEN) return;
     if (role === 'trade-admins') {
       socket.join('trade-admins');
-      socket.emit('trade:state', tradeCtrl.state);
+      socket.emit('trade:state', tradeCtrl.state); // send current state on join
+    } else if (role === 'trade-scripts') {
+      socket.join('trade-scripts');
     }
   });
 
-  // Mobile control page sends a command (e.g. { action: 'skip' })
+  // Script reports its current job state → forward to admin viewers
+  socket.on('trade:state', (state, auth) => {
+    if (auth !== TRADE_CTRL_TOKEN) return;
+    tradeCtrl.state = { ...state, updatedAt: Date.now() };
+    socket.to('trade-admins').emit('trade:state', tradeCtrl.state);
+  });
+
+  // Mobile sends a command → push directly to scripts + store for REST fallback
   socket.on('trade:command', (cmd, auth) => {
     if (auth !== TRADE_CTRL_TOKEN) return;
     if (!cmd || !['skip'].includes(cmd.action)) return;
-    tradeCtrl.command = cmd.action;
-    console.log(`[trade] command issued via socket: ${cmd.action}`);
-    // Acknowledge back to the sender so the UI can confirm
+    tradeCtrl.command = cmd.action; // REST polling fallback
+    io.to('trade-scripts').emit('trade:command', cmd); // real-time push
+    console.log(`[trade] command: ${cmd.action}`);
     socket.emit('trade:command-ack', { action: cmd.action, issuedAt: Date.now() });
   });
 
