@@ -219,3 +219,14 @@ Trades are **not** aggregated per item — they're grouped per **trade**.
    (or the matching detail builder) and record the extra fields in `details[]`.
 5. Optionally add a badge color in `FREE_SOURCE_BADGE` / `USAGE_SOURCE_BADGE`.
 6. Regenerate `LOG_TYPE_NAMES` from `log_types.json` if the title isn't in the script.
+
+---
+
+## 11. Trade automation companion behavior
+
+`tampermonkey/trade-automation.user.js` treats Torn's selected-page message `No trade was found. It
+may have expired, in which case the goods will be returned to you within 15 minutes.` as a terminal
+cancelled/expired trade. Before running any active-job stage, it applies the existing trade-id
+five-minute skip cooldown, clears the job, navigates back to the trade list, and proceeds with the
+next available trade. The terminal message is distinct from Torn's temporary locked-trade message,
+although both use the same safe skip/cooldown mechanism.

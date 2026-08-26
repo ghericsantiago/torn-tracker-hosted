@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.5.0
+// @version      2.5.1
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -136,6 +136,13 @@
   function pageShowsLockedTrade() {
     const pageText = normalize(document.body.textContent);
     return pageText.includes('this trade is currently locked') && pageText.includes('please wait');
+  }
+
+  function pageShowsMissingTrade() {
+    const pageText = normalize(document.body.textContent);
+    return pageText.includes('no trade was found')
+      && pageText.includes('it may have expired')
+      && pageText.includes('the goods will be returned to you within 15 minutes');
   }
 
   function parseHash() {
@@ -458,6 +465,12 @@
 
   async function handleView(settings, job, id) {
     if (!job || String(job.tradeId) !== String(id)) {
+      navigateTrade();
+      return;
+    }
+
+    if (pageShowsMissingTrade()) {
+      deferLockedTrade(job.tradeId);
       navigateTrade();
       return;
     }

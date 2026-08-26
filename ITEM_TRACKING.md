@@ -811,6 +811,11 @@ Cooldowns**. Lock detection scans the selected trade container's complete
 visible text rather than depending on a specific alert class. While any job is
 active, the floating panel also exposes **Skip Trade**, which manually applies
 the same trade-id-specific five-minute cooldown and clears the active job.
+The automation applies that skip behavior automatically when the selected page contains Torn's
+terminal `No trade was found. It may have expired...` message: it defers that trade id for five
+minutes, clears the job, returns to the trade list, and continues with another trade. This check
+runs before normal stage handling, so the missing trade cannot remain stuck retrying comments,
+pricing, money, or acceptance.
 The floating automation status and settings panel is anchored at the top-right
 of the viewport.
 While a trade is in the waiting stage, that panel displays **Price Now**. A

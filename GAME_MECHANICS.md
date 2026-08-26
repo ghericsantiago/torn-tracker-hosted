@@ -152,6 +152,10 @@ a limited-access key. Each summary includes the trade id, participants, and
 `GET /user/{tradeId}/trade`. API polling is the supported background mechanism
 for detecting changes to open trades.
 
+When a selected trade has been cancelled or expired, Torn can replace its contents with `No trade
+was found. It may have expired, in which case the goods will be returned to you within 15
+minutes.` This is a terminal missing-trade state, not a temporary lock or incomplete page render.
+
 Torn logs a completed trade as a **set of sub-logs** sharing one trade id
 (`parsed_trade_id`), split by side and content type:
 
