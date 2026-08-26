@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.6.0
+// @version      2.6.1
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -540,6 +540,12 @@
     }
 
     if (pageShowsLockedTrade() && ['opening', 'waiting', 'waiting_for_items', 'waiting_for_adjustment', 'pricing', 'receipt_posted', 'add_money'].includes(job.stage)) {
+      deferLockedTrade(job.tradeId);
+      navigateTrade();
+      return;
+    }
+
+    if (normalize(document.body.textContent).includes('you cannot remove anything from this trade as one party has already accepted it')) {
       deferLockedTrade(job.tradeId);
       navigateTrade();
       return;
