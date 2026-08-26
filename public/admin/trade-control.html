@@ -14,11 +14,10 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
       padding: 24px 16px;
       gap: 20px;
     }
-    h1 { font-size: 1.2rem; color: #aab4bf; letter-spacing: 0.04em; text-transform: uppercase; }
+    h1 { font-size: 1.15rem; color: #aab4bf; letter-spacing: 0.04em; text-transform: uppercase; }
     .card {
       width: 100%;
       max-width: 420px;
@@ -30,11 +29,12 @@
       flex-direction: column;
       gap: 14px;
     }
+    .hidden { display: none !important; }
     .row { display: flex; justify-content: space-between; align-items: center; }
     .label { font-size: 0.78rem; color: #7a8896; text-transform: uppercase; letter-spacing: 0.05em; }
     .value { font-size: 1rem; font-weight: 600; color: #e8edf2; }
-    .value.idle { color: #556070; }
-    .value.error { color: #e07070; }
+    .value.dim { color: #556070; }
+    .value.err { color: #e07070; }
     .badge {
       display: inline-block;
       padding: 3px 10px;
@@ -44,22 +44,18 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .badge.idle      { background: #252d36; color: #556070; }
-    .badge.waiting   { background: #1e3448; color: #5aabef; }
-    .badge.pricing   { background: #1e3332; color: #4dd4ac; }
-    .badge.posted    { background: #2a2a1e; color: #d4be4d; }
-    .badge.money     { background: #1e2e1e; color: #6dcc6d; }
-    .badge.accept    { background: #2e261e; color: #e8a84d; }
-    .badge.complete  { background: #1e2e1e; color: #4dcc7e; }
-    .badge.error     { background: #2e1e1e; color: #e07070; }
-    .status-dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: #3a4550;
-      flex-shrink: 0;
-    }
-    .status-dot.connected { background: #3acc7e; box-shadow: 0 0 6px #3acc7e88; }
-    .status-dot.disconnected { background: #cc4444; }
-    .conn-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #667788; }
+    .badge.idle    { background:#252d36;color:#556070 }
+    .badge.waiting { background:#1e3448;color:#5aabef }
+    .badge.pricing { background:#1e3332;color:#4dd4ac }
+    .badge.posted  { background:#2a2a1e;color:#d4be4d }
+    .badge.money   { background:#1e2e1e;color:#6dcc6d }
+    .badge.accept  { background:#2e261e;color:#e8a84d }
+    .badge.complete{ background:#1e2e1e;color:#4dcc7e }
+    .badge.error   { background:#2e1e1e;color:#e07070 }
+    .conn-row { display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#667788 }
+    .dot { width:10px;height:10px;border-radius:50%;background:#3a4550;flex-shrink:0 }
+    .dot.ok  { background:#3acc7e;box-shadow:0 0 6px #3acc7e88 }
+    .dot.bad { background:#cc4444 }
     .btn-skip {
       width: 100%;
       padding: 18px;
@@ -75,75 +71,74 @@
       transition: background 0.15s, transform 0.1s;
       -webkit-tap-highlight-color: transparent;
     }
-    .btn-skip:active { transform: scale(0.97); background: #a93226; }
-    .btn-skip:disabled { background: #2e3740; color: #556070; cursor: not-allowed; transform: none; }
+    .btn-skip:active   { transform:scale(0.97);background:#a93226 }
+    .btn-skip:disabled { background:#2e3740;color:#556070;cursor:not-allowed;transform:none }
+    .btn-link {
+      background: none; border: none; color: #4a6a8a;
+      font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0;
+    }
     .feedback {
-      text-align: center;
-      font-size: 0.85rem;
-      color: #5aabef;
-      min-height: 1.2em;
-      transition: opacity 0.3s;
+      text-align: center; font-size: 0.85rem; color: #5aabef;
+      min-height: 1.2em; transition: opacity 0.4s;
     }
-    .feedback.fade { opacity: 0; }
-    #token-form {
-      width: 100%;
-      max-width: 420px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .updated { font-size:0.72rem;color:#445060;text-align:right }
+    /* token form */
+    #token-section { width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px }
+    #token-section p  { font-size:0.83rem;color:#7a8896;line-height:1.5 }
+    #token-section code {
+      display:block;margin-top:6px;padding:8px 10px;border-radius:6px;
+      background:#11161a;color:#7ecbef;font-size:0.78rem;word-break:break-all;
+      border:1px solid #2a3440;user-select:all;cursor:text;
     }
-    #token-form input {
-      padding: 14px;
-      border-radius: 10px;
-      border: 1px solid #2e3740;
-      background: #1a2028;
-      color: #dde2e8;
-      font-size: 1rem;
-      width: 100%;
+    #token-section input {
+      padding:14px;border-radius:10px;border:1px solid #2e3740;
+      background:#1a2028;color:#dde2e8;font-size:0.95rem;width:100%;
     }
-    #token-form button {
-      padding: 14px;
-      border-radius: 10px;
-      border: none;
-      background: #1e4070;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
+    #token-section button.primary {
+      padding:14px;border-radius:10px;border:none;
+      background:#1e4070;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;
     }
-    .updated-at { font-size: 0.72rem; color: #445060; text-align: right; }
   </style>
 </head>
 <body>
   <h1>Trade Remote Control</h1>
 
-  <div id="token-form" style="display:none">
-    <p style="font-size:0.85rem;color:#7a8896">Enter your receipt token to connect</p>
-    <input id="token-input" type="password" placeholder="Receipt token" autocomplete="off">
-    <button id="token-submit">Connect</button>
+  <!-- Token entry (shown when no token saved) -->
+  <div id="token-section" class="hidden">
+    <p>
+      Paste your receipt token below. You can find it at the top of the
+      Tampermonkey script as <strong>RECEIPT_TOKEN</strong>:
+      <code>926cc7e6-5092-40cc-ba8a-a3f9b8070a6c</code>
+    </p>
+    <input id="token-input" type="text" placeholder="Paste token here…" autocomplete="off" spellcheck="false">
+    <button class="primary" id="token-submit">Connect</button>
   </div>
 
-  <div class="card" id="state-card" style="display:none">
+  <!-- Live state card -->
+  <div class="card hidden" id="state-card">
     <div class="conn-row">
-      <div class="status-dot" id="conn-dot"></div>
+      <div class="dot" id="conn-dot"></div>
       <span id="conn-label">Connecting…</span>
+      <button class="btn-link" id="btn-change-token" style="margin-left:auto">Change token</button>
     </div>
     <div class="row">
       <span class="label">Trade</span>
-      <span class="value" id="trade-id">—</span>
+      <span class="value dim" id="trade-id">—</span>
     </div>
     <div class="row">
       <span class="label">Stage</span>
       <span class="badge idle" id="stage-badge">idle</span>
     </div>
-    <div class="row" id="error-row" style="display:none">
+    <div class="row hidden" id="error-row">
       <span class="label">Error</span>
-      <span class="value error" id="trade-error"></span>
+      <span class="value err" id="trade-error"></span>
     </div>
-    <div class="updated-at" id="updated-at"></div>
+    <div class="updated" id="updated-at"></div>
   </div>
 
-  <div style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px" id="controls" style="display:none">
+  <!-- Controls -->
+  <div class="hidden" id="controls"
+       style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px">
     <button class="btn-skip" id="btn-skip" disabled>Skip Trade</button>
     <div class="feedback" id="feedback"></div>
   </div>
@@ -151,97 +146,100 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const TOKEN_KEY = 'trade_ctrl_token';
-    let socket = null;
-    let currentStage = 'idle';
-    let feedbackTimer = null;
+    let socket = null, feedbackTimer = null;
 
-    function savedToken() {
+    // ── token helpers ──────────────────────────────────────────────────────
+    function getToken() {
+      // URL param takes priority (allows bookmarking the full URL on mobile)
+      const p = new URLSearchParams(location.search).get('token');
+      if (p) { localStorage.setItem(TOKEN_KEY, p); return p; }
       return localStorage.getItem(TOKEN_KEY) || '';
     }
 
-    function showFeedback(text, color = '#5aabef') {
+    function clearToken() {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+
+    // ── UI helpers ─────────────────────────────────────────────────────────
+    function show(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function showFeedback(text, color) {
       const el = document.getElementById('feedback');
-      el.style.color = color;
+      el.style.color = color || '#5aabef';
       el.style.opacity = '1';
       el.textContent = text;
       clearTimeout(feedbackTimer);
-      feedbackTimer = setTimeout(() => { el.style.opacity = '0'; }, 3000);
+      feedbackTimer = setTimeout(() => { el.style.opacity = '0'; }, 3500);
     }
 
-    const STAGE_CLASS = {
-      idle: 'idle',
-      opening: 'waiting', waiting: 'waiting', waiting_for_items: 'waiting',
-      waiting_for_adjustment: 'waiting', pricing: 'pricing',
-      receipt_posted: 'posted', add_money: 'money', returning: 'money',
-      thank_posted: 'accept', awaiting_accept: 'accept',
-      complete: 'complete', reopened: 'waiting',
+    const STAGE_CLS = {
+      idle:'idle', opening:'waiting', waiting:'waiting',
+      waiting_for_items:'waiting', waiting_for_adjustment:'waiting',
+      pricing:'pricing', receipt_posted:'posted', add_money:'money',
+      returning:'money', thank_posted:'accept', awaiting_accept:'accept',
+      complete:'complete', reopened:'waiting',
     };
 
     function applyState(state) {
-      currentStage = state.stage || 'idle';
-      const tradeId = document.getElementById('trade-id');
+      const stage = state.stage || 'idle';
+      document.getElementById('trade-id').textContent = state.tradeId ? `#${state.tradeId}` : '—';
+      document.getElementById('trade-id').className = 'value' + (state.tradeId ? '' : ' dim');
+
       const badge = document.getElementById('stage-badge');
-      const errorRow = document.getElementById('error-row');
-      const errorEl = document.getElementById('trade-error');
-      const updatedAt = document.getElementById('updated-at');
-      const skipBtn = document.getElementById('btn-skip');
+      badge.className = 'badge ' + (STAGE_CLS[stage] || 'idle');
+      badge.textContent = stage.replace(/_/g, ' ');
 
-      tradeId.textContent = state.tradeId ? `#${state.tradeId}` : '—';
-      tradeId.className = 'value' + (state.tradeId ? '' : ' idle');
-
-      const cls = STAGE_CLASS[currentStage] || 'idle';
-      badge.className = `badge ${cls}`;
-      badge.textContent = currentStage.replace(/_/g, ' ');
-
+      const errRow = document.getElementById('error-row');
       if (state.error) {
-        errorRow.style.display = '';
-        errorEl.textContent = state.error;
+        errRow.classList.remove('hidden');
+        document.getElementById('trade-error').textContent = state.error;
       } else {
-        errorRow.style.display = 'none';
+        errRow.classList.add('hidden');
       }
 
       if (state.updatedAt) {
-        const d = new Date(state.updatedAt);
-        updatedAt.textContent = `Updated ${d.toLocaleTimeString()}`;
+        document.getElementById('updated-at').textContent =
+          'Updated ' + new Date(state.updatedAt).toLocaleTimeString();
       }
 
-      skipBtn.disabled = !state.tradeId || currentStage === 'idle';
+      document.getElementById('btn-skip').disabled = !state.tradeId || stage === 'idle';
     }
 
+    // ── socket connection ──────────────────────────────────────────────────
     function connect(token) {
-      if (socket) socket.disconnect();
+      if (socket) { socket.disconnect(); socket = null; }
 
       socket = io({ transports: ['websocket', 'polling'] });
 
-      const dot = document.getElementById('conn-dot');
-      const label = document.getElementById('conn-label');
-      const skipBtn = document.getElementById('btn-skip');
-
       socket.on('connect', () => {
-        dot.className = 'status-dot connected';
-        label.textContent = 'Connected';
+        document.getElementById('conn-dot').className = 'dot ok';
+        document.getElementById('conn-label').textContent = 'Connected';
         socket.emit('trade:join', 'trade-admins', token);
       });
 
-      socket.on('disconnect', () => {
-        dot.className = 'status-dot disconnected';
-        label.textContent = 'Disconnected — reconnecting…';
-        skipBtn.disabled = true;
+      socket.on('connect_error', () => {
+        document.getElementById('conn-dot').className = 'dot bad';
+        document.getElementById('conn-label').textContent = 'Connection failed — retrying…';
       });
 
-      socket.on('trade:state', (state) => {
-        applyState(state);
+      socket.on('disconnect', () => {
+        document.getElementById('conn-dot').className = 'dot bad';
+        document.getElementById('conn-label').textContent = 'Disconnected — reconnecting…';
+        document.getElementById('btn-skip').disabled = true;
       });
+
+      socket.on('trade:state', applyState);
 
       socket.on('trade:command-ack', (data) => {
-        showFeedback(`Skip command sent (${new Date(data.issuedAt).toLocaleTimeString()})`, '#6dcc6d');
+        showFeedback('Skip command sent ✓', '#6dcc6d');
       });
     }
 
+    // ── events ─────────────────────────────────────────────────────────────
     document.getElementById('btn-skip').addEventListener('click', () => {
       if (!socket?.connected) return;
-      const token = savedToken();
-      socket.emit('trade:command', { action: 'skip' }, token);
+      socket.emit('trade:command', { action: 'skip' }, getToken());
       showFeedback('Sending skip command…', '#d4be4d');
     });
 
@@ -249,20 +247,29 @@
       const token = document.getElementById('token-input').value.trim();
       if (!token) return;
       localStorage.setItem(TOKEN_KEY, token);
-      document.getElementById('token-form').style.display = 'none';
-      document.getElementById('state-card').style.display = '';
-      document.getElementById('controls').style.display = '';
+      hide('token-section');
+      show('state-card');
+      show('controls');
       connect(token);
     });
 
-    // Auto-connect if token already saved
-    const existing = savedToken();
-    if (existing) {
-      document.getElementById('state-card').style.display = '';
-      document.getElementById('controls').style.display = '';
-      connect(existing);
+    document.getElementById('btn-change-token').addEventListener('click', () => {
+      if (socket) { socket.disconnect(); socket = null; }
+      clearToken();
+      hide('state-card');
+      hide('controls');
+      document.getElementById('token-input').value = '';
+      show('token-section');
+    });
+
+    // ── auto-connect ───────────────────────────────────────────────────────
+    const saved = getToken();
+    if (saved) {
+      show('state-card');
+      show('controls');
+      connect(saved);
     } else {
-      document.getElementById('token-form').style.display = '';
+      show('token-section');
     }
   </script>
 </body>
