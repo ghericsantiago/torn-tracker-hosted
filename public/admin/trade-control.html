@@ -134,11 +134,6 @@
       <span class="value err" id="trade-error"></span>
     </div>
     <div class="updated" id="updated-at">Waiting for first update…</div>
-  </div>
-
-  <!-- Controls -->
-  <div class="hidden" id="controls"
-       style="width:100%;max-width:420px;display:flex;flex-direction:column;gap:10px">
     <button class="btn-skip" id="btn-skip" disabled>Skip Trade</button>
     <div class="feedback" id="feedback"></div>
   </div>
@@ -212,7 +207,10 @@
 
       lastStateAt = Date.now();
 
-      document.getElementById('btn-skip').disabled = !state.tradeId || stage === 'idle';
+      const hasActiveTrade = !!state.tradeId && stage !== 'idle';
+      const skipBtn = document.getElementById('btn-skip');
+      skipBtn.disabled = !hasActiveTrade;
+      skipBtn.textContent = hasActiveTrade ? 'Skip Trade' : 'No active trade';
     }
 
     // ── socket connection ──────────────────────────────────────────────────
@@ -235,7 +233,9 @@
       socket.on('disconnect', () => {
         document.getElementById('conn-dot').className = 'dot bad';
         document.getElementById('conn-label').textContent = 'Disconnected — reconnecting…';
-        document.getElementById('btn-skip').disabled = true;
+        const s = document.getElementById('btn-skip');
+        s.disabled = true;
+        s.textContent = 'No active trade';
       });
 
       socket.on('trade:state', applyState);
@@ -258,7 +258,6 @@
       localStorage.setItem(TOKEN_KEY, token);
       hide('token-section');
       show('state-card');
-      show('controls');
       connect(token);
     });
 
@@ -275,7 +274,6 @@
     const saved = getToken();
     if (saved) {
       show('state-card');
-      show('controls');
       connect(saved);
     } else {
       show('token-section');
