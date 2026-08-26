@@ -43,6 +43,7 @@
     apiKey: '',
     apiPollSeconds: 30,
     waitSeconds: 60,
+    bloodBagTriggerMinutes: 5,
     pricingServerUrl: DEFAULT_APP_URL,
     requestMessage: 'Hi! Please add your items. Thanks',
     receiptMessage: 'Receipt: {url} | Total: {total}',
@@ -771,7 +772,8 @@
   function checkHospitalBloodBag(settings) {
     if (!settings.enabled) return false;
     const remaining = hospitalSecondsRemaining();
-    if (remaining === null || remaining <= 0 || remaining > HOSPITAL_TRIGGER_SECS) return false;
+    const triggerSecs = Math.max(1, Number(settings.bloodBagTriggerMinutes) || 5) * 60;
+    if (remaining === null || remaining <= 0 || remaining > triggerSecs) return false;
     const stamp = Number(document.getElementById('topHeaderBanner')?.dataset.hospital || 0);
     const saved = readJson(BLOODBAG_KEY, null);
     if (saved?.stamp === stamp) return false;
@@ -856,6 +858,9 @@
         <label>Wait before continuing <small>(seconds)</small>
           <input id="tta-wait" type="number" min="5" max="3600" value="${settings.waitSeconds}">
         </label>
+        <label>Use blood bag when hospital time is under <small>(minutes)</small>
+          <input id="tta-bloodbag-trigger" type="number" min="1" max="60" value="${settings.bloodBagTriggerMinutes}">
+        </label>
         <label>Pricing server URL <small>(use http://localhost:3001 for local testing)</small>
           <input id="tta-server-url" type="url" value="${escapeHtml(settings.pricingServerUrl)}">
         </label>
@@ -898,6 +903,7 @@
         apiKey: overlay.querySelector('#tta-api-key').value.trim(),
         apiPollSeconds: Math.min(3600, Math.max(15, Number(overlay.querySelector('#tta-api-interval').value) || 30)),
         waitSeconds: Math.min(3600, Math.max(5, Number(overlay.querySelector('#tta-wait').value) || 30)),
+        bloodBagTriggerMinutes: Math.min(60, Math.max(1, Number(overlay.querySelector('#tta-bloodbag-trigger').value) || 5)),
         pricingServerUrl: overlay.querySelector('#tta-server-url').value.trim().replace(/\/+$/, '') || DEFAULT_APP_URL,
         requestMessage: overlay.querySelector('#tta-request').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.requestMessage,
         receiptMessage: overlay.querySelector('#tta-receipt').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.receiptMessage,
