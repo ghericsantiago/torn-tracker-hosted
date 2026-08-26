@@ -69,6 +69,7 @@
   let busy = false;
   let lastApiPoll = 0;
   let remoteStatus = 'idle'; // 'idle' | 'ok' | 'error'
+  let remoteStatusDetail = '…';
 
   function readJson(key, fallback) {
     try {
@@ -1088,9 +1089,8 @@
     if (!toggle || !state || !priceNow || !skip) return;
     if (remoteDot) {
       const color = remoteStatus === 'ok' ? '#3acc7e' : remoteStatus === 'error' ? '#e05555' : '#556070';
-      const tip = remoteStatus === 'ok' ? 'Remote sync: OK' : remoteStatus === 'error' ? 'Remote sync: FAILED' : 'Remote sync: waiting…';
       remoteDot.style.cssText = `color:${color};font-size:10px;line-height:1`;
-      remoteDot.title = tip;
+      remoteDot.title = `Remote sync: ${remoteStatusDetail}`;
     }
     toggle.textContent = settings.enabled ? 'Automation: ON' : 'Automation: OFF';
     toggle.classList.toggle('on', settings.enabled);
@@ -1161,10 +1161,11 @@
       timeout: 8000,
       onload: (r) => {
         remoteStatus = r.status >= 200 && r.status < 300 ? 'ok' : 'error';
+        remoteStatusDetail = r.status >= 200 && r.status < 300 ? `OK (${r.status})` : `HTTP ${r.status}`;
         renderStatus();
       },
-      onerror: () => { remoteStatus = 'error'; renderStatus(); },
-      ontimeout: () => { remoteStatus = 'error'; renderStatus(); },
+      onerror: () => { remoteStatus = 'error'; remoteStatusDetail = 'Network error'; renderStatus(); },
+      ontimeout: () => { remoteStatus = 'error'; remoteStatusDetail = 'Timeout'; renderStatus(); },
     });
   }
 
