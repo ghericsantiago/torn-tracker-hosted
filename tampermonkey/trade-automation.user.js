@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.9.0
+// @version      2.10.0
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -33,6 +33,7 @@
   const NAV_GUARD_MS = 60000;
   const ITEM_SETTLE_MS = 10000;
   const AUTO_SKIP_MS = 2 * 60 * 1000; // 2 minutes
+  const COMPLETED_RECHECK_MS = 5 * 60 * 1000; // 5 minutes
   // Stages the script should complete quickly; auto-skip if stuck longer than AUTO_SKIP_MS
   const AUTO_SKIP_STAGES = new Set(['opening', 'pricing', 'receipt_posted', 'add_money', 'returning', 'thank_posted', 'reopened']);
   const BLOODBAG_KEY = 'tta_bloodbag_v1';
@@ -143,6 +144,20 @@
     });
     writeJson(DONE_KEY, completed);
     clearJob(tradeId);
+  }
+
+  function isTradeCompleted(tradeId) {
+    const completed = readJson(DONE_KEY, {});
+    const entry = completed[String(tradeId)];
+    if (!entry) return false;
+    const at = typeof entry === 'number' ? entry : entry?.at;
+    if (!at) return false;
+    return Date.now() - at < COMPLETED_RECHECK_MS;
+  }
+
+  function getCompletedEntry(tradeId) {
+    const completed = readJson(DONE_KEY, {});
+    return completed[String(tradeId)] || null;
   }
 
   function activeLockedTrades() {
@@ -340,10 +355,25 @@
     const locked = activeLockedTrades();
     const eligible = (Array.isArray(data.trades) ? data.trades : [])
       .filter(trade => trade?.id && !locked[String(trade.id)]);
-    const pending = eligible.filter(t => !completed[String(t.id)]);
+    const pending = eligible.filter(t => {
+      const entry = completed[String(t.id)];
+      if (!entry) return true;
+      const at = typeof entry === 'number' ? entry : entry?.at;
+      if (!at) return true;
+      // Skip if completed within the recheck window
+      if (Date.now() - at < COMPLETED_RECHECK_MS) return false;
+      // Allow as reopened after cooldown
+      return true;
+    });
     const sorted = arr => arr.sort((a, b) => Number(a.expires_at || Infinity) - Number(b.expires_at || Infinity));
     if (pending.length) return sorted(pending)[0];
-    const reopened = eligible.filter(t => completed[String(t.id)]);
+    const reopened = eligible.filter(t => {
+      const entry = completed[String(t.id)];
+      if (!entry) return false;
+      const at = typeof entry === 'number' ? entry : entry?.at;
+      if (!at) return false;
+      return Date.now() - at >= COMPLETED_RECHECK_MS;
+    });
     return reopened.length ? { ...sorted(reopened)[0], reopened: true } : null;
   }
 
@@ -461,11 +491,23 @@
         const link = row.querySelector('a[href*="step=view"][href*="ID="]');
         const id = link?.href.match(/[?&#]ID=(\d+)/i)?.[1];
         if (!id || locked[String(id)]) return null;
-        return { row, link, id, expires: expirySeconds(row), reopened: Boolean(completed[String(id)]) };
+        const entry = completed[String(id)];
+        const isCompleted = entry ? true : false;
+        const at = entry ? (typeof entry === 'number' ? entry : entry?.at) : null;
+        const isRecent = at ? (Date.now() - at < COMPLETED_RECHECK_MS) : false;
+        // Skip if completed within the recheck window
+        if (isCompleted && isRecent) return null;
+        // Mark as reopened if completed and cooldown has passed
+        const reopened = isCompleted && !isRecent;
+        return { row, link, id, expires: expirySeconds(row), reopened };
       })
       .filter(Boolean);
     candidates.sort((a, b) => a.expires - b.expires);
-    return candidates.find(c => !c.reopened) || candidates.find(c => c.reopened) || null;
+    // Prefer non-reopened trades
+    const nonReopened = candidates.find(c => !c.reopened);
+    if (nonReopened) return nonReopened;
+    // Then reopened trades
+    return candidates.find(c => c.reopened) || null;
   }
 
   function pendingTradeAlert() {
@@ -552,8 +594,8 @@
         const completed = readJson(DONE_KEY, {});
         const entry = completed[String(oldest.id)];
         lastAcceptedItemSignature = typeof entry === 'object' ? (entry?.itemSignature || '') : '';
-        delete completed[String(oldest.id)];
-        writeJson(DONE_KEY, completed);
+        // Keep completed entry for future reference; it will be used to pass itemSignature
+        // but we don't delete it yet - we'll use it when reopening
       }
       saveJob({ tradeId: oldest.id, stage: oldest.reopened ? 'reopened' : 'opening', startedAt: Date.now(), lastAcceptedItemSignature });
       navigateTrade('view', oldest.id);
@@ -975,8 +1017,7 @@
             const completed = readJson(DONE_KEY, {});
             const entry = completed[String(apiTrade.id)];
             lastAcceptedItemSignature = typeof entry === 'object' ? (entry?.itemSignature || '') : '';
-            delete completed[String(apiTrade.id)];
-            writeJson(DONE_KEY, completed);
+            // Keep completed entry for future reference
           }
           job = { tradeId: String(apiTrade.id), stage: apiTrade.reopened ? 'reopened' : 'opening', startedAt: Date.now(), lastAcceptedItemSignature };
           saveJob(job);
