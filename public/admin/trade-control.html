@@ -82,6 +82,14 @@
     .btn-toggle.on  { background: #176b39; }
     .btn-toggle.off { background: #2e3740; }
     .btn-toggle:active { transform: scale(0.97); }
+    .btn-price {
+      width: 100%; padding: 14px; font-size: 1rem; font-weight: 700;
+      border: none; border-radius: 12px; cursor: pointer; color: #fff;
+      background: #0e4a5c; transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-price:active  { transform: scale(0.97); background: #0b3a49; }
+    .btn-price:disabled { background: #2e3740; color: #556070; cursor: not-allowed; transform: none; }
     .btn-link {
       background: none; border: none; color: #4a6a8a;
       font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0;
@@ -156,6 +164,7 @@
     </div>
     <div class="updated" id="updated-at">Waiting for first update…</div>
     <button class="btn-toggle" id="btn-toggle">Automation: —</button>
+    <button class="btn-price" id="btn-price" disabled>Price Now</button>
     <button class="btn-skip" id="btn-skip" disabled>Skip Trade</button>
     <div class="feedback" id="feedback"></div>
   </div>
@@ -268,6 +277,10 @@
       const skipBtn = document.getElementById('btn-skip');
       skipBtn.disabled = !hasActiveTrade;
       skipBtn.textContent = hasActiveTrade ? 'Skip Trade' : 'No active trade';
+
+      const canPriceNow = hasActiveTrade && ['waiting', 'waiting_for_items', 'waiting_for_adjustment', 'reopened'].includes(stage);
+      const priceBtn = document.getElementById('btn-price');
+      priceBtn.disabled = !canPriceNow;
     }
 
     // ── socket connection ──────────────────────────────────────────────────
@@ -307,6 +320,12 @@
       if (!socket?.connected) return;
       socket.emit('trade:command', { action: 'toggle' }, getToken());
       showFeedback('Toggling automation…', '#5aabef');
+    });
+
+    document.getElementById('btn-price').addEventListener('click', () => {
+      if (!socket?.connected) return;
+      socket.emit('trade:command', { action: 'price_now' }, getToken());
+      showFeedback('Pricing now…', '#4dd4ac');
     });
 
     document.getElementById('btn-skip').addEventListener('click', () => {

@@ -1302,6 +1302,12 @@
             saveSettings(s);
             renderStatus();
             tick();
+          } else if (command === 'price_now') {
+            const job = getJob();
+            if (job && ['waiting', 'waiting_for_items', 'waiting_for_adjustment', 'reopened'].includes(job.stage)) {
+              saveJob({ ...job, deadline: Date.now() - 1, defaultDeadline: Date.now() - 1 });
+              tick();
+            }
           }
         } catch (_) {}
       },
