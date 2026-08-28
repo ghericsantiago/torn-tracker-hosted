@@ -644,10 +644,10 @@
       return;
     }
 
-    const prices = records.map(r => r.price).filter(p => p != null);
+    const prices = records.map(r => Number(r.price)).filter(p => !isNaN(p));
     const lo     = Math.min(...prices);
     const hi     = Math.max(...prices);
-    const avg    = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
+    const avg    = prices.length ? Math.round(prices.reduce((s, p) => s + p, 0) / prices.length) : null;
     const latest = records[records.length - 1];
 
     const legendItems = [
@@ -692,7 +692,8 @@
 
       const points = records
         .filter(r => r.price != null && r.created_at)
-        .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
+        .map(r => ({ x: new Date(r.created_at).getTime(), y: Number(r.price) }))
+        .filter(p => !isNaN(p.y));
 
       const avgPrice = points.length
         ? Math.round(points.reduce((s, p) => s + p.y, 0) / points.length)
