@@ -484,7 +484,7 @@ router.get('/api/receipts', cors(CORS_TORN), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/item-offering/:itemId — return our current bazaar/inventory snapshot for an item
+// GET /api/item-offering/:itemId — bazaar/inventory snapshot + receipt price in one call
 router.options('/api/item-offering/:itemId', cors(CORS_TORN));
 router.get('/api/item-offering/:itemId', cors(CORS_TORN), async (req, res) => {
   try {
@@ -492,24 +492,75 @@ router.get('/api/item-offering/:itemId', cors(CORS_TORN), async (req, res) => {
     const itemId = Number(req.params.itemId);
     if (!itemId) return res.status(400).json({ error: 'Invalid item_id' });
 
-    const { rows } = await db.query(`
-      SELECT DISTINCT ON (location) location, qty, list_price, taken_at
-      FROM torn_inventory_snapshots
-      WHERE item_id = $1
-      ORDER BY location, taken_at DESC
-    `, [itemId]);
+    const [snapRes, listingRes, itemRes, ceilingRows, profileRes, latestMarketRes] = await Promise.all([
+      db.query(
+        `SELECT DISTINCT ON (location) location, qty, list_price, taken_at
+         FROM torn_inventory_snapshots WHERE item_id = $1
+         ORDER BY location, taken_at DESC`,
+        [itemId]
+      ),
+      db.query(PRICE_LOOKUP, [[itemId]]),
+      db.query('SELECT id, name, type, market_price FROM torn_items WHERE id = $1', [itemId]),
+      db.query(
+        `WITH obs AS (
+           SELECT item_id, price, created_at,
+                  (created_at AT TIME ZONE 'Asia/Manila')::date AS tracked_date
+           FROM item_market WHERE item_id = $1 AND price IS NOT NULL
+         ), latest_day AS (
+           SELECT MAX(tracked_date) AS tracked_date FROM obs
+         )
+         SELECT obs.item_id, obs.price, obs.created_at, obs.tracked_date
+         FROM obs JOIN latest_day ON obs.tracked_date = latest_day.tracked_date
+         ORDER BY obs.price, obs.created_at`,
+        [itemId]
+      ),
+      db.query('SELECT default_market_pct, market_protection_enabled FROM trade_profiles WHERE id = 1'),
+      db.query(
+        'SELECT price, created_at FROM item_market WHERE item_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [itemId]
+      ),
+    ]);
 
-    const baz  = rows.find(r => r.location === 'bazaar');
-    const inv  = rows.find(r => r.location === 'inventory');
-    const disp = rows.find(r => r.location === 'display');
+    // Inventory snapshot
+    const baz  = snapRes.rows.find(r => r.location === 'bazaar');
+    const inv  = snapRes.rows.find(r => r.location === 'inventory');
+    const disp = snapRes.rows.find(r => r.location === 'display');
+
+    // Receipt price cascade (mirrors buildPricedItems logic)
+    const listing    = listingRes.rows[0] || null;
+    const baseItem   = itemRes.rows[0] || null;
+    const globalPct  = profileRes.rows[0]?.default_market_pct ?? null;
+    const marketPrice = listing
+      ? (Number(listing.market_price) || null)
+      : (baseItem?.market_price ? Number(baseItem.market_price) : null);
+
+    let catalogPrice = listing ? (Number(listing.effective_price) || null) : null;
+    if (!listing && marketPrice && globalPct) {
+      catalogPrice = Math.round(marketPrice * Number(globalPct));
+    }
+
+    const resaleCeilingMap  = selectDailyResaleCeiling(ceilingRows.rows);
+    const resaleCeiling     = resaleCeilingMap.get(itemId) || null;
+    const latestMarket      = latestMarketRes.rows[0] || null;
 
     res.json({
       item_id:     itemId,
+      // Inventory snapshot
       baz_price:   baz?.list_price ? Number(baz.list_price) : null,
       baz_qty:     baz  ? Number(baz.qty)  : 0,
       inv_qty:     inv  ? Number(inv.qty)  : 0,
       disp_qty:    disp ? Number(disp.qty) : 0,
       snapshot_at: baz?.taken_at || inv?.taken_at || null,
+      // Receipt pricing
+      in_catalog:            listing?.is_active === true,
+      price_mode:            listing?.price_mode || (catalogPrice != null && !listing ? 'market_pct' : null),
+      resolved_pct:          listing ? Number(listing.resolved_pct) : (globalPct ? Number(globalPct) : null),
+      market_price:          marketPrice,
+      catalog_price:         catalogPrice,
+      latest_lowest_price:   latestMarket?.price != null ? Number(latestMarket.price) : null,
+      latest_lowest_at:      latestMarket?.created_at || null,
+      market_reference_price: resaleCeiling?.price != null ? Number(resaleCeiling.price) : null,
+      market_reference_date:  resaleCeiling?.tracked_date || null,
     });
   } catch (err) {
     console.error('[item-offering]', err.message);

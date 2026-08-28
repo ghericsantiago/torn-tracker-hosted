@@ -157,19 +157,28 @@
     #mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
     #mp-empty { text-align: center; color: var(--mp-muted); padding: 60px 0; font-size: 12px; line-height: 2.2; }
 
-    /* Our offering banner */
+    /* Our position card */
     #mp-our-offer {
-      background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.2);
-      border-radius: 10px; padding: 11px 14px;
-      display: flex; align-items: center; gap: 14px;
+      background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.18);
+      border-radius: 10px; overflow: hidden;
     }
-    #mp-our-offer .oo-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mp-accent); margin-bottom: 4px; }
-    #mp-our-offer .oo-price { font-size: 18px; font-weight: 700; color: #e2e8f0; font-family: var(--mp-mono); }
-    #mp-our-offer .oo-meta  { font-size: 10px; color: var(--mp-dim); margin-top: 2px; }
-    #mp-our-offer .oo-stocks { display: flex; gap: 10px; margin-left: auto; }
-    #mp-our-offer .oo-stock  { text-align: center; }
-    #mp-our-offer .oo-stock-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
-    #mp-our-offer .oo-stock-lbl { font-size: 9px; color: var(--mp-muted); text-transform: uppercase; }
+    .oo-card-hdr {
+      padding: 7px 14px; font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--mp-accent);
+      border-bottom: 1px solid rgba(74,222,128,0.12);
+      background: rgba(74,222,128,0.04);
+    }
+    .oo-row {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .oo-row:last-child { border-bottom: none; }
+    .oo-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mp-muted); width: 90px; flex-shrink: 0; }
+    .oo-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
+    .oo-val.green  { color: #4ade80; }
+    .oo-val.yellow { color: #fbbf24; }
+    .oo-val.cyan   { color: #22d3ee; }
+    .oo-meta { font-size: 10px; color: var(--mp-muted); margin-left: 2px; }
 
     /* Section cards */
     .mp-sec { background: var(--mp-card); border: 1px solid var(--mp-border); border-radius: 10px; overflow: hidden; }
@@ -404,31 +413,42 @@
   }
 
   function renderOurOffering(el, d) {
-    const hasAny = d.baz_qty > 0 || d.inv_qty > 0 || d.disp_qty > 0;
-    if (!hasAny) {
-      el.innerHTML = `<span style="font-size:11px;color:#64748b">Not currently in bazaar or inventory</span>`;
-      el.style.padding = '10px 14px';
-      return;
-    }
+    const pctLabel = d.resolved_pct != null
+      ? ` · ${Math.round(d.resolved_pct * 100)}% market`
+      : '';
+    const modeLabel = d.price_mode === 'fixed' ? ' · fixed' : pctLabel;
+    const inCatalog = d.in_catalog ? '' : ' · <span style="color:#f87171">not in catalog</span>';
+
+    const stockMeta = [
+      d.baz_qty  > 0 ? `×${d.baz_qty} baz`  : null,
+      d.inv_qty  > 0 ? `×${d.inv_qty} inv`  : null,
+      d.disp_qty > 0 ? `×${d.disp_qty} disp` : null,
+    ].filter(Boolean).join('  ');
 
     const snap = d.snapshot_at ? fmtIso(d.snapshot_at) : '—';
+
     el.outerHTML = `
       <div id="mp-our-offer">
-        <div style="flex:1;min-width:0">
-          <div class="oo-label">Our Offering</div>
-          <div class="oo-price">${d.baz_price ? fmtFull(d.baz_price) : '—'}</div>
-          <div class="oo-meta">Snapshot ${snap}</div>
+        <div class="oo-card-hdr">Our Position</div>
+        <div class="oo-row">
+          <span class="oo-lbl">Receipt Price</span>
+          <span class="oo-val green">${d.catalog_price != null ? fmtFull(d.catalog_price) : '—'}</span>
+          <span class="oo-meta">${modeLabel}${inCatalog}</span>
         </div>
-        <div class="oo-stocks">
-          <div class="oo-stock">
-            <div class="oo-stock-val">${d.baz_qty}</div>
-            <div class="oo-stock-lbl">Bazaar</div>
-          </div>
-          <div class="oo-stock">
-            <div class="oo-stock-val">${d.inv_qty}</div>
-            <div class="oo-stock-lbl">Inventory</div>
-          </div>
-          ${d.disp_qty > 0 ? `<div class="oo-stock"><div class="oo-stock-val">${d.disp_qty}</div><div class="oo-stock-lbl">Display</div></div>` : ''}
+        <div class="oo-row">
+          <span class="oo-lbl">Bazaar Listing</span>
+          <span class="oo-val yellow">${d.baz_price != null ? fmtFull(d.baz_price) : '—'}</span>
+          <span class="oo-meta">${stockMeta || 'not listed'} · snap ${snap}</span>
+        </div>
+        <div class="oo-row">
+          <span class="oo-lbl">Market Ref</span>
+          <span class="oo-val cyan">${d.market_reference_price != null ? fmtFull(d.market_reference_price) : '—'}</span>
+          <span class="oo-meta">${d.market_reference_date ? 'resale ceiling · ' + d.market_reference_date : 'no ceiling data'}</span>
+        </div>
+        <div class="oo-row">
+          <span class="oo-lbl">Torn Ref</span>
+          <span class="oo-val">${d.market_price != null ? fmtFull(d.market_price) : '—'}</span>
+          <span class="oo-meta">latest IMA: ${d.latest_lowest_price != null ? fmtFull(d.latest_lowest_price) : '—'}</span>
         </div>
       </div>
     `;
