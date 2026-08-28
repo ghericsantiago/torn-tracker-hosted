@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.5.0
+// @version      1.5.1
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -675,8 +675,8 @@
     const prices = records.map(r => Number(r.price)).filter(p => !isNaN(p));
     const lo     = Math.min(...prices);
     const hi     = Math.max(...prices);
-    const avg    = prices.length ? Math.round(prices.reduce((s, p) => s + p, 0) / prices.length) : null;
     const latest = records[records.length - 1];
+    const avg    = latest?.average_price != null ? Number(latest.average_price) : null;
 
     const legendItems = [
       `<div class="mp-legend-item"><div class="mp-legend-line" style="background:#22d3ee"></div>Price</div>`,
@@ -723,9 +723,10 @@
         .map(r => ({ x: new Date(r.created_at).getTime(), y: Number(r.price) }))
         .filter(p => !isNaN(p.y));
 
-      const avgPrice = points.length
-        ? Math.round(points.reduce((s, p) => s + p.y, 0) / points.length)
-        : null;
+      const avgPoints = records
+        .filter(r => r.average_price != null && r.created_at)
+        .map(r => ({ x: new Date(r.created_at).getTime(), y: Number(r.average_price) }))
+        .filter(p => !isNaN(p.y));
 
       const datasets = [
         {
@@ -741,10 +742,10 @@
         },
       ];
 
-      // Average price — gray dashed horizontal lane (non-interactive)
-      if (avgPrice != null) {
+      // Average price — Torn market average as time-series (non-interactive)
+      if (avgPoints.length > 0) {
         datasets.push({
-          data: [{ x: xMin, y: avgPrice }, { x: xMax, y: avgPrice }],
+          data: avgPoints,
           borderColor: 'rgba(148,163,184,0.55)',
           borderWidth: 1,
           borderDash: [3, 3],
