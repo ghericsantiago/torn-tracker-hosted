@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.2.0
+// @version      1.3.0
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -47,11 +47,21 @@
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
            d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
-  function fmtDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${d.getDate()} ${mo[d.getMonth()]}`;
+  function fmtDay(utcDate) {
+    return utcDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
+  function fmtHHMM(ms) {
+    const d = new Date(ms);
+    return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  }
+  function todayUTC() {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  }
+  function sameDay(a, b) {
+    return a.getUTCFullYear() === b.getUTCFullYear() &&
+           a.getUTCMonth()    === b.getUTCMonth()    &&
+           a.getUTCDate()     === b.getUTCDate();
   }
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c =>
@@ -73,6 +83,7 @@
   let currentItem = null;
   let acTimer     = null;
   let imaChart    = null;
+  let imaState    = { itemId: null, date: null, refPrice: null, catalogPrice: null };
 
   // ── Styles ────────────────────────────────────────────────────────────────
   GM_addStyle(`
@@ -86,8 +97,6 @@
       --mp-tr:      0.18s ease;
       --mp-mono:    'JetBrains Mono', monospace;
     }
-
-    /* ── Toggle ── */
     #mp-toggle {
       position: fixed; left: 0; top: 50%; transform: translateY(-50%);
       background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.22);
@@ -102,7 +111,6 @@
     #mp-toggle:hover { background: rgba(74,222,128,0.15); }
     #mp-toggle.open  { opacity: 0; pointer-events: none; }
 
-    /* ── Panel ── */
     #mp-panel {
       position: fixed; top: 0; left: -540px; width: min(520px, 100vw);
       height: 100dvh; background: rgba(7,8,15,0.97);
@@ -116,7 +124,6 @@
     }
     #mp-panel.open { left: 0; }
 
-    /* ── Header ── */
     #mp-hdr {
       padding: 13px 16px 11px; border-bottom: 1px solid var(--mp-border);
       background: rgba(74,222,128,0.03); flex-shrink: 0;
@@ -132,7 +139,6 @@
     }
     .mp-icon-btn:hover { color: #e2e8f0; }
 
-    /* ── Search ── */
     #mp-search-wrap {
       padding: 11px 14px; border-bottom: 1px solid var(--mp-border);
       flex-shrink: 0; position: relative;
@@ -162,43 +168,59 @@
     .mp-ac-row:last-child { border-bottom: none; }
     .mp-ac-id { color: var(--mp-muted); font-size: 10px; font-family: var(--mp-mono); }
 
-    /* ── Body ── */
     #mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
     #mp-empty { text-align: center; color: var(--mp-muted); padding: 60px 0; font-size: 12px; line-height: 2.2; }
 
-    /* ── Receipt Strip ── */
+    /* Receipt strip */
     #mp-receipt-strip {
       display: flex; gap: 1px; background: var(--mp-border);
       border: 1px solid rgba(74,222,128,0.18); border-radius: 10px; overflow: hidden;
     }
-    .rs-cell {
-      flex: 1; background: var(--mp-bg); padding: 9px 12px;
-      display: flex; flex-direction: column; gap: 2px;
-    }
+    .rs-cell { flex: 1; background: var(--mp-bg); padding: 9px 12px; display: flex; flex-direction: column; gap: 2px; }
     .rs-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mp-muted); }
     .rs-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
-    .rs-val.green  { color: #4ade80; }
-    .rs-val.cyan   { color: #22d3ee; }
+    .rs-val.green { color: #4ade80; }
+    .rs-val.cyan  { color: #22d3ee; }
     .rs-sub { font-size: 9px; color: var(--mp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ── Markets Row (side-by-side) ── */
+    /* Markets side-by-side */
     #mp-markets-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-    /* ── Section Cards ── */
+    /* Section cards */
     .mp-sec { background: var(--mp-card); border: 1px solid var(--mp-border); border-radius: 10px; overflow: hidden; min-width: 0; }
     .mp-sec-hdr {
       padding: 7px 10px; border-bottom: 1px solid var(--mp-border);
       font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--mp-muted);
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     }
-    .mp-sec-hdr .mp-sub { margin-left: auto; font-weight: 400; font-size: 9px; }
     .mp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
     .mp-dot.green  { background: #4ade80; }
     .mp-dot.yellow { background: #fbbf24; }
     .mp-dot.cyan   { background: #22d3ee; }
 
-    /* Compact key-stat inside narrow card */
+    /* IMA date navigation */
+    .mp-date-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .mp-nav-btn {
+      background: rgba(255,255,255,0.06); border: 1px solid var(--mp-border);
+      color: var(--mp-dim); width: 18px; height: 18px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; display: flex; align-items: center;
+      justify-content: center; padding: 0; line-height: 1;
+      transition: background var(--mp-tr), color var(--mp-tr);
+    }
+    .mp-nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+    .mp-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    #mp-ima-date { font-size: 9px; font-weight: 400; color: #94a3b8; min-width: 72px; text-align: center; font-family: var(--mp-mono); }
+
+    /* Chart legend */
+    .mp-chart-legend {
+      display: flex; gap: 12px; padding: 4px 10px 0;
+      font-size: 9px; color: var(--mp-muted);
+    }
+    .mp-legend-item { display: flex; align-items: center; gap: 4px; }
+    .mp-legend-line { width: 14px; height: 2px; border-radius: 1px; }
+
+    /* Key stat inside narrow card */
     .mp-key-stat {
       padding: 7px 10px; border-bottom: 1px solid var(--mp-border);
       display: flex; flex-direction: column; gap: 1px;
@@ -209,21 +231,20 @@
     .mp-key-val.yellow { color: #fbbf24; }
     .mp-key-sub { font-size: 9px; color: var(--mp-muted); }
 
-    /* Price list rows */
     .mp-price-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.03);
     }
     .mp-price-row:last-child { border-bottom: none; }
-    .mp-price-row.cheapest  .mp-pr-price { color: #4ade80; font-weight: 700; }
+    .mp-price-row.cheapest   .mp-pr-price { color: #4ade80; font-weight: 700; }
     .mp-price-row.cheapest-y .mp-pr-price { color: #fbbf24; font-weight: 700; }
     .mp-pr-price { font-family: var(--mp-mono); font-size: 11px; }
     .mp-pr-right { font-size: 10px; color: var(--mp-dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
     .mp-more { padding: 5px 10px; font-size: 9px; color: var(--mp-muted); border-top: 1px solid rgba(255,255,255,0.03); }
 
-    /* Full-width stats for IMA section */
+    /* IMA stats row */
     .mp-stats4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: var(--mp-border); }
-    .mp-stat4 { background: var(--mp-bg); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+    .mp-stat4 { background: var(--mp-bg); padding: 7px 10px; display: flex; flex-direction: column; gap: 2px; }
     .mp-stat4-lbl { font-size: 8px; text-transform: uppercase; color: var(--mp-muted); letter-spacing: 0.06em; }
     .mp-stat4-val { font-size: 12px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
     .mp-stat4-val.green { color: #4ade80; }
@@ -232,13 +253,11 @@
     .mp-stat4-sub { font-size: 8px; color: var(--mp-muted); }
 
     /* Chart */
-    .mp-chart-wrap { position: relative; height: 190px; padding: 10px 10px 6px; }
+    .mp-chart-wrap { position: relative; height: 180px; padding: 8px 10px 6px; }
 
-    /* Loading / error */
     .mp-loading { padding: 16px 10px; text-align: center; color: var(--mp-muted); font-size: 11px; }
     .mp-err     { padding: 10px; color: #f87171; font-size: 10px; word-break: break-word; }
 
-    /* ── Footer ── */
     #mp-footer {
       padding: 9px 14px; border-top: 1px solid var(--mp-border);
       flex-shrink: 0; display: flex; align-items: center; gap: 8px;
@@ -270,7 +289,7 @@
     panel.innerHTML = `
       <div id="mp-hdr">
         <h2>Market Pulse<span id="mp-item-tag"></span></h2>
-        <button class="mp-icon-btn" id="mp-close" title="Close">✕</button>
+        <button class="mp-icon-btn" id="mp-close">✕</button>
       </div>
       <div id="mp-search-wrap">
         <input id="mp-search" placeholder="Search item name…" autocomplete="off" spellcheck="false" />
@@ -341,7 +360,7 @@
     document.getElementById('mp-panel').classList.remove('open');
     document.getElementById('mp-toggle').classList.remove('open');
   }
-  function closeAC(acEl) { acEl.innerHTML = ''; acEl.classList.remove('show'); }
+  function closeAC(el) { el.innerHTML = ''; el.classList.remove('show'); }
 
   // ── Autocomplete ──────────────────────────────────────────────────────────
   async function fetchAC(q, acEl) {
@@ -375,6 +394,9 @@
 
     if (imaChart) { imaChart.destroy(); imaChart = null; }
 
+    const today  = todayUTC();
+    imaState = { itemId: id, date: today, refPrice: null, catalogPrice: null };
+
     document.getElementById('mp-body').innerHTML = `
       <div id="mp-receipt-strip">
         <div class="rs-cell"><div class="rs-lbl">Receipt Price</div><div class="rs-val">—</div><div class="rs-sub">loading…</div></div>
@@ -392,15 +414,48 @@
         </div>
       </div>
       <div class="mp-sec" id="mp-sec-ima">
-        <div class="mp-sec-hdr"><span class="mp-dot cyan"></span>Price History (IMA)</div>
-        <div class="mp-loading">Loading…</div>
+        <div class="mp-sec-hdr">
+          <span class="mp-dot cyan"></span>Price History (IMA)
+          <div class="mp-date-nav">
+            <button class="mp-nav-btn" id="mp-ima-prev">‹</button>
+            <span id="mp-ima-date">${fmtDay(today)}</span>
+            <button class="mp-nav-btn" id="mp-ima-next" disabled>›</button>
+          </div>
+        </div>
+        <div id="mp-ima-content"><div class="mp-loading">Loading…</div></div>
       </div>
     `;
 
-    loadReceiptData(id);
+    document.getElementById('mp-ima-prev').addEventListener('click', () => navigateIma(-1));
+    document.getElementById('mp-ima-next').addEventListener('click', () => navigateIma(1));
+
+    // Load receipt data and IMA in parallel; store ref prices before chart draws
+    Promise.allSettled([
+      loadReceiptData(id),
+      loadImaForDate(id),
+    ]);
+
     loadTornMarket(id);
     loadWeav3r(id);
-    loadImaHistory(id);
+  }
+
+  // ── IMA date navigation ───────────────────────────────────────────────────
+  function navigateIma(dir) {
+    if (imaChart) { imaChart.destroy(); imaChart = null; }
+
+    const d = new Date(imaState.date);
+    d.setUTCDate(d.getUTCDate() + dir);
+    imaState.date = d;
+
+    const dateEl = document.getElementById('mp-ima-date');
+    const nextBtn = document.getElementById('mp-ima-next');
+    if (dateEl) dateEl.textContent = fmtDay(d);
+    if (nextBtn) nextBtn.disabled = sameDay(d, todayUTC());
+
+    const content = document.getElementById('mp-ima-content');
+    if (content) content.innerHTML = '<div class="mp-loading">Loading…</div>';
+
+    loadImaForDate(imaState.itemId);
   }
 
   // ── Receipt Price Strip ───────────────────────────────────────────────────
@@ -410,25 +465,25 @@
         `${APP_URL}/api/item-offering/${itemId}`,
         { 'X-Receipt-Token': RECEIPT_TOKEN }
       );
+      imaState.refPrice     = d.market_reference_price ?? null;
+      imaState.catalogPrice = d.catalog_price ?? null;
       renderReceiptStrip(d);
     } catch {
       const strip = document.getElementById('mp-receipt-strip');
-      if (strip) strip.innerHTML = `<div class="rs-cell" style="flex:1"><span style="font-size:10px;color:#64748b">Our pricing unavailable</span></div>`;
+      if (strip) strip.innerHTML = `<div class="rs-cell" style="flex:1"><span style="font-size:10px;color:#64748b">Pricing unavailable</span></div>`;
     }
   }
 
   function renderReceiptStrip(d) {
     const strip = document.getElementById('mp-receipt-strip');
     if (!strip) return;
-
-    const pctStr = d.resolved_pct != null ? Math.round(d.resolved_pct * 100) + '% mkt' : '';
+    const pctStr  = d.resolved_pct != null ? Math.round(d.resolved_pct * 100) + '% mkt' : '';
     const modeStr = d.price_mode === 'fixed' ? 'fixed' : pctStr;
-
     strip.innerHTML = `
       <div class="rs-cell">
         <div class="rs-lbl">Receipt Price</div>
         <div class="rs-val green">${d.catalog_price != null ? fmtFull(d.catalog_price) : '—'}</div>
-        <div class="rs-sub">${d.in_catalog ? modeStr : modeStr + ' · not in catalog'}</div>
+        <div class="rs-sub">${d.in_catalog ? modeStr : (modeStr ? modeStr + ' · not in catalog' : 'not in catalog')}</div>
       </div>
       <div class="rs-cell">
         <div class="rs-lbl">Market Ref</div>
@@ -464,36 +519,28 @@
     const im       = data.itemmarket ?? {};
     const listings = im.listings ?? [];
     const total    = data._metadata?.total ?? listings.length;
-    const avgPrice = im.item?.average_price;
+    if (!listings.length) { replaceLoading(sec, `<div class="mp-loading">No listings</div>`); return; }
 
-    if (!listings.length) {
-      replaceLoading(sec, `<div class="mp-loading">No listings</div>`);
-      return;
-    }
-
-    const sorted   = [...listings].sort((a, b) => a.price - b.price);
+    const sorted    = [...listings].sort((a, b) => a.price - b.price);
     const lowestAsk = sorted[0].price;
     const totalAmt  = listings.reduce((s, l) => s + (l.amount || 0), 0);
 
-    // Update header subtitle
     sec.querySelector('.mp-sec-hdr').insertAdjacentHTML('beforeend',
-      `<span class="mp-sub" style="color:var(--mp-muted)">${total} listings</span>`
+      `<span style="margin-left:auto;font-weight:400;font-size:9px;color:var(--mp-muted)">${total}</span>`
     );
-
     const rows = sorted.slice(0, 10).map((l, i) =>
       `<div class="mp-price-row ${i === 0 ? 'cheapest' : ''}">
         <span class="mp-pr-price">${fmtFull(l.price)}</span>
         <span class="mp-pr-right">×${l.amount}</span>
       </div>`
     ).join('');
-
     replaceLoading(sec, `
       <div class="mp-key-stat">
         <div class="mp-key-lbl">Lowest Ask</div>
         <div class="mp-key-val green">${fmtFull(lowestAsk)}</div>
-        <div class="mp-key-sub">avg ${fmt(avgPrice)} · ${totalAmt.toLocaleString()} units</div>
+        <div class="mp-key-sub">avg ${fmt(im.item?.average_price)} · ${totalAmt.toLocaleString()} units</div>
       </div>
-      <div class="mp-price-list">${rows}</div>
+      <div>${rows}</div>
       ${total > 10 ? `<div class="mp-more">+${total - 10} more</div>` : ''}
     `);
   }
@@ -511,72 +558,84 @@
 
   function renderWeav3r(sec, data) {
     const listings = data.listings ?? [];
-    if (!listings.length) {
-      replaceLoading(sec, `<div class="mp-loading">No listings</div>`);
-      return;
-    }
+    if (!listings.length) { replaceLoading(sec, `<div class="mp-loading">No listings</div>`); return; }
 
     const sorted    = [...listings].sort((a, b) => a.price - b.price);
     const lowestBaz = sorted[0].price;
-    const genAt     = fmtTs(data.generated_at);
 
     sec.querySelector('.mp-sec-hdr').insertAdjacentHTML('beforeend',
-      `<span class="mp-sub" style="color:var(--mp-muted)">${listings.length} sellers</span>`
+      `<span style="margin-left:auto;font-weight:400;font-size:9px;color:var(--mp-muted)">${listings.length}</span>`
     );
-
     const rows = sorted.slice(0, 10).map((l, i) =>
       `<div class="mp-price-row ${i === 0 ? 'cheapest-y' : ''}">
         <span class="mp-pr-price">${fmt(l.price)}</span>
         <span class="mp-pr-right">×${l.quantity} ${esc(l.player_name)}</span>
       </div>`
     ).join('');
-
     replaceLoading(sec, `
       <div class="mp-key-stat">
         <div class="mp-key-lbl">Lowest Offer</div>
         <div class="mp-key-val yellow">${fmtFull(lowestBaz)}</div>
-        <div class="mp-key-sub">avg ${fmt(data.bazaar_average)} · ${genAt}</div>
+        <div class="mp-key-sub">avg ${fmt(data.bazaar_average)} · ${fmtTs(data.generated_at)}</div>
       </div>
-      <div class="mp-price-list">${rows}</div>
+      <div>${rows}</div>
       ${listings.length > 10 ? `<div class="mp-more">+${listings.length - 10} more</div>` : ''}
     `);
   }
 
-  // ── IMA Price History Chart ───────────────────────────────────────────────
-  async function loadImaHistory(itemId) {
-    const sec = document.getElementById('mp-sec-ima');
+  // ── IMA Price History ─────────────────────────────────────────────────────
+  async function loadImaForDate(itemId) {
+    const d    = imaState.date;
+    const from = new Date(d); // already UTC midnight
+    const to   = new Date(d); to.setUTCHours(23, 59, 59, 999);
+
+    const url = `${IMA_URL}/api/market/${itemId}` +
+      `?from=${from.toISOString()}&to=${to.toISOString()}&limit=500`;
+
     try {
-      const data = await gmGet(`${IMA_URL}/api/market/${itemId}?limit=200`);
-      renderImaHistory(sec, data);
+      const data = await gmGet(url);
+      renderImaContent(Array.isArray(data) ? data : [], from, to);
     } catch (e) {
-      replaceLoading(sec, `<div class="mp-err">${esc(e.message)}</div>`);
+      const content = document.getElementById('mp-ima-content');
+      if (content) content.innerHTML = `<div class="mp-err">${esc(e.message)}</div>`;
     }
   }
 
-  function renderImaHistory(sec, data) {
-    const records = Array.isArray(data) ? data : [];
+  function renderImaContent(records, from, to) {
+    const content = document.getElementById('mp-ima-content');
+    if (!content) return;
+
+    const xMin = from.getTime();
+    const xMax = to.getTime();
+
     if (!records.length) {
-      replaceLoading(sec, `<div class="mp-loading">No price history tracked</div>`);
+      content.innerHTML = `<div class="mp-loading">No data for this day</div>`;
+      // Still draw reference lines even with no data
+      if (imaState.refPrice || imaState.catalogPrice) {
+        content.innerHTML += `<div class="mp-chart-wrap"><canvas id="mp-ima-chart"></canvas></div>`;
+        drawChart(content, [], xMin, xMax);
+      }
       return;
     }
 
-    const prices  = records.map(r => r.price).filter(p => p != null);
-    const lo      = Math.min(...prices);
-    const hi      = Math.max(...prices);
-    const avg     = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
-    const latest  = records[records.length - 1];
+    const prices = records.map(r => r.price).filter(p => p != null);
+    const lo     = Math.min(...prices);
+    const hi     = Math.max(...prices);
+    const avg    = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
+    const latest = records[records.length - 1];
 
-    // Use ms timestamps for x-axis (no adapter required)
-    const points = records
-      .filter(r => r.price != null && r.created_at)
-      .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
+    const legendItems = [
+      `<div class="mp-legend-item"><div class="mp-legend-line" style="background:#22d3ee"></div>Price</div>`,
+      imaState.refPrice    ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:rgba(248,113,113,0.8);height:1px;border-top:2px dashed rgba(248,113,113,0.8);background:transparent"></div>Mkt Ref</div>` : '',
+      imaState.catalogPrice ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:transparent;height:1px;border-top:2px dashed rgba(74,222,128,0.7)"></div>Receipt</div>` : '',
+    ].filter(Boolean).join('');
 
-    replaceLoading(sec, `
+    content.innerHTML = `
       <div class="mp-stats4">
         <div class="mp-stat4">
           <div class="mp-stat4-lbl">Latest</div>
           <div class="mp-stat4-val cyan">${fmt(latest?.price)}</div>
-          <div class="mp-stat4-sub">${fmtDate(latest?.created_at)}</div>
+          <div class="mp-stat4-sub">${fmtHHMM(new Date(latest?.created_at).getTime())} TCT</div>
         </div>
         <div class="mp-stat4">
           <div class="mp-stat4-lbl">Avg (${records.length})</div>
@@ -591,31 +650,68 @@
           <div class="mp-stat4-val red">${fmt(hi)}</div>
         </div>
       </div>
-      <div class="mp-chart-wrap">
-        <canvas id="mp-ima-chart"></canvas>
-      </div>
-    `);
+      <div class="mp-chart-legend">${legendItems}</div>
+      <div class="mp-chart-wrap"><canvas id="mp-ima-chart"></canvas></div>
+    `;
 
-    // Small delay so canvas is laid out before Chart.js reads dimensions
+    drawChart(content, records, xMin, xMax);
+  }
+
+  function drawChart(container, records, xMin, xMax) {
     setTimeout(() => {
-      const canvas = sec.querySelector('#mp-ima-chart');
+      const canvas = container.querySelector('#mp-ima-chart');
       if (!canvas || typeof Chart === 'undefined') return;
       if (imaChart) { imaChart.destroy(); imaChart = null; }
 
+      const points = records
+        .filter(r => r.price != null && r.created_at)
+        .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
+
+      const datasets = [
+        {
+          data: points,
+          borderColor: '#22d3ee',
+          backgroundColor: 'rgba(34,211,238,0.07)',
+          borderWidth: 1.5,
+          pointRadius: points.length > 50 ? 0 : 3,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          fill: true,
+          order: 1,
+        },
+      ];
+
+      // Market reference price — red dashed horizontal lane
+      if (imaState.refPrice != null) {
+        datasets.push({
+          data: [{ x: xMin, y: imaState.refPrice }, { x: xMax, y: imaState.refPrice }],
+          borderColor: 'rgba(248,113,113,0.85)',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 2,
+        });
+      }
+
+      // Receipt/catalog price — green dashed horizontal lane
+      if (imaState.catalogPrice != null) {
+        datasets.push({
+          data: [{ x: xMin, y: imaState.catalogPrice }, { x: xMax, y: imaState.catalogPrice }],
+          borderColor: 'rgba(74,222,128,0.75)',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 2,
+        });
+      }
+
       imaChart = new Chart(canvas, {
         type: 'line',
-        data: {
-          datasets: [{
-            data: points,
-            borderColor: '#22d3ee',
-            backgroundColor: 'rgba(34,211,238,0.07)',
-            borderWidth: 1.5,
-            pointRadius: points.length > 60 ? 0 : 2,
-            pointHoverRadius: 4,
-            tension: 0.3,
-            fill: true,
-          }],
-        },
+        data: { datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -623,8 +719,9 @@
           plugins: {
             legend: { display: false },
             tooltip: {
+              filter: item => item.datasetIndex === 0,
               callbacks: {
-                title: ctx => fmtIso(new Date(ctx[0].parsed.x).toISOString()),
+                title: ctx => fmtHHMM(ctx[0].parsed.x) + ' TCT',
                 label: ctx => fmtFull(ctx.parsed.y),
               },
             },
@@ -632,9 +729,11 @@
           scales: {
             x: {
               type: 'linear',
+              min: xMin,
+              max: xMax,
               ticks: {
-                color: '#64748b', maxTicksLimit: 5, font: { size: 9 },
-                callback: v => fmtDate(new Date(v).toISOString()),
+                color: '#64748b', maxTicksLimit: 6, font: { size: 9 },
+                callback: v => fmtHHMM(v),
               },
               grid: { color: 'rgba(255,255,255,0.04)' },
             },
@@ -648,7 +747,7 @@
           },
         },
       });
-    }, 30);
+    }, 40);
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
