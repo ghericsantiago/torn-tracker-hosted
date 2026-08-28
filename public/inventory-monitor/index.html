@@ -240,6 +240,7 @@
   <div class="card">
     <h2>Current inventory <span class="n" id="inv-count">0 items</span>
       <button class="btn gray sm" id="fifo-reconcile-btn" title="Close any gap between FIFO totals and inventory counts — runs automatically after each poll">Reconcile FIFO <span id="fifo-mismatch-count" class="n" style="display:none"></span></button>
+      <span class="n" id="inv-net-badge" title="Items with net stock > 0">0</span>
     </h2>
     <table>
       <thead><tr><th data-sort="item">Item</th><th data-sort="cat">Category</th><th class="r" data-sort="in">In</th><th class="r" data-sort="out">Out</th><th class="r" data-sort="net">Net</th><th class="r" data-sort="val">Value</th><th class="r" data-sort="avgcost">Avg Cost</th><th class="r" data-sort="costbasis">Cost Basis</th><th class="r" data-sort="lots">Lots</th><th class="r" data-sort="last">Last moved</th></tr></thead>

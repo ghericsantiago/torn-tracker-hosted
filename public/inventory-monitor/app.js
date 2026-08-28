@@ -256,8 +256,10 @@ function renderInventory(q) {
   const sortedItems = sortRows(items, 'tb-inv');
   items = sortedItems === items ? items.sort((a, b) => (Math.abs(b.net) * b.value) - (Math.abs(a.net) * a.value)) : sortedItems;
 
+  const invNetCount = state.items.filter(it => it.net > 0).length;
   $('inv-count').textContent = state.items.filter(it => it.net > 0 && (!q || it.name.toLowerCase().includes(q) || (it.category || '').toLowerCase().includes(q))).length + ' items';
-  $('inv-badge').textContent = state.items.filter(it => it.net > 0).length;
+  $('inv-badge').textContent    = invNetCount;
+  $('inv-net-badge').textContent = invNetCount;
 
   initTabPage('tb-inv', items,
     '<tr><td colspan="10" class="empty">No inventory yet — nothing has moved since 02:00 AM.</td></tr>',
