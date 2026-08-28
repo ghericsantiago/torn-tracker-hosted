@@ -277,7 +277,7 @@ function renderInventory(q) {
         ? `<td class="r dim">${it.fifoLots}</td>`
         : `<td class="r dim">—</td>`;
       return `<tr>
-        <td class="item">${esc(it.name)}<button class="btn-adj" data-item-id="${it.id}" data-item-name="${esc(it.name)}" data-net="${it.net}" title="Reconcile">⚖</button></td>
+        <td class="item">${esc(it.name)}${tabAdjBtn(it.id, it.name, it.net, 'inventory')}</td>
         <td class="cat dim">${esc(it.category || '')}</td>
         <td class="green hv-cell" data-item="${it.id}" data-dir="in">+${fmtQty(it.in)}</td>
         <td class="red hv-cell" data-item="${it.id}" data-dir="out">−${fmtQty(it.out)}</td>
