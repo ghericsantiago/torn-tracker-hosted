@@ -484,4 +484,37 @@ router.get('/api/receipts', cors(CORS_TORN), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/item-offering/:itemId — return our current bazaar/inventory snapshot for an item
+router.options('/api/item-offering/:itemId', cors(CORS_TORN));
+router.get('/api/item-offering/:itemId', cors(CORS_TORN), async (req, res) => {
+  try {
+    if (!await verifyToken(req, res)) return;
+    const itemId = Number(req.params.itemId);
+    if (!itemId) return res.status(400).json({ error: 'Invalid item_id' });
+
+    const { rows } = await db.query(`
+      SELECT DISTINCT ON (location) location, qty, list_price, taken_at
+      FROM torn_inventory_snapshots
+      WHERE item_id = $1
+      ORDER BY location, taken_at DESC
+    `, [itemId]);
+
+    const baz  = rows.find(r => r.location === 'bazaar');
+    const inv  = rows.find(r => r.location === 'inventory');
+    const disp = rows.find(r => r.location === 'display');
+
+    res.json({
+      item_id:     itemId,
+      baz_price:   baz?.list_price ? Number(baz.list_price) : null,
+      baz_qty:     baz  ? Number(baz.qty)  : 0,
+      inv_qty:     inv  ? Number(inv.qty)  : 0,
+      disp_qty:    disp ? Number(disp.qty) : 0,
+      snapshot_at: baz?.taken_at || inv?.taken_at || null,
+    });
+  } catch (err) {
+    console.error('[item-offering]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

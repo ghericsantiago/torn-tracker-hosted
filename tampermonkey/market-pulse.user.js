@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.0.0
+// @version      1.1.0
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -11,17 +11,28 @@
 // @connect      api.torn.com
 // @connect      weav3r.dev
 // @connect      torn-imarket-tracker.gvsantiago.com
+// @connect      itrade.devs.surf
+// @require      https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js
+// @require      https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js
 // @run-at       document-idle
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const IMA_URL = 'https://torn-imarket-tracker.gvsantiago.com';
-  const WEAV3R  = 'https://weav3r.dev';
+  const IMA_URL       = 'https://torn-imarket-tracker.gvsantiago.com';
+  const WEAV3R        = 'https://weav3r.dev';
+  const APP_URL       = 'https://itrade.devs.surf';
+  const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function fmt(n) {
+    if (n == null) return '—';
+    if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(2) + 'M';
+    if (n >= 1_000)     return '$' + (n / 1_000).toFixed(1) + 'K';
+    return '$' + Number(n).toLocaleString('en-US');
+  }
+  function fmtFull(n) {
     return n == null ? '—' : '$' + Number(n).toLocaleString('en-US');
   }
   function fmtTs(unix) {
@@ -41,10 +52,10 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
     );
   }
-  function gmGet(url) {
+  function gmGet(url, headers = {}) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
-        method: 'GET', url, timeout: 12000,
+        method: 'GET', url, headers, timeout: 12000,
         onload:    r => { try { resolve(JSON.parse(r.responseText)); } catch { reject(new Error('Parse error')); } },
         onerror:   () => reject(new Error('Network error')),
         ontimeout: () => reject(new Error('Timeout')),
@@ -53,9 +64,9 @@
   }
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let panelOpen   = false;
   let currentItem = null;
   let acTimer     = null;
+  let imaChart    = null;
 
   // ── Styles ────────────────────────────────────────────────────────────────
   GM_addStyle(`
@@ -98,42 +109,38 @@
 
     /* Header */
     #mp-hdr {
-      padding: 14px 16px 12px; border-bottom: 1px solid var(--mp-border);
+      padding: 13px 16px 11px; border-bottom: 1px solid var(--mp-border);
       background: rgba(74,222,128,0.03); flex-shrink: 0;
       display: flex; align-items: center; gap: 10px;
     }
-    #mp-hdr h2 { margin: 0; font-size: 13px; font-weight: 700; color: #e2e8f0; flex: 1; }
-    #mp-item-tag {
-      font-size: 10px; color: var(--mp-accent);
-      font-family: var(--mp-mono); margin-left: 6px; font-weight: 400;
-    }
+    #mp-hdr h2 { margin: 0; font-size: 13px; font-weight: 700; color: #e2e8f0; flex: 1; line-height: 1.3; }
+    #mp-item-tag { display: block; font-size: 10px; color: var(--mp-accent); font-family: var(--mp-mono); font-weight: 400; }
     .mp-icon-btn {
       background: none; border: 1px solid var(--mp-border); color: var(--mp-muted);
       width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 13px;
       display: flex; align-items: center; justify-content: center;
-      transition: color var(--mp-tr), border-color var(--mp-tr);
+      transition: color var(--mp-tr); flex-shrink: 0;
     }
-    .mp-icon-btn:hover { color: #e2e8f0; border-color: rgba(255,255,255,0.18); }
+    .mp-icon-btn:hover { color: #e2e8f0; }
 
     /* Search */
     #mp-search-wrap {
-      padding: 12px 16px; border-bottom: 1px solid var(--mp-border);
+      padding: 11px 14px; border-bottom: 1px solid var(--mp-border);
       flex-shrink: 0; position: relative;
     }
     #mp-search {
       width: 100%; box-sizing: border-box;
       background: rgba(255,255,255,0.06); border: 1px solid rgba(74,222,128,0.25);
-      border-radius: 8px; padding: 9px 12px; color: #e2e8f0;
+      border-radius: 8px; padding: 8px 12px; color: #e2e8f0;
       font-size: 13px; outline: none; transition: border-color var(--mp-tr);
     }
     #mp-search:focus { border-color: rgba(74,222,128,0.5); }
     #mp-search::placeholder { color: var(--mp-muted); }
-
     #mp-ac {
-      position: absolute; top: calc(100% - 2px); left: 16px; right: 16px;
+      position: absolute; top: calc(100% - 2px); left: 14px; right: 14px;
       background: #0d1020; border: 1px solid rgba(74,222,128,0.25);
       border-top: none; border-radius: 0 0 8px 8px;
-      z-index: 10; max-height: 200px; overflow-y: auto; display: none;
+      z-index: 10; max-height: 220px; overflow-y: auto; display: none;
     }
     #mp-ac.show { display: block; }
     .mp-ac-row {
@@ -147,70 +154,76 @@
     .mp-ac-id { color: var(--mp-muted); font-size: 10px; font-family: var(--mp-mono); }
 
     /* Body */
-    #mp-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+    #mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+    #mp-empty { text-align: center; color: var(--mp-muted); padding: 60px 0; font-size: 12px; line-height: 2.2; }
 
-    #mp-empty { text-align: center; color: var(--mp-muted); padding: 60px 0; font-size: 12px; line-height: 2; }
+    /* Our offering banner */
+    #mp-our-offer {
+      background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.2);
+      border-radius: 10px; padding: 11px 14px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    #mp-our-offer .oo-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mp-accent); margin-bottom: 4px; }
+    #mp-our-offer .oo-price { font-size: 18px; font-weight: 700; color: #e2e8f0; font-family: var(--mp-mono); }
+    #mp-our-offer .oo-meta  { font-size: 10px; color: var(--mp-dim); margin-top: 2px; }
+    #mp-our-offer .oo-stocks { display: flex; gap: 10px; margin-left: auto; }
+    #mp-our-offer .oo-stock  { text-align: center; }
+    #mp-our-offer .oo-stock-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
+    #mp-our-offer .oo-stock-lbl { font-size: 9px; color: var(--mp-muted); text-transform: uppercase; }
 
     /* Section cards */
-    .mp-sec {
-      background: var(--mp-card); border: 1px solid var(--mp-border);
-      border-radius: 10px; overflow: hidden;
-    }
+    .mp-sec { background: var(--mp-card); border: 1px solid var(--mp-border); border-radius: 10px; overflow: hidden; }
     .mp-sec-hdr {
-      padding: 9px 14px; border-bottom: 1px solid var(--mp-border);
+      padding: 8px 14px; border-bottom: 1px solid var(--mp-border);
       font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
       text-transform: uppercase; color: var(--mp-muted);
       display: flex; align-items: center; gap: 7px;
     }
+    .mp-sec-hdr .mp-sub { margin-left: auto; font-weight: 400; font-size: 9px; color: var(--mp-muted); }
     .mp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .mp-dot.green  { background: #4ade80; }
     .mp-dot.yellow { background: #fbbf24; }
     .mp-dot.cyan   { background: #22d3ee; }
 
     /* Stat grid */
-    .mp-stats {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 1px; background: var(--mp-border);
-    }
-    .mp-stat { background: var(--mp-bg); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
-    .mp-stat.full { grid-column: 1 / -1; }
+    .mp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--mp-border); }
+    .mp-stat { background: var(--mp-bg); padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; }
+    .mp-stat.span2 { grid-column: 1 / -1; }
     .mp-stat-lbl { font-size: 9px; color: var(--mp-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-    .mp-stat-val {
-      font-size: 15px; font-weight: 700; color: #e2e8f0;
-      font-family: var(--mp-mono);
-    }
+    .mp-stat-val { font-size: 15px; font-weight: 700; color: #e2e8f0; font-family: var(--mp-mono); }
     .mp-stat-val.green  { color: #4ade80; }
     .mp-stat-val.yellow { color: #fbbf24; }
     .mp-stat-val.cyan   { color: #22d3ee; }
     .mp-stat-val.red    { color: #f87171; }
-    .mp-stat-sub { font-size: 9px; color: var(--mp-muted); }
+    .mp-stat-sub { font-size: 9px; color: var(--mp-muted); margin-top: 1px; }
 
-    /* Tables */
-    .mp-tbl { width: 100%; border-collapse: collapse; }
-    .mp-tbl thead tr { border-bottom: 1px solid var(--mp-border); }
-    .mp-tbl th {
-      padding: 6px 14px; text-align: left;
-      font-size: 9px; font-weight: 600; color: var(--mp-muted);
-      text-transform: uppercase; letter-spacing: 0.06em;
+    /* Price list rows (Torn + Bazaar) */
+    .mp-price-list { display: flex; flex-direction: column; }
+    .mp-price-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 14px; border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background var(--mp-tr);
     }
-    .mp-tbl td {
-      padding: 7px 14px; font-size: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-    }
-    .mp-tbl tr:last-child td { border-bottom: none; }
-    .mp-tbl tr.mp-best td:last-child { color: #4ade80; font-weight: 600; }
-    .mp-tbl tr.mp-best-y td:last-child { color: #fbbf24; font-weight: 600; }
-    .mp-tbl .mp-num { text-align: right; font-family: var(--mp-mono); font-size: 11px; }
-    .mp-tbl .mp-dim { color: var(--mp-dim); font-size: 11px; }
+    .mp-price-row:last-child { border-bottom: none; }
+    .mp-price-row:hover { background: rgba(255,255,255,0.03); }
+    .mp-price-row.cheapest .mp-pr-price { color: #4ade80; }
+    .mp-price-row.cheapest-y .mp-pr-price { color: #fbbf24; }
+    .mp-pr-price { font-family: var(--mp-mono); font-size: 13px; font-weight: 600; }
+    .mp-pr-right { font-size: 11px; color: var(--mp-dim); text-align: right; }
+    .mp-pr-qty { font-family: var(--mp-mono); }
     .mp-more { padding: 6px 14px; font-size: 10px; color: var(--mp-muted); border-top: 1px solid rgba(255,255,255,0.03); }
 
-    /* Loading / error */
-    .mp-loading { padding: 20px 14px; text-align: center; color: var(--mp-muted); font-size: 12px; }
-    .mp-err     { padding: 12px 14px; color: #f87171; font-size: 11px; }
+    /* Chart wrapper */
+    .mp-chart-wrap { padding: 12px 14px 8px; }
+    .mp-chart-wrap canvas { display: block; width: 100% !important; }
 
-    /* API key footer */
+    /* Loading / error */
+    .mp-loading { padding: 18px 14px; text-align: center; color: var(--mp-muted); font-size: 12px; }
+    .mp-err     { padding: 11px 14px; color: #f87171; font-size: 11px; }
+
+    /* Footer */
     #mp-footer {
-      padding: 10px 14px; border-top: 1px solid var(--mp-border);
+      padding: 9px 14px; border-top: 1px solid var(--mp-border);
       flex-shrink: 0; display: flex; align-items: center; gap: 8px;
       background: rgba(0,0,0,0.3);
     }
@@ -225,7 +238,6 @@
       background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25);
       color: #4ade80; border-radius: 6px; padding: 5px 10px;
       font-size: 10px; cursor: pointer; white-space: nowrap;
-      transition: background var(--mp-tr);
     }
     #mp-key-save:hover { background: rgba(74,222,128,0.18); }
   `);
@@ -260,7 +272,6 @@
     document.body.appendChild(toggle);
     document.body.appendChild(panel);
 
-    // API key
     const keyInput = panel.querySelector('#mp-key-input');
     keyInput.value = GM_getValue('tornApiKey', '');
     panel.querySelector('#mp-key-save').addEventListener('click', () => {
@@ -268,11 +279,9 @@
       keyInput.blur();
     });
 
-    // Toggle / close
-    toggle.addEventListener('click', () => openPanel());
-    panel.querySelector('#mp-close').addEventListener('click', () => closePanel());
+    toggle.addEventListener('click', openPanel);
+    panel.querySelector('#mp-close').addEventListener('click', closePanel);
 
-    // Autocomplete
     const searchEl = panel.querySelector('#mp-search');
     const acEl     = panel.querySelector('#mp-ac');
 
@@ -284,20 +293,19 @@
     });
 
     searchEl.addEventListener('keydown', e => {
-      const rows = acEl.querySelectorAll('.mp-ac-row');
+      const rows = [...acEl.querySelectorAll('.mp-ac-row')];
       if (!rows.length) return;
-      const focused = acEl.querySelector('.mp-ac-row.focused');
-      const idx = focused ? [...rows].indexOf(focused) : -1;
+      const fi  = rows.findIndex(r => r.classList.contains('focused'));
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        rows[Math.min(idx + 1, rows.length - 1)]?.classList.add('focused');
-        if (idx >= 0) rows[idx].classList.remove('focused');
+        if (fi >= 0) rows[fi].classList.remove('focused');
+        rows[Math.min(fi + 1, rows.length - 1)].classList.add('focused');
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (idx > 0) { rows[idx].classList.remove('focused'); rows[idx - 1].classList.add('focused'); }
-      } else if (e.key === 'Enter' && focused) {
+        if (fi > 0) { rows[fi].classList.remove('focused'); rows[fi - 1].classList.add('focused'); }
+      } else if (e.key === 'Enter' && fi >= 0) {
         e.preventDefault();
-        pickItem(focused, acEl, searchEl);
+        pickItem(rows[fi], acEl, searchEl);
       } else if (e.key === 'Escape') {
         closeAC(acEl);
       }
@@ -311,18 +319,13 @@
   function openPanel() {
     document.getElementById('mp-panel').classList.add('open');
     document.getElementById('mp-toggle').classList.add('open');
-    panelOpen = true;
     document.getElementById('mp-search').focus();
   }
   function closePanel() {
     document.getElementById('mp-panel').classList.remove('open');
     document.getElementById('mp-toggle').classList.remove('open');
-    panelOpen = false;
   }
-  function closeAC(acEl) {
-    acEl.innerHTML = '';
-    acEl.classList.remove('show');
-  }
+  function closeAC(acEl) { acEl.innerHTML = ''; acEl.classList.remove('show'); }
 
   // ── Autocomplete ──────────────────────────────────────────────────────────
   async function fetchAC(q, acEl) {
@@ -338,33 +341,33 @@
         </div>`
       ).join('');
       acEl.classList.add('show');
-
-      acEl.querySelectorAll('.mp-ac-row').forEach(row => {
+      acEl.querySelectorAll('.mp-ac-row').forEach(row =>
         row.addEventListener('mousedown', e => {
           e.preventDefault();
           pickItem(row, acEl, document.getElementById('mp-search'));
-        });
-      });
-    } catch {
-      closeAC(acEl);
-    }
+        })
+      );
+    } catch { closeAC(acEl); }
   }
 
   function pickItem(row, acEl, searchEl) {
-    const id   = Number(row.dataset.id);
-    const name = row.dataset.name;
-    searchEl.value = name;
+    searchEl.value = row.dataset.name;
     closeAC(acEl);
-    selectItem(id, name);
+    selectItem(Number(row.dataset.id), row.dataset.name);
   }
 
-  // ── Load item data ────────────────────────────────────────────────────────
+  // ── Select Item ───────────────────────────────────────────────────────────
   function selectItem(id, name) {
     currentItem = { id, name };
-    document.getElementById('mp-item-tag').textContent = ` — ${name} #${id}`;
 
-    const body = document.getElementById('mp-body');
-    body.innerHTML = `
+    const tag = document.getElementById('mp-item-tag');
+    tag.textContent = `${name}  #${id}`;
+
+    // Destroy old chart before rebuilding body
+    if (imaChart) { imaChart.destroy(); imaChart = null; }
+
+    document.getElementById('mp-body').innerHTML = `
+      <div id="mp-our-offer" class="mp-loading" style="text-align:left;padding:11px 14px">Loading your offering…</div>
       <div class="mp-sec" id="mp-sec-torn">
         <div class="mp-sec-hdr"><span class="mp-dot green"></span>Item Market (Torn API)</div>
         <div class="mp-loading">Loading…</div>
@@ -379,86 +382,141 @@
       </div>
     `;
 
+    loadOurOffering(id);
     loadTornMarket(id);
     loadWeav3r(id);
     loadImaHistory(id);
   }
 
-  // ── Torn Item Market (v2 API) ─────────────────────────────────────────────
+  // ── Our Offering ──────────────────────────────────────────────────────────
+  async function loadOurOffering(itemId) {
+    const el = document.getElementById('mp-our-offer');
+    if (!el) return;
+    try {
+      const d = await gmGet(
+        `${APP_URL}/api/item-offering/${itemId}`,
+        { 'X-Receipt-Token': RECEIPT_TOKEN }
+      );
+      renderOurOffering(el, d);
+    } catch (e) {
+      el.innerHTML = `<span style="font-size:11px;color:#64748b">Our offering: unavailable (${esc(e.message)})</span>`;
+    }
+  }
+
+  function renderOurOffering(el, d) {
+    const hasAny = d.baz_qty > 0 || d.inv_qty > 0 || d.disp_qty > 0;
+    if (!hasAny) {
+      el.innerHTML = `<span style="font-size:11px;color:#64748b">Not currently in bazaar or inventory</span>`;
+      el.style.padding = '10px 14px';
+      return;
+    }
+
+    const snap = d.snapshot_at ? fmtIso(d.snapshot_at) : '—';
+    el.outerHTML = `
+      <div id="mp-our-offer">
+        <div style="flex:1;min-width:0">
+          <div class="oo-label">Our Offering</div>
+          <div class="oo-price">${d.baz_price ? fmtFull(d.baz_price) : '—'}</div>
+          <div class="oo-meta">Snapshot ${snap}</div>
+        </div>
+        <div class="oo-stocks">
+          <div class="oo-stock">
+            <div class="oo-stock-val">${d.baz_qty}</div>
+            <div class="oo-stock-lbl">Bazaar</div>
+          </div>
+          <div class="oo-stock">
+            <div class="oo-stock-val">${d.inv_qty}</div>
+            <div class="oo-stock-lbl">Inventory</div>
+          </div>
+          ${d.disp_qty > 0 ? `<div class="oo-stock"><div class="oo-stock-val">${d.disp_qty}</div><div class="oo-stock-lbl">Display</div></div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Torn Item Market ──────────────────────────────────────────────────────
+  // Response: { itemmarket: { item: { average_price }, listings: [{ price, amount }] }, _metadata: { total } }
   async function loadTornMarket(itemId) {
     const sec = document.getElementById('mp-sec-torn');
     const key = GM_getValue('tornApiKey', '');
     if (!key) {
-      setSecContent(sec, `<div class="mp-err">No API key set — enter it in the footer below.</div>`);
+      replaceLoading(sec, `<div class="mp-err">No API key — enter it in the footer.</div>`);
       return;
     }
     try {
       const data = await gmGet(`https://api.torn.com/v2/market/${itemId}/itemmarket?key=${key}`);
       renderTornMarket(sec, data);
     } catch (e) {
-      setSecContent(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
     }
   }
 
   function renderTornMarket(sec, data) {
     if (data.error) {
-      setSecContent(sec, `<div class="mp-err">Torn API error: ${esc(data.error.error || JSON.stringify(data.error))}</div>`);
+      replaceLoading(sec, `<div class="mp-err">Torn API: ${esc(data.error?.error ?? JSON.stringify(data.error))}</div>`);
       return;
     }
-    const listings = data.itemmarket || [];
+    const im       = data.itemmarket ?? {};
+    const listings = im.listings ?? [];
+    const total    = data._metadata?.total ?? listings.length;
+    const avgPrice = im.item?.average_price;
+
     if (!listings.length) {
-      setSecContent(sec, `<div class="mp-loading">No active Item Market listings</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No active Item Market listings</div>`);
       return;
     }
 
     const sorted   = [...listings].sort((a, b) => a.price - b.price);
     const lowestAsk = sorted[0].price;
-    const totalQty  = listings.reduce((s, l) => s + (l.quantity || 1), 0);
+    const totalAmt  = listings.reduce((s, l) => s + (l.amount || 0), 0);
 
-    const rows = sorted.slice(0, 10).map((l, i) =>
-      `<tr class="${i === 0 ? 'mp-best' : ''}">
-        <td class="mp-dim">×${l.quantity || 1}</td>
-        <td class="mp-num">${fmt(l.price)}</td>
-      </tr>`
+    const rows = sorted.slice(0, 12).map((l, i) =>
+      `<div class="mp-price-row ${i === 0 ? 'cheapest' : ''}">
+        <span class="mp-pr-price">${fmtFull(l.price)}</span>
+        <span class="mp-pr-right"><span class="mp-pr-qty">×${l.amount}</span></span>
+      </div>`
     ).join('');
-    const more = listings.length > 10
-      ? `<div class="mp-more">+ ${listings.length - 10} more listings</div>`
-      : '';
 
-    setSecContent(sec, `
+    replaceLoading(sec, `
       <div class="mp-stats">
         <div class="mp-stat">
           <div class="mp-stat-lbl">Lowest Ask</div>
-          <div class="mp-stat-val green">${fmt(lowestAsk)}</div>
+          <div class="mp-stat-val green">${fmtFull(lowestAsk)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">Listings / Total Qty</div>
-          <div class="mp-stat-val">${listings.length} / ${totalQty}</div>
+          <div class="mp-stat-lbl">Avg Price</div>
+          <div class="mp-stat-val">${fmtFull(avgPrice)}</div>
+        </div>
+        <div class="mp-stat">
+          <div class="mp-stat-lbl">Listings</div>
+          <div class="mp-stat-val">${total}</div>
+        </div>
+        <div class="mp-stat">
+          <div class="mp-stat-lbl">Total Units</div>
+          <div class="mp-stat-val">${totalAmt.toLocaleString()}</div>
         </div>
       </div>
-      <table class="mp-tbl">
-        <thead><tr><th>Qty</th><th style="text-align:right">Price</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      ${more}
+      <div class="mp-price-list">${rows}</div>
+      ${total > 12 ? `<div class="mp-more">Showing first 12 of ${total} listings</div>` : ''}
     `);
   }
 
   // ── Weav3r Bazaar ─────────────────────────────────────────────────────────
+  // Response: { market_price, bazaar_average, generated_at, listings: [{ player_name, quantity, price }] }
   async function loadWeav3r(itemId) {
     const sec = document.getElementById('mp-sec-weav');
     try {
       const data = await gmGet(`${WEAV3R}/api/marketplace/${itemId}?limit=100`);
       renderWeav3r(sec, data);
     } catch (e) {
-      setSecContent(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
     }
   }
 
   function renderWeav3r(sec, data) {
-    const listings = data.listings || [];
+    const listings = data.listings ?? [];
     if (!listings.length) {
-      setSecContent(sec, `<div class="mp-loading">No bazaar listings found</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No bazaar listings</div>`);
       return;
     }
 
@@ -466,60 +524,56 @@
     const lowestBaz = sorted[0].price;
     const genAt     = fmtTs(data.generated_at);
 
-    const rows = sorted.slice(0, 10).map((l, i) =>
-      `<tr class="${i === 0 ? 'mp-best-y' : ''}">
-        <td class="mp-dim">${esc(l.player_name)}</td>
-        <td class="mp-dim">×${l.quantity}</td>
-        <td class="mp-num">${fmt(l.price)}</td>
-      </tr>`
+    const rows = sorted.slice(0, 12).map((l, i) =>
+      `<div class="mp-price-row ${i === 0 ? 'cheapest-y' : ''}">
+        <span class="mp-pr-price">${fmtFull(l.price)}</span>
+        <span class="mp-pr-right">
+          <span class="mp-pr-qty">×${l.quantity}</span>
+          <span style="margin-left:6px">${esc(l.player_name)}</span>
+        </span>
+      </div>`
     ).join('');
-    const more = listings.length > 10
-      ? `<div class="mp-more">+ ${listings.length - 10} more listings</div>`
-      : '';
 
-    setSecContent(sec, `
+    replaceLoading(sec, `
       <div class="mp-stats">
         <div class="mp-stat">
           <div class="mp-stat-lbl">Lowest Offer</div>
-          <div class="mp-stat-val yellow">${fmt(lowestBaz)}</div>
+          <div class="mp-stat-val yellow">${fmtFull(lowestBaz)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">Bazaar Average</div>
+          <div class="mp-stat-lbl">Bazaar Avg</div>
           <div class="mp-stat-val">${fmt(data.bazaar_average)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">Torn Market Ref</div>
+          <div class="mp-stat-lbl">Torn Ref Price</div>
           <div class="mp-stat-val">${fmt(data.market_price)}</div>
         </div>
         <div class="mp-stat">
           <div class="mp-stat-lbl">Sellers</div>
           <div class="mp-stat-val">${listings.length}</div>
-          <div class="mp-stat-sub">Snapshot ${genAt}</div>
+          <div class="mp-stat-sub">${genAt}</div>
         </div>
       </div>
-      <table class="mp-tbl">
-        <thead><tr><th>Seller</th><th>Qty</th><th style="text-align:right">Price</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      ${more}
+      <div class="mp-price-list">${rows}</div>
+      ${listings.length > 12 ? `<div class="mp-more">+ ${listings.length - 12} more sellers</div>` : ''}
     `);
   }
 
-  // ── IMA Price History ─────────────────────────────────────────────────────
+  // ── IMA Price History (Chart) ─────────────────────────────────────────────
   async function loadImaHistory(itemId) {
     const sec = document.getElementById('mp-sec-ima');
     try {
-      const data = await gmGet(`${IMA_URL}/api/market/${itemId}?limit=50`);
+      const data = await gmGet(`${IMA_URL}/api/market/${itemId}?limit=200`);
       renderImaHistory(sec, data);
     } catch (e) {
-      setSecContent(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
     }
   }
 
   function renderImaHistory(sec, data) {
     const records = Array.isArray(data) ? data : [];
     if (!records.length) {
-      setSecContent(sec, `<div class="mp-loading">No price history tracked for this item</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No price history for this item</div>`);
       return;
     }
 
@@ -529,49 +583,90 @@
     const avg     = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
     const latest  = records[records.length - 1];
 
-    const recentRows = records.slice(-10).reverse().map(r =>
-      `<tr>
-        <td class="mp-dim">${fmtIso(r.created_at)}</td>
-        <td class="mp-num">${fmt(r.price)}</td>
-      </tr>`
-    ).join('');
+    const points = records
+      .filter(r => r.price != null && r.created_at)
+      .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
 
-    setSecContent(sec, `
+    replaceLoading(sec, `
       <div class="mp-stats">
         <div class="mp-stat">
           <div class="mp-stat-lbl">Latest</div>
-          <div class="mp-stat-val cyan">${fmt(latest?.price)}</div>
+          <div class="mp-stat-val cyan">${fmtFull(latest?.price)}</div>
           <div class="mp-stat-sub">${fmtIso(latest?.created_at)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">Avg (${records.length} pts)</div>
-          <div class="mp-stat-val">${fmt(avg)}</div>
+          <div class="mp-stat-lbl">Average (${records.length} pts)</div>
+          <div class="mp-stat-val">${fmtFull(avg)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">All-time Low</div>
-          <div class="mp-stat-val green">${fmt(lo)}</div>
+          <div class="mp-stat-lbl">Low</div>
+          <div class="mp-stat-val green">${fmtFull(lo)}</div>
         </div>
         <div class="mp-stat">
-          <div class="mp-stat-lbl">All-time High</div>
-          <div class="mp-stat-val red">${fmt(hi)}</div>
+          <div class="mp-stat-lbl">High</div>
+          <div class="mp-stat-val red">${fmtFull(hi)}</div>
         </div>
       </div>
-      <table class="mp-tbl">
-        <thead><tr><th>Recorded</th><th style="text-align:right">Price</th></tr></thead>
-        <tbody>${recentRows}</tbody>
-      </table>
-      ${records.length > 10 ? `<div class="mp-more">Showing last 10 of ${records.length} records</div>` : ''}
+      <div class="mp-chart-wrap">
+        <canvas id="mp-ima-chart" height="160"></canvas>
+      </div>
     `);
+
+    const canvas = sec.querySelector('#mp-ima-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (imaChart) { imaChart.destroy(); imaChart = null; }
+
+    imaChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        datasets: [{
+          data: points,
+          borderColor: '#22d3ee',
+          backgroundColor: 'rgba(34,211,238,0.07)',
+          borderWidth: 1.5,
+          pointRadius: points.length > 80 ? 0 : 2,
+          pointHoverRadius: 4,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => fmtFull(ctx.parsed.y),
+              title: ctx => fmtIso(new Date(ctx[0].parsed.x).toISOString()),
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { tooltipFormat: 'dd MMM HH:mm' },
+            ticks: { color: '#64748b', maxTicksLimit: 5, font: { size: 9 } },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            ticks: {
+              color: '#64748b', maxTicksLimit: 5, font: { size: 9 },
+              callback: v => fmt(v),
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+        },
+      },
+    });
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
-  function setSecContent(sec, html) {
-    const loading = sec.querySelector('.mp-loading');
-    if (loading) loading.outerHTML = html;
-    else {
-      const hdr = sec.querySelector('.mp-sec-hdr');
-      hdr.insertAdjacentHTML('afterend', html);
-    }
+  function replaceLoading(sec, html) {
+    const el = sec.querySelector('.mp-loading');
+    if (el) el.outerHTML = html;
+    else sec.querySelector('.mp-sec-hdr').insertAdjacentHTML('afterend', html);
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
