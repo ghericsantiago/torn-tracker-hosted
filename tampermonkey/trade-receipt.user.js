@@ -150,23 +150,18 @@
             </thead>
             <tbody id="tt-body">${rowsHtml}</tbody>
             <tfoot>
-              <tr id="tt-bonus-row" style="background:rgba(74,222,128,.03)">
-                <td colspan="2" style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase;letter-spacing:.08em">Bonus</td>
-                <td style="padding:6px 12px">
-                  <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px">
-                    <span style="color:#64748b;font:11px monospace">$</span>
-                    <input type="number" id="tt-bonus-input" value="0" step="1000"
-                      style="width:110px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
-                             border-radius:6px;padding:4px 8px;color:#4ade80;font-family:monospace;font-size:12px;
-                             text-align:right;outline:none">
-                  </div>
-                  <div id="tt-bonus-hint" style="font-size:10px;font-family:monospace;color:#64748b;text-align:right;margin-top:2px;min-height:14px"></div>
-                </td>
-                <td id="tt-bonus-display" style="padding:8px 12px;text-align:right;font-family:monospace;font-size:13px;color:#4ade80"></td>
-              </tr>
               <tr style="border-top:1px solid rgba(255,255,255,.1)">
-                <td colspan="3" style="padding:10px 12px;text-align:right;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase;letter-spacing:.08em">Total</td>
-                <td id="tt-total" style="padding:10px 12px;text-align:right;font-family:monospace;font-size:16px;font-weight:700;color:#6ee7f7">${fmt(initTotal)}</td>
+                <td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase;letter-spacing:.08em">Total</td>
+                <td colspan="2" style="padding:8px 12px">
+                  <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px">
+                    <span style="color:#64748b;font:13px monospace;font-weight:700">$</span>
+                    <input type="number" id="tt-total-input" value="${initTotal}" min="0" step="1000"
+                      style="width:150px;background:rgba(110,231,247,.05);border:1px solid rgba(110,231,247,.2);
+                             border-radius:6px;padding:5px 10px;color:#6ee7f7;font-family:monospace;
+                             font-size:16px;font-weight:700;text-align:right;outline:none">
+                  </div>
+                  <div id="tt-adj-hint" style="font-size:10px;font-family:monospace;text-align:right;margin-top:3px;min-height:14px;color:#64748b"></div>
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -181,38 +176,23 @@
 
     document.body.appendChild(overlay);
 
-    // Copy total to clipboard on click
-    const totalEl = document.getElementById('tt-total');
-    totalEl.style.cursor = 'pointer';
-    totalEl.title = 'Click to copy';
-    totalEl.addEventListener('click', () => {
-      const raw = totalEl.textContent.replace(/[^0-9]/g, '');
-      navigator.clipboard.writeText(raw).then(() => {
-        const orig = totalEl.textContent;
-        const origColor = totalEl.style.color;
-        totalEl.textContent = 'Copied!';
-        totalEl.style.color = '#4ade80';
-        setTimeout(() => { totalEl.textContent = orig; totalEl.style.color = origColor; }, 1000);
-      });
-    });
+    // No separate clipboard target needed — user can select the input value directly
 
     function recalcTotalRow() {
       const itemsTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
-      document.getElementById('tt-total').textContent = fmt(itemsTotal + bonusAmount);
-      const dispEl = document.getElementById('tt-bonus-display');
-      const hintEl = document.getElementById('tt-bonus-hint');
+      // Keep bonus locked — update the displayed total to reflect item price changes + bonus
+      const totalInput = document.getElementById('tt-total-input');
+      if (totalInput) totalInput.value = itemsTotal + bonusAmount;
+      const hintEl = document.getElementById('tt-adj-hint');
+      if (!hintEl) return;
       if (bonusAmount === 0) {
-        if (dispEl) dispEl.textContent = '';
-        if (hintEl) hintEl.textContent = '';
+        hintEl.textContent = '';
       } else {
         const pos = bonusAmount > 0;
-        if (dispEl) { dispEl.textContent = (pos ? '+' : '−') + fmt(Math.abs(bonusAmount)); dispEl.style.color = pos ? '#4ade80' : '#f87171'; }
-        if (hintEl) {
-          const n = itemsCopy.length;
-          const perItem = Math.round(Math.abs(bonusAmount) / n);
-          hintEl.textContent = `÷ ${n} items ≈ ${fmt(perItem)} each`;
-          hintEl.style.color = pos ? '#4ade80' : '#f87171';
-        }
+        const n = itemsCopy.length;
+        const perItem = Math.round(Math.abs(bonusAmount) / n);
+        hintEl.textContent = `${pos ? '+' : '−'}${fmt(Math.abs(bonusAmount))} adjustment ÷ ${n} items ≈ ${fmt(perItem)} each`;
+        hintEl.style.color = pos ? '#4ade80' : '#f87171';
       }
     }
 
@@ -276,8 +256,10 @@
       });
     });
 
-    document.getElementById('tt-bonus-input').addEventListener('input', () => {
-      bonusAmount = Math.round(Number(document.getElementById('tt-bonus-input').value) || 0);
+    document.getElementById('tt-total-input').addEventListener('input', () => {
+      const itemsTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
+      const entered = Math.round(Number(document.getElementById('tt-total-input').value) || 0);
+      bonusAmount = entered - itemsTotal;
       recalcTotalRow();
     });
 
