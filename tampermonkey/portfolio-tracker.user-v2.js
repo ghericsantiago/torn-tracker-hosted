@@ -4,11 +4,7 @@
 // @version      1.0
 // @description  Track buy/sell transactions with market prices and potential income
 // @author       Gheric
-// @match        https://www.torn.com
-// @match        https://www.torn.com/index.php
-// @match        https://www.torn.com/page.php?sid=travel*
-// @match        https://www.torn.com/gym.php
-// @match        https://www.torn.com/hospitalview.php*
+// @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_getValue
