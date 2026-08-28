@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.3.0
+// @version      1.4.0
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -146,11 +146,20 @@
     #mp-search {
       width: 100%; box-sizing: border-box;
       background: rgba(255,255,255,0.06); border: 1px solid rgba(74,222,128,0.25);
-      border-radius: 8px; padding: 8px 12px; color: #e2e8f0;
+      border-radius: 8px; padding: 8px 32px 8px 12px; color: #e2e8f0;
       font-size: 13px; outline: none; transition: border-color var(--mp-tr);
     }
     #mp-search:focus { border-color: rgba(74,222,128,0.5); }
     #mp-search::placeholder { color: var(--mp-muted); }
+    #mp-search-clear {
+      position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--mp-muted);
+      cursor: pointer; padding: 4px 6px; font-size: 11px; line-height: 1;
+      display: none; align-items: center; justify-content: center;
+      transition: color var(--mp-tr); border-radius: 4px;
+    }
+    #mp-search-clear:hover { color: #e2e8f0; background: rgba(255,255,255,0.06); }
+    #mp-search-clear.visible { display: flex; }
     #mp-ac {
       position: absolute; top: calc(100% - 2px); left: 14px; right: 14px;
       background: #0d1020; border: 1px solid rgba(74,222,128,0.25);
@@ -293,6 +302,7 @@
       </div>
       <div id="mp-search-wrap">
         <input id="mp-search" placeholder="Search item name…" autocomplete="off" spellcheck="false" />
+        <button id="mp-search-clear" title="Clear">✕</button>
         <div id="mp-ac"></div>
       </div>
       <div id="mp-body">
@@ -318,11 +328,24 @@
     toggle.addEventListener('click', openPanel);
     panel.querySelector('#mp-close').addEventListener('click', closePanel);
 
-    const searchEl = panel.querySelector('#mp-search');
-    const acEl     = panel.querySelector('#mp-ac');
+    const searchEl  = panel.querySelector('#mp-search');
+    const acEl      = panel.querySelector('#mp-ac');
+    const clearBtn  = panel.querySelector('#mp-search-clear');
+
+    function syncClearBtn() {
+      clearBtn.classList.toggle('visible', searchEl.value.length > 0);
+    }
+
+    clearBtn.addEventListener('click', () => {
+      searchEl.value = '';
+      syncClearBtn();
+      closeAC(acEl);
+      searchEl.focus();
+    });
 
     searchEl.addEventListener('input', () => {
       clearTimeout(acTimer);
+      syncClearBtn();
       const q = searchEl.value.trim();
       if (q.length < 2) { closeAC(acEl); return; }
       acTimer = setTimeout(() => fetchAC(q, acEl), 280);
@@ -383,6 +406,8 @@
 
   function pickItem(row, acEl, searchEl) {
     searchEl.value = row.dataset.name;
+    const cb = document.getElementById('mp-search-clear');
+    if (cb) cb.classList.add('visible');
     closeAC(acEl);
     selectItem(Number(row.dataset.id), row.dataset.name);
   }
@@ -429,14 +454,15 @@
     document.getElementById('mp-ima-prev').addEventListener('click', () => navigateIma(-1));
     document.getElementById('mp-ima-next').addEventListener('click', () => navigateIma(1));
 
-    // Load receipt data and IMA in parallel; store ref prices before chart draws
-    Promise.allSettled([
-      loadReceiptData(id),
-      loadImaForDate(id),
-    ]);
-
+    // Receipt first so ref prices are ready when the chart draws
+    loadReceiptThenIma(id);
     loadTornMarket(id);
     loadWeav3r(id);
+  }
+
+  async function loadReceiptThenIma(id) {
+    await loadReceiptData(id);
+    loadImaForDate(id);
   }
 
   // ── IMA date navigation ───────────────────────────────────────────────────
@@ -626,8 +652,9 @@
 
     const legendItems = [
       `<div class="mp-legend-item"><div class="mp-legend-line" style="background:#22d3ee"></div>Price</div>`,
-      imaState.refPrice    ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:rgba(248,113,113,0.8);height:1px;border-top:2px dashed rgba(248,113,113,0.8);background:transparent"></div>Mkt Ref</div>` : '',
-      imaState.catalogPrice ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:transparent;height:1px;border-top:2px dashed rgba(74,222,128,0.7)"></div>Receipt</div>` : '',
+      `<div class="mp-legend-item"><div class="mp-legend-line" style="background:transparent;border-top:1.5px dashed rgba(148,163,184,0.55)"></div>Avg</div>`,
+      imaState.refPrice     ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:transparent;border-top:1.5px dashed rgba(248,113,113,0.85)"></div>Mkt Ref</div>` : '',
+      imaState.catalogPrice ? `<div class="mp-legend-item"><div class="mp-legend-line" style="background:transparent;border-top:1.5px dashed rgba(74,222,128,0.75)"></div>Receipt</div>` : '',
     ].filter(Boolean).join('');
 
     content.innerHTML = `
@@ -667,6 +694,10 @@
         .filter(r => r.price != null && r.created_at)
         .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
 
+      const avgPrice = points.length
+        ? Math.round(points.reduce((s, p) => s + p.y, 0) / points.length)
+        : null;
+
       const datasets = [
         {
           data: points,
@@ -680,6 +711,20 @@
           order: 1,
         },
       ];
+
+      // Average price — gray dashed horizontal lane (non-interactive)
+      if (avgPrice != null) {
+        datasets.push({
+          data: [{ x: xMin, y: avgPrice }, { x: xMax, y: avgPrice }],
+          borderColor: 'rgba(148,163,184,0.55)',
+          borderWidth: 1,
+          borderDash: [3, 3],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 3,
+        });
+      }
 
       // Market reference price — red dashed horizontal lane
       if (imaState.refPrice != null) {
