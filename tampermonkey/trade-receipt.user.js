@@ -118,6 +118,7 @@
       </tr>`;
     }).join('');
 
+    let bonusAmount = 0;
     const initTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
 
     overlay.innerHTML = `
@@ -149,6 +150,20 @@
             </thead>
             <tbody id="tt-body">${rowsHtml}</tbody>
             <tfoot>
+              <tr id="tt-bonus-row" style="background:rgba(74,222,128,.03)">
+                <td colspan="2" style="padding:8px 12px;text-align:right;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase;letter-spacing:.08em">Bonus</td>
+                <td style="padding:6px 12px">
+                  <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px">
+                    <span style="color:#64748b;font:11px monospace">$</span>
+                    <input type="number" id="tt-bonus-input" value="0" step="1000"
+                      style="width:110px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+                             border-radius:6px;padding:4px 8px;color:#4ade80;font-family:monospace;font-size:12px;
+                             text-align:right;outline:none">
+                  </div>
+                  <div id="tt-bonus-hint" style="font-size:10px;font-family:monospace;color:#64748b;text-align:right;margin-top:2px;min-height:14px"></div>
+                </td>
+                <td id="tt-bonus-display" style="padding:8px 12px;text-align:right;font-family:monospace;font-size:13px;color:#4ade80"></td>
+              </tr>
               <tr style="border-top:1px solid rgba(255,255,255,.1)">
                 <td colspan="3" style="padding:10px 12px;text-align:right;font-size:11px;color:#64748b;font-family:monospace;text-transform:uppercase;letter-spacing:.08em">Total</td>
                 <td id="tt-total" style="padding:10px 12px;text-align:right;font-family:monospace;font-size:16px;font-weight:700;color:#6ee7f7">${fmt(initTotal)}</td>
@@ -181,6 +196,26 @@
       });
     });
 
+    function recalcTotalRow() {
+      const itemsTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
+      document.getElementById('tt-total').textContent = fmt(itemsTotal + bonusAmount);
+      const dispEl = document.getElementById('tt-bonus-display');
+      const hintEl = document.getElementById('tt-bonus-hint');
+      if (bonusAmount === 0) {
+        if (dispEl) dispEl.textContent = '';
+        if (hintEl) hintEl.textContent = '';
+      } else {
+        const pos = bonusAmount > 0;
+        if (dispEl) { dispEl.textContent = (pos ? '+' : '−') + fmt(Math.abs(bonusAmount)); dispEl.style.color = pos ? '#4ade80' : '#f87171'; }
+        if (hintEl) {
+          const n = itemsCopy.length;
+          const perItem = Math.round(Math.abs(bonusAmount) / n);
+          hintEl.textContent = `÷ ${n} items ≈ ${fmt(perItem)} each`;
+          hintEl.style.color = pos ? '#4ade80' : '#f87171';
+        }
+      }
+    }
+
     // Live recalculate for either an exact fixed unit price or a percentage of market value.
     function recalculateItem(idx) {
         const input = overlay.querySelector(`.tt-price-value[data-idx="${idx}"]`);
@@ -202,8 +237,7 @@
         }
         if (protectionDetail) protectionDetail.textContent = 'manual adjustment replaces protection';
         row.querySelector('.tt-sub').textContent = fmt(unit * itemsCopy[idx].quantity);
-        const newTotal = itemsCopy.reduce((s, i) => s + (i.effective_price ?? 0) * i.quantity, 0);
-        document.getElementById('tt-total').textContent = fmt(newTotal);
+        recalcTotalRow();
 
         const deltaEl = document.getElementById(`tt-delta-${idx}`);
         if (deltaEl && original > 0 && unit !== original) {
@@ -242,6 +276,11 @@
       });
     });
 
+    document.getElementById('tt-bonus-input').addEventListener('input', () => {
+      bonusAmount = Math.round(Number(document.getElementById('tt-bonus-input').value) || 0);
+      recalcTotalRow();
+    });
+
     const close = () => overlay.remove();
     document.getElementById('tt-close').addEventListener('click', close);
     document.getElementById('tt-cancel').addEventListener('click', close);
@@ -274,9 +313,17 @@
       btn.disabled = true;
       btn.textContent = 'Creating…';
 
-      const overrides = itemsCopy.map(i => ({
+      // Distribute bonus equally across items (extra total ÷ qty = unit price adj)
+      const n = itemsCopy.length;
+      const bonusPerItem = Array.from({ length: n }, (_, i) =>
+        i === n - 1
+          ? bonusAmount - Math.round(bonusAmount / n) * (n - 1)
+          : Math.round(bonusAmount / n)
+      );
+
+      const overrides = itemsCopy.map((i, idx) => ({
         torn_item_id: i.torn_item_id,
-        unit_price:   i.effective_price ?? 0,
+        unit_price:   (i.effective_price ?? 0) + (n > 0 ? Math.round(bonusPerItem[idx] / i.quantity) : 0),
         override_price_mode: i._editMode,
         override_market_pct: i._editMode === 'market_pct' ? (Number(i._editValue) || 0) / 100 : null,
         market_protection_applied: i.market_protection_applied === true && !i._manualAdjusted,
