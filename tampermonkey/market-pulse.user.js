@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.1.0
+// @version      1.2.0
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -13,7 +13,6 @@
 // @connect      torn-imarket-tracker.gvsantiago.com
 // @connect      itrade.devs.surf
 // @require      https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js
-// @require      https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -28,8 +27,9 @@
   // ── Helpers ───────────────────────────────────────────────────────────────
   function fmt(n) {
     if (n == null) return '—';
-    if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(2) + 'M';
-    if (n >= 1_000)     return '$' + (n / 1_000).toFixed(1) + 'K';
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000) return '$' + (n / 1_000_000).toFixed(2) + 'M';
+    if (abs >= 1_000)     return '$' + (n / 1_000).toFixed(1) + 'K';
     return '$' + Number(n).toLocaleString('en-US');
   }
   function fmtFull(n) {
@@ -46,6 +46,12 @@
     const d = new Date(iso);
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
            d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${d.getDate()} ${mo[d.getMonth()]}`;
   }
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c =>
@@ -80,6 +86,8 @@
       --mp-tr:      0.18s ease;
       --mp-mono:    'JetBrains Mono', monospace;
     }
+
+    /* ── Toggle ── */
     #mp-toggle {
       position: fixed; left: 0; top: 50%; transform: translateY(-50%);
       background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.22);
@@ -94,6 +102,7 @@
     #mp-toggle:hover { background: rgba(74,222,128,0.15); }
     #mp-toggle.open  { opacity: 0; pointer-events: none; }
 
+    /* ── Panel ── */
     #mp-panel {
       position: fixed; top: 0; left: -540px; width: min(520px, 100vw);
       height: 100dvh; background: rgba(7,8,15,0.97);
@@ -107,13 +116,13 @@
     }
     #mp-panel.open { left: 0; }
 
-    /* Header */
+    /* ── Header ── */
     #mp-hdr {
       padding: 13px 16px 11px; border-bottom: 1px solid var(--mp-border);
       background: rgba(74,222,128,0.03); flex-shrink: 0;
       display: flex; align-items: center; gap: 10px;
     }
-    #mp-hdr h2 { margin: 0; font-size: 13px; font-weight: 700; color: #e2e8f0; flex: 1; line-height: 1.3; }
+    #mp-hdr h2 { margin: 0; font-size: 13px; font-weight: 700; color: #e2e8f0; flex: 1; line-height: 1.4; }
     #mp-item-tag { display: block; font-size: 10px; color: var(--mp-accent); font-family: var(--mp-mono); font-weight: 400; }
     .mp-icon-btn {
       background: none; border: 1px solid var(--mp-border); color: var(--mp-muted);
@@ -123,7 +132,7 @@
     }
     .mp-icon-btn:hover { color: #e2e8f0; }
 
-    /* Search */
+    /* ── Search ── */
     #mp-search-wrap {
       padding: 11px 14px; border-bottom: 1px solid var(--mp-border);
       flex-shrink: 0; position: relative;
@@ -153,84 +162,83 @@
     .mp-ac-row:last-child { border-bottom: none; }
     .mp-ac-id { color: var(--mp-muted); font-size: 10px; font-family: var(--mp-mono); }
 
-    /* Body */
-    #mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+    /* ── Body ── */
+    #mp-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
     #mp-empty { text-align: center; color: var(--mp-muted); padding: 60px 0; font-size: 12px; line-height: 2.2; }
 
-    /* Our position card */
-    #mp-our-offer {
-      background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.18);
-      border-radius: 10px; overflow: hidden;
+    /* ── Receipt Strip ── */
+    #mp-receipt-strip {
+      display: flex; gap: 1px; background: var(--mp-border);
+      border: 1px solid rgba(74,222,128,0.18); border-radius: 10px; overflow: hidden;
     }
-    .oo-card-hdr {
-      padding: 7px 14px; font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
-      text-transform: uppercase; color: var(--mp-accent);
-      border-bottom: 1px solid rgba(74,222,128,0.12);
-      background: rgba(74,222,128,0.04);
+    .rs-cell {
+      flex: 1; background: var(--mp-bg); padding: 9px 12px;
+      display: flex; flex-direction: column; gap: 2px;
     }
-    .oo-row {
-      display: flex; align-items: baseline; gap: 10px;
-      padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .oo-row:last-child { border-bottom: none; }
-    .oo-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mp-muted); width: 90px; flex-shrink: 0; }
-    .oo-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
-    .oo-val.green  { color: #4ade80; }
-    .oo-val.yellow { color: #fbbf24; }
-    .oo-val.cyan   { color: #22d3ee; }
-    .oo-meta { font-size: 10px; color: var(--mp-muted); margin-left: 2px; }
+    .rs-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mp-muted); }
+    .rs-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
+    .rs-val.green  { color: #4ade80; }
+    .rs-val.cyan   { color: #22d3ee; }
+    .rs-sub { font-size: 9px; color: var(--mp-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Section cards */
-    .mp-sec { background: var(--mp-card); border: 1px solid var(--mp-border); border-radius: 10px; overflow: hidden; }
+    /* ── Markets Row (side-by-side) ── */
+    #mp-markets-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* ── Section Cards ── */
+    .mp-sec { background: var(--mp-card); border: 1px solid var(--mp-border); border-radius: 10px; overflow: hidden; min-width: 0; }
     .mp-sec-hdr {
-      padding: 8px 14px; border-bottom: 1px solid var(--mp-border);
-      font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
+      padding: 7px 10px; border-bottom: 1px solid var(--mp-border);
+      font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
       text-transform: uppercase; color: var(--mp-muted);
-      display: flex; align-items: center; gap: 7px;
+      display: flex; align-items: center; gap: 6px;
     }
-    .mp-sec-hdr .mp-sub { margin-left: auto; font-weight: 400; font-size: 9px; color: var(--mp-muted); }
-    .mp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .mp-sec-hdr .mp-sub { margin-left: auto; font-weight: 400; font-size: 9px; }
+    .mp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
     .mp-dot.green  { background: #4ade80; }
     .mp-dot.yellow { background: #fbbf24; }
     .mp-dot.cyan   { background: #22d3ee; }
 
-    /* Stat grid */
-    .mp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--mp-border); }
-    .mp-stat { background: var(--mp-bg); padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; }
-    .mp-stat.span2 { grid-column: 1 / -1; }
-    .mp-stat-lbl { font-size: 9px; color: var(--mp-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-    .mp-stat-val { font-size: 15px; font-weight: 700; color: #e2e8f0; font-family: var(--mp-mono); }
-    .mp-stat-val.green  { color: #4ade80; }
-    .mp-stat-val.yellow { color: #fbbf24; }
-    .mp-stat-val.cyan   { color: #22d3ee; }
-    .mp-stat-val.red    { color: #f87171; }
-    .mp-stat-sub { font-size: 9px; color: var(--mp-muted); margin-top: 1px; }
+    /* Compact key-stat inside narrow card */
+    .mp-key-stat {
+      padding: 7px 10px; border-bottom: 1px solid var(--mp-border);
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .mp-key-lbl { font-size: 8px; text-transform: uppercase; color: var(--mp-muted); letter-spacing: 0.06em; }
+    .mp-key-val { font-size: 14px; font-weight: 700; font-family: var(--mp-mono); }
+    .mp-key-val.green  { color: #4ade80; }
+    .mp-key-val.yellow { color: #fbbf24; }
+    .mp-key-sub { font-size: 9px; color: var(--mp-muted); }
 
-    /* Price list rows (Torn + Bazaar) */
-    .mp-price-list { display: flex; flex-direction: column; }
+    /* Price list rows */
     .mp-price-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 7px 14px; border-bottom: 1px solid rgba(255,255,255,0.03);
-      transition: background var(--mp-tr);
+      padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.03);
     }
     .mp-price-row:last-child { border-bottom: none; }
-    .mp-price-row:hover { background: rgba(255,255,255,0.03); }
-    .mp-price-row.cheapest .mp-pr-price { color: #4ade80; }
-    .mp-price-row.cheapest-y .mp-pr-price { color: #fbbf24; }
-    .mp-pr-price { font-family: var(--mp-mono); font-size: 13px; font-weight: 600; }
-    .mp-pr-right { font-size: 11px; color: var(--mp-dim); text-align: right; }
-    .mp-pr-qty { font-family: var(--mp-mono); }
-    .mp-more { padding: 6px 14px; font-size: 10px; color: var(--mp-muted); border-top: 1px solid rgba(255,255,255,0.03); }
+    .mp-price-row.cheapest  .mp-pr-price { color: #4ade80; font-weight: 700; }
+    .mp-price-row.cheapest-y .mp-pr-price { color: #fbbf24; font-weight: 700; }
+    .mp-pr-price { font-family: var(--mp-mono); font-size: 11px; }
+    .mp-pr-right { font-size: 10px; color: var(--mp-dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+    .mp-more { padding: 5px 10px; font-size: 9px; color: var(--mp-muted); border-top: 1px solid rgba(255,255,255,0.03); }
 
-    /* Chart wrapper */
-    .mp-chart-wrap { padding: 12px 14px 8px; }
-    .mp-chart-wrap canvas { display: block; width: 100% !important; }
+    /* Full-width stats for IMA section */
+    .mp-stats4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: var(--mp-border); }
+    .mp-stat4 { background: var(--mp-bg); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+    .mp-stat4-lbl { font-size: 8px; text-transform: uppercase; color: var(--mp-muted); letter-spacing: 0.06em; }
+    .mp-stat4-val { font-size: 12px; font-weight: 700; font-family: var(--mp-mono); color: #e2e8f0; }
+    .mp-stat4-val.green { color: #4ade80; }
+    .mp-stat4-val.cyan  { color: #22d3ee; }
+    .mp-stat4-val.red   { color: #f87171; }
+    .mp-stat4-sub { font-size: 8px; color: var(--mp-muted); }
+
+    /* Chart */
+    .mp-chart-wrap { position: relative; height: 190px; padding: 10px 10px 6px; }
 
     /* Loading / error */
-    .mp-loading { padding: 18px 14px; text-align: center; color: var(--mp-muted); font-size: 12px; }
-    .mp-err     { padding: 11px 14px; color: #f87171; font-size: 11px; }
+    .mp-loading { padding: 16px 10px; text-align: center; color: var(--mp-muted); font-size: 11px; }
+    .mp-err     { padding: 10px; color: #f87171; font-size: 10px; word-break: break-word; }
 
-    /* Footer */
+    /* ── Footer ── */
     #mp-footer {
       padding: 9px 14px; border-top: 1px solid var(--mp-border);
       flex-shrink: 0; display: flex; align-items: center; gap: 8px;
@@ -304,7 +312,7 @@
     searchEl.addEventListener('keydown', e => {
       const rows = [...acEl.querySelectorAll('.mp-ac-row')];
       if (!rows.length) return;
-      const fi  = rows.findIndex(r => r.classList.contains('focused'));
+      const fi = rows.findIndex(r => r.classList.contains('focused'));
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         if (fi >= 0) rows[fi].classList.remove('focused');
@@ -313,8 +321,7 @@
         e.preventDefault();
         if (fi > 0) { rows[fi].classList.remove('focused'); rows[fi - 1].classList.add('focused'); }
       } else if (e.key === 'Enter' && fi >= 0) {
-        e.preventDefault();
-        pickItem(rows[fi], acEl, searchEl);
+        e.preventDefault(); pickItem(rows[fi], acEl, searchEl);
       } else if (e.key === 'Escape') {
         closeAC(acEl);
       }
@@ -342,7 +349,6 @@
       const items = await gmGet(`${IMA_URL}/api/search?q=${encodeURIComponent(q)}`);
       const list  = Array.isArray(items) ? items : [];
       if (!list.length) { closeAC(acEl); return; }
-
       acEl.innerHTML = list.slice(0, 14).map(it =>
         `<div class="mp-ac-row" data-id="${it.item_id}" data-name="${esc(it.name)}">
           <span>${esc(it.name)}</span>
@@ -351,10 +357,7 @@
       ).join('');
       acEl.classList.add('show');
       acEl.querySelectorAll('.mp-ac-row').forEach(row =>
-        row.addEventListener('mousedown', e => {
-          e.preventDefault();
-          pickItem(row, acEl, document.getElementById('mp-search'));
-        })
+        row.addEventListener('mousedown', e => { e.preventDefault(); pickItem(row, acEl, document.getElementById('mp-search')); })
       );
     } catch { closeAC(acEl); }
   }
@@ -368,22 +371,25 @@
   // ── Select Item ───────────────────────────────────────────────────────────
   function selectItem(id, name) {
     currentItem = { id, name };
+    document.getElementById('mp-item-tag').textContent = `${name}  #${id}`;
 
-    const tag = document.getElementById('mp-item-tag');
-    tag.textContent = `${name}  #${id}`;
-
-    // Destroy old chart before rebuilding body
     if (imaChart) { imaChart.destroy(); imaChart = null; }
 
     document.getElementById('mp-body').innerHTML = `
-      <div id="mp-our-offer" class="mp-loading" style="text-align:left;padding:11px 14px">Loading your offering…</div>
-      <div class="mp-sec" id="mp-sec-torn">
-        <div class="mp-sec-hdr"><span class="mp-dot green"></span>Item Market (Torn API)</div>
-        <div class="mp-loading">Loading…</div>
+      <div id="mp-receipt-strip">
+        <div class="rs-cell"><div class="rs-lbl">Receipt Price</div><div class="rs-val">—</div><div class="rs-sub">loading…</div></div>
+        <div class="rs-cell"><div class="rs-lbl">Market Ref</div><div class="rs-val">—</div><div class="rs-sub">—</div></div>
+        <div class="rs-cell"><div class="rs-lbl">Torn Market</div><div class="rs-val">—</div><div class="rs-sub">—</div></div>
       </div>
-      <div class="mp-sec" id="mp-sec-weav">
-        <div class="mp-sec-hdr"><span class="mp-dot yellow"></span>Bazaar Offers (Weav3r)</div>
-        <div class="mp-loading">Loading…</div>
+      <div id="mp-markets-row">
+        <div class="mp-sec" id="mp-sec-torn">
+          <div class="mp-sec-hdr"><span class="mp-dot green"></span>Item Market</div>
+          <div class="mp-loading">Loading…</div>
+        </div>
+        <div class="mp-sec" id="mp-sec-weav">
+          <div class="mp-sec-hdr"><span class="mp-dot yellow"></span>Bazaar</div>
+          <div class="mp-loading">Loading…</div>
+        </div>
       </div>
       <div class="mp-sec" id="mp-sec-ima">
         <div class="mp-sec-hdr"><span class="mp-dot cyan"></span>Price History (IMA)</div>
@@ -391,89 +397,68 @@
       </div>
     `;
 
-    loadOurOffering(id);
+    loadReceiptData(id);
     loadTornMarket(id);
     loadWeav3r(id);
     loadImaHistory(id);
   }
 
-  // ── Our Offering ──────────────────────────────────────────────────────────
-  async function loadOurOffering(itemId) {
-    const el = document.getElementById('mp-our-offer');
-    if (!el) return;
+  // ── Receipt Price Strip ───────────────────────────────────────────────────
+  async function loadReceiptData(itemId) {
     try {
       const d = await gmGet(
         `${APP_URL}/api/item-offering/${itemId}`,
         { 'X-Receipt-Token': RECEIPT_TOKEN }
       );
-      renderOurOffering(el, d);
-    } catch (e) {
-      el.innerHTML = `<span style="font-size:11px;color:#64748b">Our offering: unavailable (${esc(e.message)})</span>`;
+      renderReceiptStrip(d);
+    } catch {
+      const strip = document.getElementById('mp-receipt-strip');
+      if (strip) strip.innerHTML = `<div class="rs-cell" style="flex:1"><span style="font-size:10px;color:#64748b">Our pricing unavailable</span></div>`;
     }
   }
 
-  function renderOurOffering(el, d) {
-    const pctLabel = d.resolved_pct != null
-      ? ` · ${Math.round(d.resolved_pct * 100)}% market`
-      : '';
-    const modeLabel = d.price_mode === 'fixed' ? ' · fixed' : pctLabel;
-    const inCatalog = d.in_catalog ? '' : ' · <span style="color:#f87171">not in catalog</span>';
+  function renderReceiptStrip(d) {
+    const strip = document.getElementById('mp-receipt-strip');
+    if (!strip) return;
 
-    const stockMeta = [
-      d.baz_qty  > 0 ? `×${d.baz_qty} baz`  : null,
-      d.inv_qty  > 0 ? `×${d.inv_qty} inv`  : null,
-      d.disp_qty > 0 ? `×${d.disp_qty} disp` : null,
-    ].filter(Boolean).join('  ');
+    const pctStr = d.resolved_pct != null ? Math.round(d.resolved_pct * 100) + '% mkt' : '';
+    const modeStr = d.price_mode === 'fixed' ? 'fixed' : pctStr;
 
-    const snap = d.snapshot_at ? fmtIso(d.snapshot_at) : '—';
-
-    el.outerHTML = `
-      <div id="mp-our-offer">
-        <div class="oo-card-hdr">Our Position</div>
-        <div class="oo-row">
-          <span class="oo-lbl">Receipt Price</span>
-          <span class="oo-val green">${d.catalog_price != null ? fmtFull(d.catalog_price) : '—'}</span>
-          <span class="oo-meta">${modeLabel}${inCatalog}</span>
-        </div>
-        <div class="oo-row">
-          <span class="oo-lbl">Bazaar Listing</span>
-          <span class="oo-val yellow">${d.baz_price != null ? fmtFull(d.baz_price) : '—'}</span>
-          <span class="oo-meta">${stockMeta || 'not listed'} · snap ${snap}</span>
-        </div>
-        <div class="oo-row">
-          <span class="oo-lbl">Market Ref</span>
-          <span class="oo-val cyan">${d.market_reference_price != null ? fmtFull(d.market_reference_price) : '—'}</span>
-          <span class="oo-meta">${d.market_reference_date ? 'resale ceiling · ' + d.market_reference_date : 'no ceiling data'}</span>
-        </div>
-        <div class="oo-row">
-          <span class="oo-lbl">Torn Ref</span>
-          <span class="oo-val">${d.market_price != null ? fmtFull(d.market_price) : '—'}</span>
-          <span class="oo-meta">latest IMA: ${d.latest_lowest_price != null ? fmtFull(d.latest_lowest_price) : '—'}</span>
-        </div>
+    strip.innerHTML = `
+      <div class="rs-cell">
+        <div class="rs-lbl">Receipt Price</div>
+        <div class="rs-val green">${d.catalog_price != null ? fmtFull(d.catalog_price) : '—'}</div>
+        <div class="rs-sub">${d.in_catalog ? modeStr : modeStr + ' · not in catalog'}</div>
+      </div>
+      <div class="rs-cell">
+        <div class="rs-lbl">Market Ref</div>
+        <div class="rs-val cyan">${d.market_reference_price != null ? fmtFull(d.market_reference_price) : '—'}</div>
+        <div class="rs-sub">${d.market_reference_date ? 'ceiling ' + d.market_reference_date : 'no ceiling data'}</div>
+      </div>
+      <div class="rs-cell">
+        <div class="rs-lbl">Torn Market</div>
+        <div class="rs-val">${d.market_price != null ? fmt(d.market_price) : '—'}</div>
+        <div class="rs-sub">IMA: ${d.latest_lowest_price != null ? fmt(d.latest_lowest_price) : '—'}</div>
       </div>
     `;
   }
 
   // ── Torn Item Market ──────────────────────────────────────────────────────
-  // Response: { itemmarket: { item: { average_price }, listings: [{ price, amount }] }, _metadata: { total } }
   async function loadTornMarket(itemId) {
     const sec = document.getElementById('mp-sec-torn');
     const key = GM_getValue('tornApiKey', '');
-    if (!key) {
-      replaceLoading(sec, `<div class="mp-err">No API key — enter it in the footer.</div>`);
-      return;
-    }
+    if (!key) { replaceLoading(sec, `<div class="mp-err">No API key in footer.</div>`); return; }
     try {
       const data = await gmGet(`https://api.torn.com/v2/market/${itemId}/itemmarket?key=${key}`);
       renderTornMarket(sec, data);
     } catch (e) {
-      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">${esc(e.message)}</div>`);
     }
   }
 
   function renderTornMarket(sec, data) {
     if (data.error) {
-      replaceLoading(sec, `<div class="mp-err">Torn API: ${esc(data.error?.error ?? JSON.stringify(data.error))}</div>`);
+      replaceLoading(sec, `<div class="mp-err">${esc(data.error?.error ?? JSON.stringify(data.error))}</div>`);
       return;
     }
     const im       = data.itemmarket ?? {};
@@ -482,7 +467,7 @@
     const avgPrice = im.item?.average_price;
 
     if (!listings.length) {
-      replaceLoading(sec, `<div class="mp-loading">No active Item Market listings</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No listings</div>`);
       return;
     }
 
@@ -490,53 +475,44 @@
     const lowestAsk = sorted[0].price;
     const totalAmt  = listings.reduce((s, l) => s + (l.amount || 0), 0);
 
-    const rows = sorted.slice(0, 12).map((l, i) =>
+    // Update header subtitle
+    sec.querySelector('.mp-sec-hdr').insertAdjacentHTML('beforeend',
+      `<span class="mp-sub" style="color:var(--mp-muted)">${total} listings</span>`
+    );
+
+    const rows = sorted.slice(0, 10).map((l, i) =>
       `<div class="mp-price-row ${i === 0 ? 'cheapest' : ''}">
         <span class="mp-pr-price">${fmtFull(l.price)}</span>
-        <span class="mp-pr-right"><span class="mp-pr-qty">×${l.amount}</span></span>
+        <span class="mp-pr-right">×${l.amount}</span>
       </div>`
     ).join('');
 
     replaceLoading(sec, `
-      <div class="mp-stats">
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Lowest Ask</div>
-          <div class="mp-stat-val green">${fmtFull(lowestAsk)}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Avg Price</div>
-          <div class="mp-stat-val">${fmtFull(avgPrice)}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Listings</div>
-          <div class="mp-stat-val">${total}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Total Units</div>
-          <div class="mp-stat-val">${totalAmt.toLocaleString()}</div>
-        </div>
+      <div class="mp-key-stat">
+        <div class="mp-key-lbl">Lowest Ask</div>
+        <div class="mp-key-val green">${fmtFull(lowestAsk)}</div>
+        <div class="mp-key-sub">avg ${fmt(avgPrice)} · ${totalAmt.toLocaleString()} units</div>
       </div>
       <div class="mp-price-list">${rows}</div>
-      ${total > 12 ? `<div class="mp-more">Showing first 12 of ${total} listings</div>` : ''}
+      ${total > 10 ? `<div class="mp-more">+${total - 10} more</div>` : ''}
     `);
   }
 
   // ── Weav3r Bazaar ─────────────────────────────────────────────────────────
-  // Response: { market_price, bazaar_average, generated_at, listings: [{ player_name, quantity, price }] }
   async function loadWeav3r(itemId) {
     const sec = document.getElementById('mp-sec-weav');
     try {
       const data = await gmGet(`${WEAV3R}/api/marketplace/${itemId}?limit=100`);
       renderWeav3r(sec, data);
     } catch (e) {
-      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">${esc(e.message)}</div>`);
     }
   }
 
   function renderWeav3r(sec, data) {
     const listings = data.listings ?? [];
     if (!listings.length) {
-      replaceLoading(sec, `<div class="mp-loading">No bazaar listings</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No listings</div>`);
       return;
     }
 
@@ -544,56 +520,43 @@
     const lowestBaz = sorted[0].price;
     const genAt     = fmtTs(data.generated_at);
 
-    const rows = sorted.slice(0, 12).map((l, i) =>
+    sec.querySelector('.mp-sec-hdr').insertAdjacentHTML('beforeend',
+      `<span class="mp-sub" style="color:var(--mp-muted)">${listings.length} sellers</span>`
+    );
+
+    const rows = sorted.slice(0, 10).map((l, i) =>
       `<div class="mp-price-row ${i === 0 ? 'cheapest-y' : ''}">
-        <span class="mp-pr-price">${fmtFull(l.price)}</span>
-        <span class="mp-pr-right">
-          <span class="mp-pr-qty">×${l.quantity}</span>
-          <span style="margin-left:6px">${esc(l.player_name)}</span>
-        </span>
+        <span class="mp-pr-price">${fmt(l.price)}</span>
+        <span class="mp-pr-right">×${l.quantity} ${esc(l.player_name)}</span>
       </div>`
     ).join('');
 
     replaceLoading(sec, `
-      <div class="mp-stats">
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Lowest Offer</div>
-          <div class="mp-stat-val yellow">${fmtFull(lowestBaz)}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Bazaar Avg</div>
-          <div class="mp-stat-val">${fmt(data.bazaar_average)}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Torn Ref Price</div>
-          <div class="mp-stat-val">${fmt(data.market_price)}</div>
-        </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Sellers</div>
-          <div class="mp-stat-val">${listings.length}</div>
-          <div class="mp-stat-sub">${genAt}</div>
-        </div>
+      <div class="mp-key-stat">
+        <div class="mp-key-lbl">Lowest Offer</div>
+        <div class="mp-key-val yellow">${fmtFull(lowestBaz)}</div>
+        <div class="mp-key-sub">avg ${fmt(data.bazaar_average)} · ${genAt}</div>
       </div>
       <div class="mp-price-list">${rows}</div>
-      ${listings.length > 12 ? `<div class="mp-more">+ ${listings.length - 12} more sellers</div>` : ''}
+      ${listings.length > 10 ? `<div class="mp-more">+${listings.length - 10} more</div>` : ''}
     `);
   }
 
-  // ── IMA Price History (Chart) ─────────────────────────────────────────────
+  // ── IMA Price History Chart ───────────────────────────────────────────────
   async function loadImaHistory(itemId) {
     const sec = document.getElementById('mp-sec-ima');
     try {
       const data = await gmGet(`${IMA_URL}/api/market/${itemId}?limit=200`);
       renderImaHistory(sec, data);
     } catch (e) {
-      replaceLoading(sec, `<div class="mp-err">Failed: ${esc(e.message)}</div>`);
+      replaceLoading(sec, `<div class="mp-err">${esc(e.message)}</div>`);
     }
   }
 
   function renderImaHistory(sec, data) {
     const records = Array.isArray(data) ? data : [];
     if (!records.length) {
-      replaceLoading(sec, `<div class="mp-loading">No price history for this item</div>`);
+      replaceLoading(sec, `<div class="mp-loading">No price history tracked</div>`);
       return;
     }
 
@@ -603,83 +566,89 @@
     const avg     = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
     const latest  = records[records.length - 1];
 
+    // Use ms timestamps for x-axis (no adapter required)
     const points = records
       .filter(r => r.price != null && r.created_at)
       .map(r => ({ x: new Date(r.created_at).getTime(), y: r.price }));
 
     replaceLoading(sec, `
-      <div class="mp-stats">
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Latest</div>
-          <div class="mp-stat-val cyan">${fmtFull(latest?.price)}</div>
-          <div class="mp-stat-sub">${fmtIso(latest?.created_at)}</div>
+      <div class="mp-stats4">
+        <div class="mp-stat4">
+          <div class="mp-stat4-lbl">Latest</div>
+          <div class="mp-stat4-val cyan">${fmt(latest?.price)}</div>
+          <div class="mp-stat4-sub">${fmtDate(latest?.created_at)}</div>
         </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Average (${records.length} pts)</div>
-          <div class="mp-stat-val">${fmtFull(avg)}</div>
+        <div class="mp-stat4">
+          <div class="mp-stat4-lbl">Avg (${records.length})</div>
+          <div class="mp-stat4-val">${fmt(avg)}</div>
         </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">Low</div>
-          <div class="mp-stat-val green">${fmtFull(lo)}</div>
+        <div class="mp-stat4">
+          <div class="mp-stat4-lbl">Low</div>
+          <div class="mp-stat4-val green">${fmt(lo)}</div>
         </div>
-        <div class="mp-stat">
-          <div class="mp-stat-lbl">High</div>
-          <div class="mp-stat-val red">${fmtFull(hi)}</div>
+        <div class="mp-stat4">
+          <div class="mp-stat4-lbl">High</div>
+          <div class="mp-stat4-val red">${fmt(hi)}</div>
         </div>
       </div>
       <div class="mp-chart-wrap">
-        <canvas id="mp-ima-chart" height="160"></canvas>
+        <canvas id="mp-ima-chart"></canvas>
       </div>
     `);
 
-    const canvas = sec.querySelector('#mp-ima-chart');
-    if (!canvas || typeof Chart === 'undefined') return;
-    if (imaChart) { imaChart.destroy(); imaChart = null; }
+    // Small delay so canvas is laid out before Chart.js reads dimensions
+    setTimeout(() => {
+      const canvas = sec.querySelector('#mp-ima-chart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (imaChart) { imaChart.destroy(); imaChart = null; }
 
-    imaChart = new Chart(canvas, {
-      type: 'line',
-      data: {
-        datasets: [{
-          data: points,
-          borderColor: '#22d3ee',
-          backgroundColor: 'rgba(34,211,238,0.07)',
-          borderWidth: 1.5,
-          pointRadius: points.length > 80 ? 0 : 2,
-          pointHoverRadius: 4,
-          tension: 0.3,
-          fill: true,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => fmtFull(ctx.parsed.y),
-              title: ctx => fmtIso(new Date(ctx[0].parsed.x).toISOString()),
+      imaChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          datasets: [{
+            data: points,
+            borderColor: '#22d3ee',
+            backgroundColor: 'rgba(34,211,238,0.07)',
+            borderWidth: 1.5,
+            pointRadius: points.length > 60 ? 0 : 2,
+            pointHoverRadius: 4,
+            tension: 0.3,
+            fill: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: ctx => fmtIso(new Date(ctx[0].parsed.x).toISOString()),
+                label: ctx => fmtFull(ctx.parsed.y),
+              },
+            },
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              ticks: {
+                color: '#64748b', maxTicksLimit: 5, font: { size: 9 },
+                callback: v => fmtDate(new Date(v).toISOString()),
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+            y: {
+              ticks: {
+                color: '#64748b', maxTicksLimit: 5, font: { size: 9 },
+                callback: v => fmt(v),
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' },
             },
           },
         },
-        scales: {
-          x: {
-            type: 'time',
-            time: { tooltipFormat: 'dd MMM HH:mm' },
-            ticks: { color: '#64748b', maxTicksLimit: 5, font: { size: 9 } },
-            grid: { color: 'rgba(255,255,255,0.04)' },
-          },
-          y: {
-            ticks: {
-              color: '#64748b', maxTicksLimit: 5, font: { size: 9 },
-              callback: v => fmt(v),
-            },
-            grid: { color: 'rgba(255,255,255,0.04)' },
-          },
-        },
-      },
-    });
+      });
+    }, 30);
   }
 
   // ── Util ──────────────────────────────────────────────────────────────────
