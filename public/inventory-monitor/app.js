@@ -622,8 +622,8 @@ document.addEventListener('click', async e => {
 });
 $('hover-pop-close').addEventListener('click', hideHoverPop);
 
-// ── Sortable columns: click any header to sort (click again to reverse) ──
-const sortState = {};   // tbodyId → { key, dir }
+// ── Sortable columns: click any header to sort; previous sorts become tiebreakers ──
+const sortState = {};   // tbodyId → [{ key, dir }, ...]  index 0 = primary
 const SORTS = {
   'tb-in':   { item: r => r.name, cat: r => r.category || '', in: r => r.in, val: r => r.value * r.in, src: r => Object.keys(r.sourcesIn || {}).join(','), last: r => r.lastTs },
   'tb-out':  { item: r => r.name, cat: r => r.category || '', out: r => r.out, val: r => r.value * r.out, src: r => Object.keys(r.sourcesOut || {}).join(','), last: r => r.lastTs },
@@ -638,29 +638,41 @@ const SORTS = {
   'adj-list':{ date: r => r.ts, item: r => r.name || r.itemId, qty: r => r.qty, label: r => r.label },
 };
 function sortRows(rows, tbodyId) {
-  const s = sortState[tbodyId];
-  if (!s) return rows;
-  const get = SORTS[tbodyId] && SORTS[tbodyId][s.key];
-  if (!get) return rows;
-  const dir = s.dir === 'asc' ? 1 : -1;
+  const levels = sortState[tbodyId];
+  if (!levels || !levels.length) return rows;
+  const sortDef = SORTS[tbodyId];
+  if (!sortDef) return rows;
+  const active = levels.filter(l => sortDef[l.key]);
+  if (!active.length) return rows;
   return rows.slice().sort((a, b) => {
-    const av = get(a), bv = get(b);
-    const an = av == null || av === '', bn = bv == null || bv === '';
-    if (an && bn) return 0;
-    if (an) return 1;
-    if (bn) return -1;
-    const al = typeof av === 'string' ? av.toLowerCase() : av;
-    const bl = typeof bv === 'string' ? String(bv).toLowerCase() : bv;
-    return al < bl ? -dir : al > bl ? dir : 0;
+    for (const { key, dir } of active) {
+      const get = sortDef[key];
+      const av = get(a), bv = get(b);
+      const an = av == null || av === '', bn = bv == null || bv === '';
+      if (an && bn) continue;
+      if (an) return 1;
+      if (bn) return -1;
+      const al = typeof av === 'string' ? av.toLowerCase() : av;
+      const bl = typeof bv === 'string' ? String(bv).toLowerCase() : bv;
+      if (al !== bl) return (al < bl ? -1 : 1) * (dir === 'asc' ? 1 : -1);
+    }
+    return 0;
   });
 }
 function updateSortIndicators() {
   document.querySelectorAll('th[data-sort]').forEach(th => {
     const tbody = th.closest('table') && th.closest('table').querySelector('tbody');
     const id = tbody && tbody.id;
-    const s = id && sortState[id];
-    th.classList.remove('sort-asc', 'sort-desc');
-    if (s && s.key === th.dataset.sort) th.classList.add(s.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    const levels = (id && sortState[id]) || [];
+    th.classList.remove('sort-asc', 'sort-desc', 'sort-sec');
+    th.removeAttribute('data-sort-indicator');
+    const idx = levels.findIndex(l => l.key === th.dataset.sort);
+    if (idx === 0) {
+      th.classList.add(levels[0].dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    } else if (idx > 0) {
+      th.classList.add('sort-sec');
+      th.setAttribute('data-sort-indicator', `${idx + 1}${levels[idx].dir === 'asc' ? '↑' : '↓'}`);
+    }
   });
 }
 document.addEventListener('click', e => {
@@ -669,8 +681,14 @@ document.addEventListener('click', e => {
   const tbody = th.closest('table').querySelector('tbody');
   const id = tbody.id;
   const key = th.dataset.sort;
-  const prev = sortState[id];
-  sortState[id] = { key, dir: prev && prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : 'asc' };
+  const levels = sortState[id] || [];
+  if (levels.length && levels[0].key === key) {
+    // same primary column — toggle direction
+    sortState[id] = [{ key, dir: levels[0].dir === 'asc' ? 'desc' : 'asc' }, ...levels.slice(1)];
+  } else {
+    // new primary — push to front, drop any old entry for same key, keep up to 3 levels
+    sortState[id] = [{ key, dir: 'asc' }, ...levels.filter(l => l.key !== key)].slice(0, 3);
+  }
   render();
 });
 

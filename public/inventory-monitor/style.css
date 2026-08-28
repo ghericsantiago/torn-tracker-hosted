@@ -469,6 +469,7 @@ th[data-sort]:hover { color: var(--text-dim); }
 th.sort-asc::after, th.sort-desc::after { content: ''; display: inline-block; margin-left: 4px; border-left: 4px solid transparent; border-right: 4px solid transparent; vertical-align: 1px; }
 th.sort-asc::after  { border-bottom: 5px solid var(--accent); }
 th.sort-desc::after { border-top:    5px solid var(--accent); }
+th.sort-sec::after  { content: attr(data-sort-indicator); display: inline-block; margin-left: 3px; font-size: 9px; opacity: 0.45; vertical-align: 1px; border: none; }
 
 /* ── Warn banner ── */
 .warn { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); color: var(--red); padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: 13px; }
