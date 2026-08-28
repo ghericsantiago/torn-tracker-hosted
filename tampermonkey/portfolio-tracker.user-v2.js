@@ -442,14 +442,14 @@
       transform: translateY(-50%);
       background: linear-gradient(180deg, #c9943a 0%, #a87428 100%);
       color: #fff;
-      width: 26px;
-      padding: 18px 0;
+      width: 18px;
+      padding: 12px 0;
       border-radius: 6px 0 0 6px;
       cursor: pointer;
       z-index: 2147483639;
       writing-mode: vertical-rl;
       text-orientation: mixed;
-      font: 700 10px/1 'Arial', sans-serif;
+      font: 700 8px/1 'Arial', sans-serif;
       letter-spacing: 2px;
       text-align: center;
       user-select: none;

@@ -458,4 +458,30 @@ router.get('/api/receipt/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/receipts — authenticated list of receipts (most recent first)
+router.options('/api/receipts', cors(CORS_TORN));
+router.get('/api/receipts', cors(CORS_TORN), async (req, res) => {
+  try {
+    if (!await verifyToken(req, res)) return;
+    const page   = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit  = Math.min(50, parseInt(req.query.limit) || 20);
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+    const params = status ? [status, limit, offset] : [limit, offset];
+    const where  = status ? 'WHERE status=$1' : '';
+    const lp     = status ? 2 : 1;
+    const { rows } = await db.query(
+      `SELECT id, short_id, trade_id, status, buyer_name, seller_name, total_value, created_at, completed_at
+       FROM trade_receipts ${where}
+       ORDER BY created_at DESC LIMIT $${lp} OFFSET $${lp + 1}`,
+      params
+    );
+    const { rows: cnt } = await db.query(
+      `SELECT COUNT(*) FROM trade_receipts ${where}`,
+      status ? [status] : []
+    );
+    res.json({ receipts: rows, total: parseInt(cnt[0].count), page, limit });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
