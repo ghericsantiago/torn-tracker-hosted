@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Market Pulse
 // @namespace    torn-market-pulse
-// @version      1.4.0
+// @version      1.5.0
 // @description  Quick market research drawer — Item Market, Bazaar & IMA price history
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -463,6 +463,7 @@
   async function loadReceiptThenIma(id) {
     await loadReceiptData(id);
     loadImaForDate(id);
+    loadUserMarketListing(id);
   }
 
   // ── IMA date navigation ───────────────────────────────────────────────────
@@ -520,6 +521,7 @@
         <div class="rs-lbl">Torn Market</div>
         <div class="rs-val">${d.market_price != null ? fmt(d.market_price) : '—'}</div>
         <div class="rs-sub">IMA: ${d.latest_lowest_price != null ? fmt(d.latest_lowest_price) : '—'}</div>
+        <div class="rs-sub" id="mp-my-listing" style="color:#4ade80">checking…</div>
       </div>
     `;
   }
@@ -607,6 +609,32 @@
       <div>${rows}</div>
       ${listings.length > 10 ? `<div class="mp-more">+${listings.length - 10} more</div>` : ''}
     `);
+  }
+
+  // ── User's own Item Market listing ───────────────────────────────────────
+  async function loadUserMarketListing(itemId) {
+    const el = document.getElementById('mp-my-listing');
+    if (!el) return;
+    const key = GM_getValue('tornApiKey', '');
+    if (!key) { el.textContent = ''; return; }
+    try {
+      const data = await gmGet(`https://api.torn.com/user/?selections=market&key=${key}`);
+      if (data.error) { el.textContent = ''; return; }
+      const listings = Object.values(data.market || {})
+        .filter(l => Number(l.item_id) === itemId);
+      if (!listings.length) {
+        el.textContent = 'Not listed';
+        el.style.color = 'var(--mp-muted)';
+        return;
+      }
+      const totalQty = listings.reduce((s, l) => s + (Number(l.quantity ?? l.amount) || 0), 0);
+      const prices   = listings.map(l => Number(l.price || l.cost)).filter(p => p > 0);
+      const minPrice = prices.length ? Math.min(...prices) : null;
+      el.textContent = minPrice ? `Mine: ${fmtFull(minPrice)} ×${totalQty}` : `Mine: ×${totalQty}`;
+      el.style.color = '#4ade80';
+    } catch {
+      el.textContent = '';
+    }
   }
 
   // ── IMA Price History ─────────────────────────────────────────────────────
