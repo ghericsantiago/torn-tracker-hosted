@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Torn Item Market Auto Buy
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Auto-buy a watchlist of items on the Torn item market, sizing quantity to your cash on hand, cycling items on a no-buy timeout, with an on-page settings panel.
 // @author       GitHub Copilot
 // @match        https://www.torn.com/page.php*
@@ -1057,6 +1057,7 @@
   const SNIPE_RETURN_KEY = "tmSnipeReturn"; // item name to re-select after returning from bazaar
   const BAZAAR_QUEUE_KEY = "tmBazaarQueue"; // sessionStorage queue of pending bazaar visits
   const WEAV3R_API       = "https://weav3r.dev/api/";
+  const WEAV3R_MARKETPLACE_LIMIT = 100; // Keep aligned with market-pulse.user.js.
 
   function gmFetch(url, { method = "GET", headers = {}, body } = {}) {
     return new Promise((resolve, reject) => {
@@ -1129,13 +1130,31 @@
   }
   // ---- end visited-bazaar cache ----
 
-  // Fetch cheapest bazaar listings for itemId priced <= maxPrice from weav3r.
-  async function fetchWeav3rMarketplace(itemId, maxPrice) {
+  // Fetch the same Weav3r marketplace window used by market-pulse.user.js.
+  // Price-cap and freshness checks are applied locally by the sniper so the
+  // displayed market data and the automation start from the same result set.
+  async function fetchWeav3rMarketplace(itemId) {
     try {
-      const url = `${WEAV3R_API}marketplace/${itemId}?maxPrice=${maxPrice}&limit=10`;
+      const url = `${WEAV3R_API}marketplace/${itemId}?limit=${WEAV3R_MARKETPLACE_LIMIT}`;
       const r = await gmFetch(url);
       if (!r.ok) return null;
-      return JSON.parse(r.text);
+      const data = JSON.parse(r.text);
+      if (!Array.isArray(data?.listings)) return null;
+      data.listings = data.listings
+        .map((listing) => ({
+          ...listing,
+          player_id: Number(listing.player_id),
+          price: Number(listing.price),
+          quantity: Number(listing.quantity),
+          last_checked: Number(listing.last_checked),
+        }))
+        .filter((listing) =>
+          Number.isFinite(listing.player_id) && listing.player_id > 0 &&
+          Number.isFinite(listing.price) && listing.price > 0 &&
+          Number.isFinite(listing.quantity) && listing.quantity > 0
+        )
+        .sort((a, b) => a.price - b.price);
+      return data;
     } catch (e) {
       console.warn(LOG, "[Bazaar] fetchWeav3rMarketplace failed", e);
       return null;
@@ -1692,7 +1711,7 @@
           }
 
           setStatus(`[Bazaar] Checking ${item.name} via weav3r API…`);
-          const data = await fetchWeav3rMarketplace(itemId, cap);
+          const data = await fetchWeav3rMarketplace(itemId);
           if (!data?.listings?.length) continue;
 
           const valid = data.listings

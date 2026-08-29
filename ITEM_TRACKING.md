@@ -22,6 +22,17 @@ network failure, or timeout. The server-side sync store is process memory only, 
 app restart, and uses one unauthenticated shared `itemmarket` namespace rather than a per-account
 key.
 
+### Bazaar Sniper market source
+
+The Bazaar Sniper in `tampermonkey/item-market-buy.user.js` uses the same Weav3r marketplace
+request as `tampermonkey/market-pulse.user.js`:
+`GET https://weav3r.dev/api/marketplace/{itemId}?limit=100`. Both therefore begin with the same
+100-listing market window ordered by numeric unit price. The sniper additionally validates player
+id, price, and quantity, then locally applies its watchlist price cap, configurable freshness
+limit, visited-seller cooldown, available cash, skipped state, and target-quantity state before
+navigating to a seller. These automation-only safety filters can make its actionable subset
+smaller than the informational list shown by Market Pulse.
+
 ---
 
 ## Flow schema
