@@ -7,6 +7,7 @@
 // @match        https://www.torn.com/page.php*
 // @match        https://www.torn.com/imarket.php*
 // @match        https://www.torn.com/bazaar.php*
+// @match        https://www.torn.com/museum.php*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -1072,6 +1073,10 @@
 
   function isBazaarPage() {
     return /bazaar\.php/i.test(location.pathname);
+  }
+
+  function isMuseumPage() {
+    return /museum\.php/i.test(location.pathname);
   }
 
   // ---- Visited-bazaar cache — prevents revisiting a listing with the same
@@ -2330,7 +2335,7 @@
   }
 
   function injectUI() {
-    if (!isItemMarketPage() && !isBazaarPage()) return;
+    if (!isItemMarketPage() && !isBazaarPage() && !isMuseumPage()) return;
     if (document.getElementById(FAB_ID)) return;
 
     // Remove any old inline panel left over from a previous script version.
@@ -2470,7 +2475,7 @@
     });
 
     setInterval(() => {
-      if (!isItemMarketPage()) {
+      if (!isItemMarketPage() && !isMuseumPage()) {
         document.getElementById(FAB_ID)?.remove();
         document.getElementById(MODAL_ID)?.remove();
         document.getElementById(PANEL_ID)?.remove();
