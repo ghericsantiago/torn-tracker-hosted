@@ -8,6 +8,20 @@ inventory monitor (`inventory-monitor/`, see `INVENTORY_MONITOR.md`) do today.
 
 Game-rule background (transformations, museum, trades): see `GAME_MECHANICS.md`.
 
+## Item-market auto-buy watchlist synchronization
+
+`tampermonkey/item-market-buy.user.js` stores its shopping/watchlist settings locally under
+`tmItemMarketBuySettings` and attempts to copy the complete settings object to the hosted
+`itemmarket` section of `GET/PUT /api/sync`. Cross-device synchronization depends on both devices
+having **Cloud sync** enabled and being able to reach that endpoint.
+
+The userscript uses `https://itrade.devs.surf/api/sync`, which is reachable through the public
+HTTPS reverse proxy on desktop and mobile; it does not use the raw server IP and port. The cloud
+status displays success only after a 2xx response and displays an error for a non-2xx response,
+network failure, or timeout. The server-side sync store is process memory only, is cleared by an
+app restart, and uses one unauthenticated shared `itemmarket` namespace rather than a per-account
+key.
+
 ---
 
 ## Flow schema

@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Torn Item Market Auto Buy
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  Auto-buy a watchlist of items on the Torn item market, sizing quantity to your cash on hand, cycling items on a no-buy timeout, with an on-page settings panel.
 // @author       GitHub Copilot
 // @match        https://www.torn.com/page.php*
@@ -12,7 +12,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
-// @connect      140.245.47.60
+// @connect      itrade.devs.surf
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -23,7 +23,7 @@
   const KEY = "tmItemMarketBuySettings";
 
   // =================== REST SYNC ===================
-  const SYNC_URL = "http://140.245.47.60:3001/api/sync";
+  const SYNC_URL = "https://itrade.devs.surf/api/sync";
   const PANEL_ID = "tm-imbuy-panel";
   const FAB_ID = "tm-imbuy-fab";
   const MODAL_ID = "tm-imbuy-modal";
@@ -120,12 +120,17 @@
     });
   }
 
-  function gmSyncSet(sections) {
+  function gmSyncSet(sections, onSuccess, onError) {
     GM_xmlhttpRequest({
       method: "PUT", url: SYNC_URL, timeout: 10000,
       headers: { "Content-Type": "application/json" },
       data: JSON.stringify(sections),
-      onload: () => {}, onerror: () => {}, ontimeout: () => {},
+      onload: (r) => {
+        if (r.status >= 200 && r.status < 300) onSuccess?.();
+        else onError?.(`HTTP ${r.status}`);
+      },
+      onerror: () => onError?.("network error"),
+      ontimeout: () => onError?.("timeout"),
     });
   }
 
@@ -161,9 +166,17 @@
       _cloudSavePending = {};
       _cloudSaveTimer = null;
       setCloudSaveStatus("saving");
-      gmSyncSet(pending);
-      setCloudSaveStatus("saved");
-      console.log(LOG, "Sync saved. Sections:", Object.keys(pending).join(", "));
+      gmSyncSet(
+        pending,
+        () => {
+          setCloudSaveStatus("saved");
+          console.log(LOG, "Sync saved. Sections:", Object.keys(pending).join(", "));
+        },
+        (reason) => {
+          setCloudSaveStatus("error");
+          console.error(LOG, "Sync save failed:", reason);
+        },
+      );
     }, 1500);
   }
 
