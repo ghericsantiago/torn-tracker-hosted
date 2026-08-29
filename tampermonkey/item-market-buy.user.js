@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         Torn Item Market Auto Buy
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Auto-buy a watchlist of items on the Torn item market, sizing quantity to your cash on hand, cycling items on a no-buy timeout, with an on-page settings panel.
 // @author       GitHub Copilot
 // @match        https://www.torn.com/page.php*
@@ -1241,13 +1241,6 @@
       window.location.href = returnUrl || "https://www.torn.com/page.php?sid=ItemMarket";
     };
 
-    if (!settings.enabled) {
-      showBazaarToast("Auto-buy is disabled — going back…", "warn");
-      await wait(1500);
-      goBack();
-      return;
-    }
-
     showBazaarToast(`Auto-buy: locating "${itemName}" in this bazaar…`, "info");
 
     // Reject stale listings — they may already have been purchased.
@@ -1675,7 +1668,6 @@
     if (isControllerOnly())                 return;
     if (_bazaarSnipeBusy)                   return;
     if (!settings.bazaarSniperEnabled)      return;
-    if (!settings.enabled)                  return; // master auto-buy toggle
     if (!isItemMarketPage())                return;
     if (busy)                               return; // item-market buy in progress
 

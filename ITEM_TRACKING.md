@@ -33,6 +33,10 @@ limit, visited-seller cooldown, available cash, skipped state, and target-quanti
 navigating to a seller. These automation-only safety filters can make its actionable subset
 smaller than the informational list shown by Market Pulse.
 
+The **Enable Bazaar Sniper** switch independently controls Weav3r scanning, Bazaar navigation,
+and buying. The separate **Auto-buy** switch controls only Item Market buying; it is not a hidden
+prerequisite for the Bazaar Sniper. **Controller only** still prevents automation on that device.
+
 ---
 
 ## Flow schema
