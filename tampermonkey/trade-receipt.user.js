@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipt
 // @namespace    torn-tracker-receipt
-// @version      3.4
+// @version      3.5
 // @description  Generate trade receipts with pricing from your catalog
 // @match        https://www.torn.com/trade.php*
 // @grant        GM_xmlhttpRequest
@@ -159,6 +159,15 @@
                       style="width:150px;background:rgba(110,231,247,.05);border:1px solid rgba(110,231,247,.2);
                              border-radius:6px;padding:5px 10px;color:#6ee7f7;font-family:monospace;
                              font-size:16px;font-weight:700;text-align:right;outline:none">
+                    <button id="tt-copy-total" title="Copy total to clipboard"
+                      style="background:none;border:1px solid rgba(255,255,255,.1);color:#64748b;
+                             width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;
+                             display:flex;align-items:center;justify-content:center;flex-shrink:0;
+                             transition:color .15s,border-color .15s">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    </button>
                   </div>
                   <div id="tt-adj-hint" style="font-size:10px;font-family:monospace;text-align:right;margin-top:3px;min-height:14px;color:#64748b"></div>
                 </td>
@@ -261,6 +270,21 @@
       const entered = Math.round(Number(document.getElementById('tt-total-input').value) || 0);
       bonusAmount = entered - itemsTotal;
       recalcTotalRow();
+    });
+
+    document.getElementById('tt-copy-total').addEventListener('click', () => {
+      const val = document.getElementById('tt-total-input').value;
+      navigator.clipboard.writeText(val).then(() => {
+        const btn = document.getElementById('tt-copy-total');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        btn.style.color = '#4ade80';
+        btn.style.borderColor = 'rgba(74,222,128,.4)';
+        setTimeout(() => {
+          btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+          btn.style.color = '#64748b';
+          btn.style.borderColor = 'rgba(255,255,255,.1)';
+        }, 1500);
+      }).catch(() => {});
     });
 
     const close = () => overlay.remove();
