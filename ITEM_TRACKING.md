@@ -8,6 +8,8 @@ so no Torn API key or third-party database credential is stored in the browser. 
 uses the canonical set in `museum-exchange.json`, the latest recorded Point Market offer,
 catalog market values, and low/high item-market observations for the current Asia/Manila day.
 Missing observations are returned as `null` rather than being treated as zero.
+The drawer scopes its table foreground and background colors so Torn's global table styles do
+not reduce contrast on the dark calculator panel.
 
 The **spec layer** for the inventory management system: for every Torn log type we care
 about, define the **item flows** (what leaves your inventory, what arrives, money/points

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Plushie Set Points Checker
 // @namespace    torn-tracker
-// @version      1.0.0
+// @version      1.0.1
 // @description  Compare Plushie Set costs with Point Market prices using Torn Tracker data.
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -21,7 +21,7 @@
     .pc-head{position:sticky;top:0;z-index:2;padding:20px 24px;color:#fff;background:linear-gradient(135deg,#5b4bc4,#8b65d1)}.pc-head h2{margin:0 80px 4px 0;font-size:22px}.pc-head p{margin:0;opacity:.82}
     .pc-close,.pc-refresh{position:absolute;top:18px;width:34px;height:34px;border:0;border-radius:50%;background:#ffffff25;color:#fff;cursor:pointer;font-size:18px}.pc-close{right:18px}.pc-refresh{right:58px}.pc-body{padding:20px}.pc-status{padding:36px;text-align:center;color:#a7afc0}
     .pc-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.pc-card{padding:14px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff08}.pc-card b{display:block;margin-bottom:8px;color:#b9a8ff}.pc-total{font-size:19px;font-weight:bold;color:#fff}.pc-profit{color:#48d597}.pc-loss{color:#ff7272}
-    .pc-wrap{overflow:auto;border:1px solid #ffffff12;border-radius:10px}.pc-table{width:100%;border-collapse:collapse;white-space:nowrap}.pc-table th,.pc-table td{padding:10px 12px;border-bottom:1px solid #ffffff10;text-align:right}.pc-table th:first-child,.pc-table td:first-child{text-align:left}.pc-table th{background:#242032;color:#cfc4ff}.pc-foot{margin-top:12px;color:#7f899d;text-align:right;font-size:12px}@media(max-width:620px){.pc-cards{grid-template-columns:1fr}}
+    .pc-wrap{overflow:auto;border:1px solid #ffffff12;border-radius:10px}.pc-table{width:100%;border-collapse:collapse;white-space:nowrap;color:#e5e7eb}.pc-table th,.pc-table td{padding:10px 12px;border-bottom:1px solid #ffffff10;text-align:right;color:#d8deea!important;background:#151822!important;text-shadow:none!important}.pc-table th:first-child,.pc-table td:first-child{text-align:left}.pc-table th{background:#242032!important;color:#cfc4ff!important}.pc-table td.pc-profit{color:#48d597!important}.pc-table td.pc-loss{color:#ff7272!important}.pc-foot{margin-top:12px;color:#7f899d;text-align:right;font-size:12px}@media(max-width:620px){.pc-cards{grid-template-columns:1fr}}
   `);
   const button = document.createElement('button'); button.id = 'pc-open'; button.textContent = 'P'; button.title = 'Plushie Set Points Checker';
   const panel = document.createElement('aside'); panel.id = 'pc-panel';
