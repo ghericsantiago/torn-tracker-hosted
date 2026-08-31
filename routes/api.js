@@ -4,6 +4,8 @@ const db = require('../db');
 const museumExchange = require('../museum-exchange.json');
 
 const plushieSet = museumExchange.museum.find(set => set.name === 'Plushie Set');
+const flowerSet = museumExchange.museum.find(set => set.name === 'Exotic Flower Set');
+const calculatorSets = [plushieSet, flowerSet];
 const POINT_MARKET_ID = 999999999;
 
 router.get('/points-checker', async (req, res) => {
@@ -31,19 +33,27 @@ router.get('/points-checker', async (req, res) => {
            AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'Asia/Manila'
        ) today ON TRUE
        ORDER BY ids.position`,
-      [plushieSet.items]
+      [[...new Set(calculatorSets.flatMap(set => set.items))]]
     );
     const point = pointRows[0];
+    const items = plushies.map(row => ({
+      item_id: Number(row.item_id), name: row.name,
+      market_price: row.market_price == null ? null : Number(row.market_price),
+      low: row.low == null ? null : Number(row.low),
+      high: row.high == null ? null : Number(row.high),
+      latest_price: row.latest_price == null ? null : Number(row.latest_price),
+      updated_at: row.price_at,
+    }));
+    const itemById = new Map(items.map(item => [item.item_id, item]));
     res.json({
       set: { name: plushieSet.name, points: plushieSet.points },
       point_market: point ? { price: Number(point.price), quantity: Number(point.quantity) || 0, updated_at: point.created_at } : null,
-      plushies: plushies.map(row => ({
-        item_id: Number(row.item_id), name: row.name,
-        market_price: row.market_price == null ? null : Number(row.market_price),
-        low: row.low == null ? null : Number(row.low),
-        high: row.high == null ? null : Number(row.high),
-        latest_price: row.latest_price == null ? null : Number(row.latest_price),
-        updated_at: row.price_at,
+      plushies: plushieSet.items.map(id => itemById.get(id)),
+      sets: calculatorSets.map(set => ({
+        key: set === plushieSet ? 'plushies' : 'flowers',
+        name: set.name,
+        points: set.points,
+        items: set.items.map(id => itemById.get(id)),
       })),
       generated_at: new Date().toISOString(),
     });

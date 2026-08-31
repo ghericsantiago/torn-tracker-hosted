@@ -10,6 +10,9 @@ catalog market values, and low/high item-market observations for the current Asi
 Missing observations are returned as `null` rather than being treated as zero.
 The drawer scopes its table foreground and background colors so Torn's global table styles do
 not reduce contrast on the dark calculator panel.
+Separate tabs calculate the canonical Plushie Set and Exotic Flower Set. The current Point
+Market offer pre-fills an editable expected sale-price field; changing it recalculates profit
+locally for both tabs and does not alter server data.
 
 The **spec layer** for the inventory management system: for every Torn log type we care
 about, define the **item flows** (what leaves your inventory, what arrives, money/points
