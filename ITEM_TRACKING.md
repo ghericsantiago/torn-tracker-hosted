@@ -26,6 +26,8 @@ profit percentage = profit per point / cost per point * 100
 Both supported sets currently award 10 points, so their set cost is divided by 10. The displayed
 `Profit` is **per point**, not the total profit for the complete set. Total set profit is the same
 comparison multiplied by the set's point award: `(expected point sale price * points) - set cost`.
+The Point Market quote and editable sale-price field are prices for **one point**; therefore the
+gross revenue from one complete 10-point set is `expected point sale price * 10`.
 These are gross figures and currently apply no Point Market fee or other deduction. If any item
 is missing for a price basis, that basis is shown as unavailable rather than producing a partial
 set calculation.
