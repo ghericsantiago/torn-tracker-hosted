@@ -14,6 +14,22 @@ Separate tabs calculate the canonical Plushie Set and Exotic Flower Set. The cur
 Market offer pre-fills an editable expected sale-price field; changing it recalculates profit
 locally for both tabs and does not alter server data.
 
+For each price basis (catalog market value, today's low, or today's high), the calculator uses:
+
+```text
+set cost          = sum of the price-basis value for every item in one complete set
+cost per point    = set cost / points awarded by the set
+profit per point  = expected point sale price - cost per point
+profit percentage = profit per point / cost per point * 100
+```
+
+Both supported sets currently award 10 points, so their set cost is divided by 10. The displayed
+`Profit` is **per point**, not the total profit for the complete set. Total set profit is the same
+comparison multiplied by the set's point award: `(expected point sale price * points) - set cost`.
+These are gross figures and currently apply no Point Market fee or other deduction. If any item
+is missing for a price basis, that basis is shown as unavailable rather than producing a partial
+set calculation.
+
 The **spec layer** for the inventory management system: for every Torn log type we care
 about, define the **item flows** (what leaves your inventory, what arrives, money/points
 side effects), the **conditions** that decide which flows apply, and the **quantity**
