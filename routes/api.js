@@ -1,6 +1,56 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const museumExchange = require('../museum-exchange.json');
+
+const plushieSet = museumExchange.museum.find(set => set.name === 'Plushie Set');
+const POINT_MARKET_ID = 999999999;
+
+router.get('/points-checker', async (req, res) => {
+  try {
+    const { rows: pointRows } = await db.query(
+      `SELECT price, quantity, created_at FROM item_market
+       WHERE item_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [POINT_MARKET_ID]
+    );
+    const { rows: plushies } = await db.query(
+      `SELECT ids.item_id,
+         COALESCE(ti.name, latest.name, 'Item ' || ids.item_id) AS name,
+         COALESCE(ti.market_price, latest.average_price) AS market_price,
+         today.low, today.high, latest.price AS latest_price,
+         latest.created_at AS price_at
+       FROM unnest($1::int[]) WITH ORDINALITY AS ids(item_id, position)
+       LEFT JOIN torn_items ti ON ti.id = ids.item_id
+       LEFT JOIN LATERAL (
+         SELECT name, price, average_price, created_at FROM item_market
+         WHERE item_id = ids.item_id ORDER BY created_at DESC LIMIT 1
+       ) latest ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT MIN(price) AS low, MAX(price) AS high FROM item_market
+         WHERE item_id = ids.item_id
+           AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'Asia/Manila'
+       ) today ON TRUE
+       ORDER BY ids.position`,
+      [plushieSet.items]
+    );
+    const point = pointRows[0];
+    res.json({
+      set: { name: plushieSet.name, points: plushieSet.points },
+      point_market: point ? { price: Number(point.price), quantity: Number(point.quantity) || 0, updated_at: point.created_at } : null,
+      plushies: plushies.map(row => ({
+        item_id: Number(row.item_id), name: row.name,
+        market_price: row.market_price == null ? null : Number(row.market_price),
+        low: row.low == null ? null : Number(row.low),
+        high: row.high == null ? null : Number(row.high),
+        latest_price: row.latest_price == null ? null : Number(row.latest_price),
+        updated_at: row.price_at,
+      })),
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/items — all active items with latest price
 router.get('/items', async (req, res) => {

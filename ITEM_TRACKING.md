@@ -1,5 +1,14 @@
 # Item Tracking — Log → Flow Definitions
 
+## Plushie Set points checker
+
+The Tampermonkey calculator (`tampermonkey/points-checker.user.js`) is a read-only market
+decision aid and creates no inventory flows. It gets all data from `GET /api/points-checker`,
+so no Torn API key or third-party database credential is stored in the browser. The endpoint
+uses the canonical set in `museum-exchange.json`, the latest recorded Point Market offer,
+catalog market values, and low/high item-market observations for the current Asia/Manila day.
+Missing observations are returned as `null` rather than being treated as zero.
+
 The **spec layer** for the inventory management system: for every Torn log type we care
 about, define the **item flows** (what leaves your inventory, what arrives, money/points
 side effects), the **conditions** that decide which flows apply, and the **quantity**
