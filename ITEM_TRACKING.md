@@ -633,7 +633,8 @@ limit, so long item lists are abbreviated. Automation then waits for the
 counterpart to remove or change them; it does not add money or continue toward
 acceptance while those items remain. After the trade changes, the normal preview
 and receipt flow runs again.
-The Trade Admin catalog stat pills are toggle filters for listed state, pricing
+The Trade Admin catalog stat pills are toggle filters for public visibility
+(visible/not visible), pricing
 mode (inherit, percentage override, or fixed price), and acceptance state; filters
 combine across groups and can be cleared by toggling an active pill off.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
