@@ -696,8 +696,16 @@ function renderCatalog() {
         <span class="cat-chevron">▼</span>
       </div>
       <div class="cat-items">
-        ${matchingItems.map(item => renderItemRow(item, type)).join('')}
       </div>`;
+
+    const catItems = sec.querySelector('.cat-items');
+    const renderCategoryItems = () => {
+      if (catItems.dataset.loaded === 'true') return;
+      catItems.innerHTML = matchingItems.map(item => renderItemRow(item, type)).join('');
+      catItems.dataset.loaded = 'true';
+      wireItemRows(sec, matchingItems, type);
+    };
+    if (isOpen) renderCategoryItems();
 
     // Tri-state
     const catCheck = sec.querySelector('.cat-check');
@@ -709,7 +717,9 @@ function renderCatalog() {
     sec.querySelector('.cat-row').addEventListener('click', e => {
       if (e.target.closest('.cat-pct-wrap') || e.target.closest('.cat-protection-wrap') || e.target.closest('.cat-check') ||
           e.target.closest('.sort-btns') || e.target.closest('.drag-handle')) return;
-      sec.classList.toggle('open');
+      const opening = !sec.classList.contains('open');
+      sec.classList.toggle('open', opening);
+      if (opening) renderCategoryItems();
     });
 
     // ▲▼ sort buttons
@@ -739,8 +749,6 @@ function renderCatalog() {
       renderCatalog();
     });
 
-    // Wire item rows
-    wireItemRows(sec, filtered, type);
     body.appendChild(sec);
   }
 

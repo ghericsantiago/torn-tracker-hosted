@@ -637,6 +637,8 @@ The Trade Admin catalog stat pills are toggle filters for public visibility
 (visible/not visible), pricing
 mode (inherit, percentage override, or fixed price), and acceptance state; filters
 combine across groups and can be cleared by toggling an active pill off.
+Catalog item rows are rendered when their category is opened, rather than eagerly
+building every row and item-image request on initial page load.
 The up/down market-gap filters compare the current `torn_items.market_price` with
 the median positive `item_market.average_price` recorded during the previous
 Asia/Manila calendar day. The adjustable threshold defaults to 10%; increases
