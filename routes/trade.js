@@ -153,7 +153,7 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
         tl.market_pct,
         tl.notes,
         tl.is_active,
-        tl.is_accepted,
+        COALESCE(tl.is_accepted, true) AS is_accepted,
         tcc.market_pct           AS cat_pct,
         tp.default_market_pct    AS global_pct,
         tl.market_protection_enabled AS item_protection_enabled,
