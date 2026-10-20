@@ -27,12 +27,14 @@ Four processes run under PM2:
 | Domain | Backend |
 |--------|---------|
 | `torn-imarket-tracker.gvsantiago.com` | `localhost:3001` (this app) |
+| `itrade.devs.surf` | `localhost:3001` (this app, used by trade automation) |
 | `pgweb.gvsantiago.com` | `localhost:8081` (pgweb, password-protected) |
 | `gvsantiago.com` | `localhost:3000` (personal site) |
 
-Trade receipt and trade automation userscripts must use
-`https://torn-imarket-tracker.gvsantiago.com` as their API host. The former
-`itrade.devs.surf` host no longer serves this application.
+Both `https://torn-imarket-tracker.gvsantiago.com` and `https://itrade.devs.surf`
+currently route to this application. Trade automation defaults to
+`https://itrade.devs.surf`; the standalone trade receipt userscript continues to
+use `https://torn-imarket-tracker.gvsantiago.com`.
 
 ## Standard Deploy
 

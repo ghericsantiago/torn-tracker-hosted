@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.10.4
+// @version      2.10.5
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -11,7 +11,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_registerMenuCommand
 // @connect      api.torn.com
-// @connect      torn-imarket-tracker.gvsantiago.com
+// @connect      itrade.devs.surf
 // @connect      localhost
 // @connect      127.0.0.1
 // @run-at       document-idle
@@ -20,8 +20,8 @@
 (function () {
   'use strict';
 
-  const DEFAULT_APP_URL = 'https://torn-imarket-tracker.gvsantiago.com';
-  const LEGACY_APP_URL = 'https://itrade.devs.surf';
+  const DEFAULT_APP_URL = 'https://itrade.devs.surf';
+  const PREVIOUS_APP_URL = 'https://torn-imarket-tracker.gvsantiago.com';
   const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   const SETTINGS_KEY = 'tta_settings_v1';
   const JOB_KEY = 'tta_active_job_v1';
@@ -92,7 +92,7 @@
 
   function getSettings() {
     const settings = { ...DEFAULTS, ...readJson(SETTINGS_KEY, {}) };
-    if (String(settings.pricingServerUrl).replace(/\/+$/, '') === LEGACY_APP_URL) {
+    if (String(settings.pricingServerUrl).replace(/\/+$/, '') === PREVIOUS_APP_URL) {
       settings.pricingServerUrl = DEFAULT_APP_URL;
       writeJson(SETTINGS_KEY, settings);
     }
