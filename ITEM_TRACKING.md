@@ -612,13 +612,15 @@ of its current effective state as an explicit override, and the adjacent reset
 control returns it to its parent. Category protection can be configured without a
 category percentage, and item protection can be retained on a hidden listing.
 
-Trade Admin stores public visibility separately from explicit item pricing. If an
-item has a fixed-price or custom-percentage override and is then unchecked, its
-`trade_listings` row remains with `is_active=false`: it is hidden from the public
-trade listing but its item-level price still wins over category/global fallback
-for receipt pricing. Receipt preview reports it as `in_catalog=false`, preserving
-the unlisted-item warning and negotiation message. Unchecked items without an
-explicit override are removed as before.
+Trade Admin stores public visibility separately from explicit item pricing. The
+price editor's **Show on public trade list** checkbox controls visibility
+independently from its fixed-price or custom-percentage override. Applying an
+override while this checkbox is off retains the `trade_listings` row with
+`is_active=false`: it stays hidden from the public trade listing, while its
+item-level price still wins over category/global fallback for receipt pricing.
+Receipt preview reports it as `in_catalog=false`, preserving the unlisted-item
+warning and negotiation message. Unchecked items without an explicit override
+are removed as before.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
 that resale ceiling instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and highest dense level $70

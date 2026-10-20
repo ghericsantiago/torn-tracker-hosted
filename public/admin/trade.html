@@ -228,6 +228,8 @@
     .item-editor.open { display: flex; }
 
     .editor-label { font-size: 0.68rem; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; }
+    .editor-public-toggle { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
+    .editor-public-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 
     /* Level selector — 3 pills */
     .level-sel { display: flex; gap: 0.25rem; }
@@ -776,6 +778,10 @@ function renderItemRow(item, type) {
         <input type="number" class="editor-input efixed" min="0" placeholder="e.g. 5000000" value="${fixedVal}">
         <span class="editor-label">$</span>
       </div>
+      <label class="editor-public-toggle">
+        <input type="checkbox" class="editor-public" ${chk ? 'checked' : ''}>
+        <span>Show on public trade list</span>
+      </label>
       <input type="text" class="editor-notes" placeholder="Notes (optional)" value="${noteVal}">
       <button class="editor-apply">Apply</button>
     </div>`;
@@ -845,20 +851,23 @@ function wireItemRows(sec, items, type) {
       const pctR = parseFloat(editor.querySelector('.epct').value);
       const fixR = parseInt(editor.querySelector('.efixed').value);
       const note = editor.querySelector('.editor-notes').value.trim();
+      const isPublic = editor.querySelector('.editor-public').checked;
 
       if (lv === 'inherit') {
         // Remove override — item falls back to cascade
-        const s = selections.get(item.id) || { checked: true };
+        const s = selections.get(item.id) || { checked: false, override: null };
         selections.set(item.id, { ...s, override: note ? { ...s.override, notes: note } : null });
       } else if (lv === 'market_pct') {
         if (!pctR || pctR <= 0) { toast('Enter a valid %', true); return; }
-        const s = selections.get(item.id) || { checked: true };
-        selections.set(item.id, { ...s, checked: true, override: { price_mode: 'market_pct', market_pct: pctR, fixed_price: null, notes: note } });
+        const s = selections.get(item.id) || { checked: false, override: null };
+        selections.set(item.id, { ...s, override: { price_mode: 'market_pct', market_pct: pctR, fixed_price: null, notes: note } });
       } else {
         if (!fixR || fixR <= 0) { toast('Enter a valid price', true); return; }
-        const s = selections.get(item.id) || { checked: true };
-        selections.set(item.id, { ...s, checked: true, override: { price_mode: 'fixed', fixed_price: fixR, market_pct: null, notes: note } });
+        const s = selections.get(item.id) || { checked: false, override: null };
+        selections.set(item.id, { ...s, override: { price_mode: 'fixed', fixed_price: fixR, market_pct: null, notes: note } });
       }
+      const updated = selections.get(item.id);
+      selections.set(item.id, { ...updated, checked: isPublic });
 
       editor.classList.remove('open');
       row.classList.remove('editing');
