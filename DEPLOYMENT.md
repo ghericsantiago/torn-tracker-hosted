@@ -52,6 +52,18 @@ npm run verify-schema
 pm2 restart torn-tracker --update-env
 ```
 
+When a deploy changes `records-history-schema.sql`, apply it as the PostgreSQL
+table owner. The migration briefly blocks writes to `item_market` while it
+backfills daily counts, then installs statement-level triggers to maintain the
+summary:
+
+```bash
+cd torn-tracker
+sudo -u postgres psql -d torn_tracker -v ON_ERROR_STOP=1 -1 -f records-history-schema.sql
+npm run verify-schema
+pm2 restart torn-tracker --update-env
+```
+
 Or step by step on the server:
 
 ```bash

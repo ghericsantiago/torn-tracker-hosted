@@ -689,6 +689,12 @@ from the current Asia/Manila calendar day into fixed-anchor bands using a 1% mar
 Each band starts at its lowest price and includes observations no more than 1%
 above that anchor; neighboring steps cannot chain into a wider band.
 
+The admin Records History chart reads daily counts from
+`item_market_daily_counts`, maintained by statement-level insert/delete triggers.
+The table is backfilled by `records-history-schema.sql`; query only scans raw
+market records for the partial first day of the retention window and reads
+pre-aggregated counts for the remaining days.
+
 The Tampermonkey item-market analyzer stores the selected chart timeframe and
 visibility of Lowest Offer, Market Avg, and Quantity in browser local storage.
 Applying a new date/item query rebuilds the chart but preserves those choices;

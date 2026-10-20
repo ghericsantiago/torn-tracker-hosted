@@ -423,20 +423,35 @@ router.get('/api/torn-items', requireAuth, async (req, res) => {
   }
 });
 
-// Daily records history (grouped by UTC day, limited to retention window)
+// Daily record history uses maintained daily counts; only the partial cutoff day
+// needs a raw-table count to preserve exact retention-window behavior.
 router.get('/api/stats/records-history', requireAuth, async (req, res) => {
   try {
     const { rows: sRows } = await db.query(
       `SELECT value FROM settings WHERE key = 'retention_days'`
     );
     const days = parseInt(sRows[0]?.value) || 30;
-    const interval = days > 0 ? `${days} days` : '90 days';
+    const lookbackDays = days > 0 ? days : 90;
     const { rows } = await db.query(
-      `SELECT DATE(created_at) AS day, COUNT(*) AS count
-       FROM item_market
-       WHERE created_at >= NOW() - INTERVAL '${interval}'
-       GROUP BY day
-       ORDER BY day ASC`
+      `WITH cutoff AS (
+         SELECT NOW() - ($1::int * INTERVAL '1 day') AS timestamp,
+                ((NOW() - ($1::int * INTERVAL '1 day')) AT TIME ZONE 'UTC')::date AS day
+       ), daily_counts AS (
+         SELECT daily.day, daily.record_count AS count
+         FROM item_market_daily_counts daily
+         CROSS JOIN cutoff
+         WHERE daily.day > cutoff.day
+         UNION ALL
+         SELECT cutoff.day, COUNT(*) AS count
+         FROM item_market market
+         CROSS JOIN cutoff
+         WHERE market.created_at >= cutoff.timestamp
+           AND market.created_at < ((cutoff.day + 1)::timestamp AT TIME ZONE 'UTC')
+         GROUP BY cutoff.day
+         HAVING COUNT(*) > 0
+       )
+       SELECT day, count FROM daily_counts ORDER BY day ASC`,
+      [lookbackDays]
     );
     res.json({ rows, days: days > 0 ? days : null });
   } catch (err) {

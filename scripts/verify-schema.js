@@ -8,6 +8,7 @@ const REQUIRED_COLUMNS = {
   torn_items: ['market_price', 'updated_at'],
   trade_profiles: ['default_market_pct', 'category_order', 'receipt_token', 'market_protection_enabled'],
   trade_listings: ['torn_item_id', 'price_mode', 'market_pct', 'fixed_price', 'market_protection_enabled', 'is_accepted'],
+  item_market_daily_counts: ['day', 'record_count'],
   trade_category_configs: ['item_type', 'market_pct', 'market_protection_enabled'],
   trade_receipts: ['short_id', 'items', 'total_value', 'completed_at', 'auto_cancelled'],
   activity: ['category'],
