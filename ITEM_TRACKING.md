@@ -640,8 +640,11 @@ combine across groups and can be cleared by toggling an active pill off.
 Catalog item rows are rendered when their category is opened, rather than eagerly
 building every row and item-image request on initial page load.
 The up/down market-gap filters compare the current `torn_items.market_price` with
-the median positive `item_market.average_price` recorded during the previous
-Asia/Manila calendar day. The adjustable threshold defaults to 10%; increases
+the median of positive `item_market.average_price` samples recorded during the
+previous Asia/Manila calendar day. The `average_price` field is the source value;
+the median summarizes that day's samples and reduces the effect of an outlier.
+This does not use `item_market.price` (the lowest-offer field) for the comparison.
+The adjustable threshold defaults to 10%; increases
 above it flag a possible spike, while decreases below its negative flag a
 possible buying opportunity. Items without yesterday data are excluded from both
 trend filters. Each item row also shows this percentage change beside the item
