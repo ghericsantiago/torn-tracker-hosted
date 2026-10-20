@@ -4,7 +4,7 @@ function applyMarketDropProtection(items) {
     const lowestOffer = Number(item.market_reference_price) || 0;
     const buyRate = Number(item.resolved_pct) || 0;
     const currentOffer = Number(item.effective_price) || 0;
-    if (item.market_protection_enabled === false || item.price_mode !== 'market_pct' ||
+    if (item.not_accepted || item.market_protection_enabled === false || item.price_mode !== 'market_pct' ||
         marketValue <= 0 || lowestOffer <= 0 || buyRate <= 0) return item;
     const dropPct = ((marketValue - lowestOffer) / marketValue) * 100;
     if (dropPct <= 0) return item;

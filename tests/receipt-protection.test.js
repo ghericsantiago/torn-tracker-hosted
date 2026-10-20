@@ -31,3 +31,11 @@ test('disabled protection leaves normal percentage pricing unchanged', () => {
   assert.equal(item.market_protection_applied, false);
   assert.equal(item.effective_price, 80);
 });
+
+test('market protection cannot raise a not-accepted item above zero', () => {
+  const rejected = { ...percentageItem(true), not_accepted: true, effective_price: 0, effective_total: 0 };
+  const [item] = applyMarketDropProtection([rejected]);
+  assert.equal(item.effective_price, 0);
+  assert.equal(item.effective_total, 0);
+  assert.equal(item.market_protection_applied, false);
+});

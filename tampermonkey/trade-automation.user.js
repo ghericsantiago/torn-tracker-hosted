@@ -259,6 +259,32 @@
     return '$' + Math.round(Number(value) || 0).toLocaleString();
   }
 
+  function rejectedItemsMessage(items, receiptUrl) {
+    const prefix = 'Not accepted ($0): ';
+    const instruction = '. Remove them to continue.';
+    const receipt = ` Receipt: ${receiptUrl}`;
+    const names = items.map(item => `${item.item_name || `Item #${item.torn_item_id}`}${Number(item.quantity) > 1 ? ` x${item.quantity}` : ''}`);
+    const included = [];
+
+    for (const name of names) {
+      const remaining = names.length - included.length - 1;
+      const tail = remaining > 0 ? `, +${remaining} more` : '';
+      const candidate = `${prefix}${[...included, name].join(', ')}${tail}${instruction}${receipt}`;
+      if (candidate.length > MAX_COMMENT) break;
+      included.push(name);
+    }
+
+    if (included.length === 0 && names.length) {
+      const tail = names.length > 1 ? `, +${names.length - 1} more` : '';
+      const available = Math.max(1, MAX_COMMENT - prefix.length - tail.length - instruction.length - receipt.length - 3);
+      included.push(`${names[0].slice(0, available)}...`);
+    }
+
+    const omitted = names.length - included.length;
+    const tail = omitted > 0 ? `, +${omitted} more` : '';
+    return `${prefix}${included.join(', ')}${tail}${instruction}${receipt}`.slice(0, MAX_COMMENT);
+  }
+
   function parseAmount(value) {
     const normalized = String(value || '').toLowerCase().replace(/[$,\s]/g, '');
     const match = normalized.match(/^(\d+(?:\.\d+)?)(k|m|b)?$/);
@@ -732,15 +758,17 @@
 
     if (job.stage === 'waiting_for_adjustment') {
       const itemSignature = counterpartItemSignature();
-      if (!itemSignature || itemSignature === job.itemSignature) return;
+      if (itemSignature === job.itemSignature) return;
       const now = Date.now();
       saveJob({
         ...job,
-        stage: 'waiting',
+        stage: itemSignature ? 'waiting' : 'waiting_for_items',
         defaultDeadline: now + ITEM_SETTLE_MS,
         deadline: now + ITEM_SETTLE_MS,
         itemSignature,
         itemDetected: true,
+        rejectedItemCount: 0,
+        rejectedItemNames: [],
         error: '',
       });
       return;
@@ -762,7 +790,8 @@
       }
       const total = Math.round(Number(preview.total) || 0);
       const cash = cashOnHand();
-      if (cash != null && total > cash) {
+      const rejectedItems = preview.items.filter(item => item.not_accepted === true);
+      if (!rejectedItems.length && cash != null && total > cash) {
         const message = settings.insufficientCashMessage
           .replaceAll('{cash}', money(cash))
           .replaceAll('{total}', money(total))
@@ -783,6 +812,25 @@
       const receiptServerUrl = pricingServer(settings);
       const receiptUrl = `${receiptServerUrl}${receipt.url}`;
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
+      if (rejectedItems.length) {
+        const rejectedNames = rejectedItems.map(item => item.item_name || `Item #${item.torn_item_id}`);
+        const message = rejectedItemsMessage(rejectedItems, receiptUrl);
+        const next = {
+          ...job,
+          stage: 'waiting_for_adjustment',
+          itemSignature: counterpartItemSignature() || job.itemSignature || '',
+          receiptId: receipt.short_id || receipt.id,
+          receiptUrl,
+          receiptServerUrl,
+          rejectedItemCount: rejectedItems.length,
+          rejectedItemNames: rejectedNames,
+          quotedTotal: total,
+          error: '',
+        };
+        if (!submitComment(message, next)) throw new Error('Comment form not found');
+        return;
+      }
+
       const unlistedItems = preview.items.filter(item => item.in_catalog === false);
       const protectedItems = preview.items.filter(item => item.market_protection_applied === true);
       const messageTemplate = protectedItems.length && unlistedItems.length
@@ -1257,7 +1305,11 @@
     let label = job ? `#${job.tradeId}: ${String(job.stage).replace('_', ' ')}` : 'Idle';
     if (job?.stage === 'waiting') label += ` (${Math.max(0, Math.ceil((job.deadline - Date.now()) / 1000))}s)`;
     if (job?.stage === 'waiting_for_items') label += ' - waiting for items';
-    if (job?.stage === 'waiting_for_adjustment') label += ` - only ${money(job.availableCash)} available; waiting for adjusted items`;
+    if (job?.stage === 'waiting_for_adjustment') {
+      label += job.rejectedItemCount
+        ? ` - ${job.rejectedItemCount} item(s) not accepted; waiting for removal`
+        : ` - only ${money(job.availableCash)} available; waiting for adjusted items`;
+    }
     if (job?.stage === 'awaiting_accept') label += ' - click both Torn ACCEPT buttons';
     if (job?.error) label += ` - ${job.error}`;
     state.textContent = label;

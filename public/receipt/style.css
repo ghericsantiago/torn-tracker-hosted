@@ -201,6 +201,8 @@ body {
 .item-name { font-size: 0.875rem; }
 .item-name-row { display: flex; align-items: center; gap: 0.35rem; }
 .item-type { font-size: 0.7rem; color: var(--text-muted); }
+.not-accepted-badge { padding: 0.08rem 0.3rem; border: 1px solid rgba(248,113,113,0.35); border-radius: 3px; color: #f87171; font: 600 0.58rem/1.4 var(--mono); white-space: nowrap; }
+.not-accepted-note { color: #f87171; font-size: 0.68rem; }
 .receipt-chart-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 1.55rem; height: 1.35rem; padding: 0;

@@ -153,6 +153,7 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
         tl.market_pct,
         tl.notes,
         tl.is_active,
+        tl.is_accepted,
         tcc.market_pct           AS cat_pct,
         tp.default_market_pct    AS global_pct,
         tl.market_protection_enabled AS item_protection_enabled,
@@ -259,6 +260,7 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
         is_active: l.is_active !== false,
         market_protection_enabled: l.market_protection_enabled == null
           ? null : l.market_protection_enabled === true,
+        is_accepted: l.is_accepted !== false,
       }));
       const ids = normalizedListings.map(l => l.torn_item_id);
       await client.query(
@@ -268,14 +270,16 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
       await client.query(
         `INSERT INTO trade_listings
            (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price,
-            market_pct, notes, is_active, market_protection_enabled)
+            market_pct, notes, is_active, market_protection_enabled, is_accepted)
          SELECT 1, incoming.torn_item_id, incoming.item_name, incoming.item_type,
                 incoming.price_mode, incoming.fixed_price, incoming.market_pct,
-                incoming.notes, incoming.is_active, incoming.market_protection_enabled
+                incoming.notes, incoming.is_active, incoming.market_protection_enabled,
+                incoming.is_accepted
          FROM jsonb_to_recordset($1::jsonb) AS incoming(
            torn_item_id INTEGER, item_name VARCHAR(255), item_type VARCHAR(128),
            price_mode VARCHAR(16), fixed_price BIGINT, market_pct DECIMAL(5,4),
-           notes TEXT, is_active BOOLEAN, market_protection_enabled BOOLEAN
+           notes TEXT, is_active BOOLEAN, market_protection_enabled BOOLEAN,
+           is_accepted BOOLEAN
          )
          ON CONFLICT (profile_id, torn_item_id) DO UPDATE SET
            item_name=EXCLUDED.item_name, item_type=EXCLUDED.item_type,
@@ -283,6 +287,7 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
            market_pct=EXCLUDED.market_pct, notes=EXCLUDED.notes,
            is_active=EXCLUDED.is_active,
            market_protection_enabled=EXCLUDED.market_protection_enabled,
+           is_accepted=EXCLUDED.is_accepted,
            updated_at=NOW()`,
         [JSON.stringify(normalizedListings)]
       );

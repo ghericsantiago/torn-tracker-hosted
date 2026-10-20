@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS trade_listings (
   market_pct   DECIMAL(5,4),   -- e.g. 0.8500 = 85% of market price
   notes        TEXT,
   is_active    BOOLEAN NOT NULL DEFAULT true,
+  is_accepted  BOOLEAN NOT NULL DEFAULT true,
   sort_order   INTEGER NOT NULL DEFAULT 0,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),

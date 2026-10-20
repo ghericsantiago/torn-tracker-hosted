@@ -8,6 +8,7 @@ const router  = express.Router();
 const db      = require('../db');
 const { selectDailyResaleCeiling } = require('./receipt-resale-ceiling');
 const { applyMarketDropProtection } = require('./receipt-protection');
+const { resolveAcceptancePricing } = require('../services/trade-item-acceptance');
 
 function shortId() {
   return crypto.randomBytes(6).toString('base64url').slice(0, 8);
@@ -77,7 +78,7 @@ const PRICE_LOOKUP = `
     tl.torn_item_id,
     COALESCE(tl.item_name, ti.name) AS item_name,
     tl.item_type,
-    tl.price_mode, tl.fixed_price, tl.is_active,
+    tl.price_mode, tl.fixed_price, tl.is_active, tl.is_accepted,
     COALESCE(tl.market_protection_enabled, tcc.market_protection_enabled,
              tp.market_protection_enabled, true) AS resolved_protection_enabled,
     ti.market_price,
@@ -222,7 +223,9 @@ async function buildPricedItems(tornData, itemsOverride) {
     if (override && Number.isFinite(override.unitPrice)) effectiveUnit = override.unitPrice;
 
     const marketPrice = listing ? Number(listing.market_price) : (baseItem?.market_price ? Number(baseItem.market_price) : null);
-    const effectiveTotal = effectiveUnit != null ? effectiveUnit * qty : null;
+    const acceptedPricing = resolveAcceptancePricing(effectiveUnit, qty, listing?.is_accepted !== false);
+    effectiveUnit = acceptedPricing.effective_price;
+    const effectiveTotal = acceptedPricing.effective_total;
     if (effectiveTotal != null) totalValue += effectiveTotal;
 
     return {
@@ -250,6 +253,7 @@ async function buildPricedItems(tornData, itemsOverride) {
       catalog_price:   catalogPrice,
       effective_price: effectiveUnit,
       effective_total: effectiveTotal,
+      not_accepted:    acceptedPricing.not_accepted,
       // Inactive rows retain admin-only item pricing but stay unlisted publicly.
       in_catalog:      listing?.is_active === true,
       market_protection_applied: override?.marketProtectionApplied || false,
@@ -266,7 +270,7 @@ async function buildPricedItems(tornData, itemsOverride) {
     };
   });
 
-  return { buyer, seller, items, totalValue: totalValue || null };
+  return { buyer, seller, items, totalValue };
 }
 
 // ── GET /api/receipt/token (admin) — MUST be before /:id ─────────────────────
@@ -408,7 +412,7 @@ router.post('/api/receipt/preview', cors(CORS_TORN), async (req, res) => {
     const total = items.reduce(
       (sum, item) => sum + (Number(item.effective_price) || 0) * (Number(item.quantity) || 0),
       0
-    ) || null;
+    );
     res.json({ trade_id, buyer: priced.buyer, seller: priced.seller, items, total });
   } catch (e) {
     console.error('[receipt] preview error:', e.message);
@@ -567,6 +571,8 @@ router.get('/api/item-offering/:itemId', cors(CORS_TORN), async (req, res) => {
       resolved_pct:          listing ? Number(listing.resolved_pct) : (globalPct ? Number(globalPct) : null),
       market_price:          marketPrice,
       catalog_price:         catalogPrice,
+      not_accepted:          listing?.is_accepted === false,
+      effective_price:       listing?.is_accepted === false ? 0 : catalogPrice,
       latest_lowest_price:   latestMarket?.price != null ? Number(latestMarket.price) : null,
       latest_lowest_at:      latestMarket?.created_at || null,
       market_reference_price: resaleCeiling?.price != null ? Number(resaleCeiling.price) : null,

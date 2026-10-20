@@ -153,6 +153,8 @@
 
       const pctBadge = item.in_catalog && item.price_mode === 'market_pct' && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
+      const notAcceptedBadge = item.not_accepted
+        ? '<span class="not-accepted-badge">NOT ACCEPTED · $0</span>' : '';
       const notInCatalog = !item.in_catalog && item.resolved_pct
         ? `<span class="pct-badge">${pct(item.resolved_pct)}</span>` : '';
       const chartButton = item.market_protection_applied
@@ -169,7 +171,7 @@
             </svg>
           </span>`
         : '';
-      if (!item.market_protection_applied && item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
+      if (!item.not_accepted && !item.market_protection_applied && item.catalog_price != null && item.effective_price != null && item.effective_price !== item.catalog_price) {
         const delta = item.effective_price - item.catalog_price;
         const deltaPct = Math.abs((delta / item.catalog_price) * 100).toFixed(1);
         if (delta > 0) {
@@ -184,8 +186,9 @@
           <div class="item-cell">
             <img class="item-icon" src="${imgSrc}" alt="" onerror="this.style.display='none'">
             <div class="item-text">
-              <div class="item-name-row"><div class="item-name">${item.item_name}</div>${chartButton}</div>
+              <div class="item-name-row"><div class="item-name">${item.item_name}</div>${notAcceptedBadge}${chartButton}</div>
               ${item.item_type ? `<div class="item-type">${item.item_type}</div>` : ''}
+              ${item.not_accepted ? '<div class="not-accepted-note">Please remove this item from the trade.</div>' : ''}
             </div>
           </div>
         </td>

@@ -481,6 +481,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function resolvePrice(item) {
   const s = selections.get(item.id);
 
+  if (s?.isAccepted === false) {
+    return { level: 'notAccepted', price_mode: null, eff: 0, label: fmt(0), badge: 'Not accepted' };
+  }
+
   // L3 explicit item override
   if (s?.override) {
     const o = s.override;
@@ -574,6 +578,7 @@ async function loadCatalog() {
         // market_pct=null means inherit → no override
         selections.set(item.id, {
           checked,
+          isAccepted: item.is_accepted !== false,
           override,
           protectionOverride: item.item_protection_enabled == null
             ? null : item.item_protection_enabled === true,
@@ -731,7 +736,10 @@ function renderItemRow(item, type) {
     : `<button type="button" class="protection-reset item-protection-reset" title="Inherit category/global protection">&times;</button>`;
 
   let priceHtml = '';
-  if (!chk && !s?.override) {
+  if (s?.isAccepted === false) {
+    priceHtml = `<span class="ptag none">not accepted · $0</span>`;
+    if (!chk) priceHtml += `<span class="pbadge">hidden</span>`;
+  } else if (!chk && !s?.override) {
     priceHtml = `<span class="ptag none">not listed</span>`;
   } else if (res.level === 'noPrice') {
     priceHtml = `<span class="ptag none">no price set</span>`;
@@ -782,6 +790,10 @@ function renderItemRow(item, type) {
         <input type="checkbox" class="editor-public" ${chk ? 'checked' : ''}>
         <span>Show on public trade list</span>
       </label>
+      <label class="editor-public-toggle">
+        <input type="checkbox" class="editor-accepted" ${s?.isAccepted === false ? '' : 'checked'}>
+        <span>We accept this item</span>
+      </label>
       <input type="text" class="editor-notes" placeholder="Notes (optional)" value="${noteVal}">
       <button class="editor-apply">Apply</button>
     </div>`;
@@ -792,6 +804,11 @@ function wireItemRows(sec, items, type) {
     const row    = sec.querySelector(`.item-row[data-id="${item.id}"]`);
     const editor = sec.querySelector(`.item-editor[data-editor="${item.id}"]`);
     if (!row || !editor) continue;
+
+    editor.querySelector('.editor-accepted').addEventListener('change', e => {
+      const current = selections.get(item.id) || { checked: false, override: null, isAccepted: true };
+      selections.set(item.id, { ...current, isAccepted: e.target.checked });
+    });
 
     row.querySelector('.item-check').addEventListener('change', e => {
       e.stopPropagation();
@@ -957,7 +974,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
     for (const item of items) {
       const s = selections.get(item.id);
       // Preserve an explicit item price even when it is not published.
-      if (!s || (!s.checked && !s.override && s.protectionOverride == null)) continue;
+      if (!s || (!s.checked && !s.override && s.protectionOverride == null && s.isAccepted !== false)) continue;
       const o = s.override;
       listings.push({
         torn_item_id: item.id,
@@ -971,6 +988,7 @@ document.getElementById('saveChangesBtn').addEventListener('click', async () => 
         notes:        o?.notes || null,
         is_active:    s.checked,
         market_protection_enabled: s.protectionOverride,
+        is_accepted:  s.isAccepted !== false,
       });
     }
   }

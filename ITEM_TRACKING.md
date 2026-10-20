@@ -621,6 +621,15 @@ item-level price still wins over category/global fallback for receipt pricing.
 Receipt preview reports it as `in_catalog=false`, preserving the unlisted-item
 warning and negotiation message. Unchecked items without an explicit override
 are removed as before.
+
+Trade Admin also has a separate **We accept this item** setting, stored as
+`trade_listings.is_accepted`. It is independent of public visibility and price:
+an unaccepted incoming item remains identifiable on a receipt but its effective
+unit and line total are forced to zero by the server, including when a client
+sends a price override. Trade automation posts a comment naming rejected items
+(and the receipt link), then waits for the counterpart to remove or change them;
+it does not add money or continue toward acceptance while those items remain.
+After the trade changes, the normal preview and receipt flow runs again.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
 that resale ceiling instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and highest dense level $70

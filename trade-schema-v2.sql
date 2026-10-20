@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS trade_category_configs (
 ALTER TABLE trade_category_configs ALTER COLUMN market_pct DROP NOT NULL;
 ALTER TABLE trade_category_configs ADD COLUMN IF NOT EXISTS market_protection_enabled BOOLEAN;
 ALTER TABLE trade_listings ADD COLUMN IF NOT EXISTS market_protection_enabled BOOLEAN;
+ALTER TABLE trade_listings ADD COLUMN IF NOT EXISTS is_accepted BOOLEAN NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS idx_trade_cat_configs ON trade_category_configs(profile_id);
 
