@@ -5,13 +5,16 @@ const path = require('path');
 const db = require('../db');
 
 async function main() {
-  const sql = await fs.promises.readFile(path.join(__dirname, '../trade-schema-v2.sql'), 'utf8');
+  const sqlFiles = ['trade-schema-v2.sql', 'trade-schema-receipts.sql'];
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await client.query(sql);
+    for (const file of sqlFiles) {
+      const sql = await fs.promises.readFile(path.join(__dirname, '..', file), 'utf8');
+      await client.query(sql);
+    }
     await client.query('COMMIT');
-    console.log('Trade schema applied successfully.');
+    console.log('Trade and receipt schemas applied successfully.');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

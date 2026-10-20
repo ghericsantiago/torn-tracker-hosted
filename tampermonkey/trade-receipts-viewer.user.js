@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Torn Tracker — Trade Receipts Viewer
 // @namespace    torn-tracker-receipts-viewer
-// @version      1.0.0
+// @version      1.0.1
 // @description  Browse trade receipts in a side drawer on any Torn page
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
-// @connect      itrade.devs.surf
+// @connect      torn-imarket-tracker.gvsantiago.com
 // @connect      localhost
 // @connect      127.0.0.1
 // @run-at       document-idle
@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  const APP_URL       = 'https://itrade.devs.surf';
+  const APP_URL       = 'https://torn-imarket-tracker.gvsantiago.com';
   const RECEIPT_TOKEN = '926cc7e6-5092-40cc-ba8a-a3f9b8070a6c';
   const PAGE_SIZE     = 15;
 

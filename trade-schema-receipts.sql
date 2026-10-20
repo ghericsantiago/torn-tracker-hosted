@@ -34,3 +34,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS trade_receipts_trade_id_idx ON trade_receipts 
 ALTER TABLE trade_receipts ADD COLUMN IF NOT EXISTS short_id VARCHAR(16);
 CREATE UNIQUE INDEX IF NOT EXISTS trade_receipts_short_id_idx
   ON trade_receipts (short_id) WHERE short_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS trade_receipts_created_at_idx
+  ON trade_receipts (created_at DESC);
+CREATE INDEX IF NOT EXISTS trade_receipts_status_created_at_idx
+  ON trade_receipts (status, created_at DESC);

@@ -30,15 +30,20 @@ Four processes run under PM2:
 | `pgweb.gvsantiago.com` | `localhost:8081` (pgweb, password-protected) |
 | `gvsantiago.com` | `localhost:3000` (personal site) |
 
+Trade receipt and trade automation userscripts must use
+`https://torn-imarket-tracker.gvsantiago.com` as their API host. The former
+`itrade.devs.surf` host no longer serves this application.
+
 ## Standard Deploy
 
 ```bash
 ssh -i "C:\Users\My PC\.ssh\id_ed25519" ubuntu@140.245.47.60 "cd torn-tracker && git pull && pm2 restart torn-tracker --update-env"
 ```
 
-When a deploy changes `trade-schema-v2.sql`, apply its idempotent migration before
-the restart. The Node command uses the application's dotenv/database configuration,
-so it also works when the server `.env` has CRLF line endings:
+When a deploy changes `trade-schema-v2.sql` or `trade-schema-receipts.sql`, apply
+the idempotent trade/receipt schema migration before the restart. The Node command
+uses the application's dotenv/database configuration, so it also works when the
+server `.env` has CRLF line endings:
 
 ```bash
 cd torn-tracker
