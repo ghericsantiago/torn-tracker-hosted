@@ -4,6 +4,7 @@
   // ── Settings modal ──
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.remove('hidden');
+    loadAdminAccount();
   });
   document.getElementById('closeSettings').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.add('hidden');
@@ -43,6 +44,62 @@
       showSetupModal();
     }
   }
+
+  async function loadAdminAccount() {
+    const message = document.getElementById('accountMessage');
+    const res = await api('/admin/api/account');
+    if (!res || !res.ok) {
+      message.textContent = 'Unable to load admin account.';
+      return;
+    }
+    const account = await res.json();
+    document.getElementById('adminUsername').value = account.username || '';
+    document.getElementById('adminCurrentPassword').value = '';
+    document.getElementById('adminNewPassword').value = '';
+    document.getElementById('adminConfirmPassword').value = '';
+    message.textContent = '';
+  }
+
+  document.getElementById('accountForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const message = document.getElementById('accountMessage');
+    const button = document.getElementById('saveAccountBtn');
+    const newPassword = document.getElementById('adminNewPassword').value;
+    const confirmation = document.getElementById('adminConfirmPassword').value;
+    message.textContent = '';
+    if (newPassword !== confirmation) {
+      message.textContent = 'New password confirmation does not match.';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Updating…';
+    try {
+      const res = await api('/admin/api/account', {
+        method: 'PUT',
+        body: JSON.stringify({
+          username: document.getElementById('adminUsername').value,
+          current_password: document.getElementById('adminCurrentPassword').value,
+          new_password: newPassword,
+        }),
+      });
+      const result = await res?.json().catch(() => ({}));
+      if (!res?.ok) {
+        message.textContent = result.error || 'Unable to update admin credentials.';
+        return;
+      }
+      document.getElementById('adminUsername').value = result.username;
+      document.getElementById('adminCurrentPassword').value = '';
+      document.getElementById('adminNewPassword').value = '';
+      document.getElementById('adminConfirmPassword').value = '';
+      message.textContent = 'Admin credentials updated.';
+    } catch (_) {
+      message.textContent = 'Unable to update admin credentials.';
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Update Credentials';
+    }
+  });
 
   function updateSyncUI(s) {
     const count = Number(s.items_count || 0);

@@ -176,6 +176,33 @@
           <button class="btn-close" id="closeSettings">&times;</button>
         </div>
 
+        <form id="accountForm" class="settings-section">
+          <div class="settings-section-title">Account Security</div>
+          <p class="settings-desc">Change the username or password used to sign in to this admin panel. Your current password is required.</p>
+          <div class="field">
+            <label for="adminUsername">Admin username</label>
+            <input id="adminUsername" type="text" autocomplete="username" minlength="3" maxlength="64" required>
+          </div>
+          <div class="field">
+            <label for="adminCurrentPassword">Current password</label>
+            <input id="adminCurrentPassword" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="field">
+            <label for="adminNewPassword">New password <span style="text-transform:none;letter-spacing:0">(12+ characters; leave blank to keep current)</span></label>
+            <input id="adminNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128">
+          </div>
+          <div class="field">
+            <label for="adminConfirmPassword">Confirm new password</label>
+            <input id="adminConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128">
+          </div>
+          <div id="accountMessage" class="sync-time" role="status" aria-live="polite"></div>
+          <div class="retention-actions">
+            <button id="saveAccountBtn" type="submit" class="btn btn-primary btn-sm">Update Credentials</button>
+          </div>
+        </form>
+
+        <div class="settings-divider"></div>
+
         <div class="settings-section">
           <div class="settings-section-title">Item Database</div>
           <div class="sync-section">

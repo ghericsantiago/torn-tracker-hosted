@@ -7,10 +7,19 @@ const { fetchAllTornItems } = require('../services/torn');
 const { cleanupOldRecords } = require('../scheduler');
 const { reconcileReceiptStatuses } = require('../services/receipt-reconciliation');
 
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
-
 const requireAuth = require('../middleware/auth');
+const { resolveAdminCredentials, validateAdminCredentials } = require('../services/admin-credentials');
+
+async function getAdminCredentials(req) {
+  const { rows } = await db.query(
+    'SELECT key, value FROM settings WHERE key = ANY($1::text[])',
+    [['admin_username', 'admin_password_hash']]
+  );
+  return resolveAdminCredentials(rows, {
+    username: req.app.locals.adminUser || process.env.ADMIN_USER || 'admin',
+    passwordHash: req.app.locals.adminHash,
+  });
+}
 
 // Login page
 router.get('/', (req, res) => {
@@ -25,15 +34,21 @@ router.get('/', (req, res) => {
 // Authenticate
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  const userMatch = username === ADMIN_USER;
-  const passMatch = await bcrypt.compare(password, req.app.locals.adminHash);
-  if (userMatch && passMatch) {
-    req.session.authenticated = true;
-    const next = req.session.returnTo || '/admin/dashboard';
-    delete req.session.returnTo;
-    return res.json({ ok: true, next });
+  try {
+    const credentials = await getAdminCredentials(req);
+    const userMatch = username === credentials.username;
+    const passMatch = typeof password === 'string' && await bcrypt.compare(password, credentials.passwordHash);
+    if (userMatch && passMatch) {
+      req.session.authenticated = true;
+      const next = req.session.returnTo || '/admin/dashboard';
+      delete req.session.returnTo;
+      return res.json({ ok: true, next });
+    }
+    res.status(401).json({ error: 'Invalid credentials' });
+  } catch (error) {
+    console.error('[admin/login]', error.message);
+    res.status(500).json({ error: 'Unable to authenticate right now.' });
   }
-  res.status(401).json({ error: 'Invalid credentials' });
 });
 
 // Logout
@@ -51,6 +66,57 @@ router.get('/receipts', requireAuth, (req, res) => {
 });
 
 // --- Admin API (all require auth) ---
+
+router.get('/api/account', requireAuth, async (req, res) => {
+  try {
+    const credentials = await getAdminCredentials(req);
+    res.json({ username: credentials.username });
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to load account settings.' });
+  }
+});
+
+router.put('/api/account', requireAuth, async (req, res) => {
+  const currentPassword = req.body?.current_password;
+  const validation = validateAdminCredentials(req.body?.username, req.body?.new_password);
+  if (!validation.username || typeof currentPassword !== 'string' || !currentPassword) {
+    return res.status(400).json({ error: validation.error || 'Current password is required.' });
+  }
+
+  try {
+    const credentials = await getAdminCredentials(req);
+    if (!await bcrypt.compare(currentPassword, credentials.passwordHash)) {
+      return res.status(403).json({ error: 'Current password is incorrect.' });
+    }
+    if (!validation.newPassword && validation.username === credentials.username) {
+      return res.status(400).json({ error: 'Enter a new username or password.' });
+    }
+
+    const keys = ['admin_username'];
+    const values = [validation.username];
+    let nextPasswordHash = credentials.passwordHash;
+    if (validation.newPassword) {
+      nextPasswordHash = await bcrypt.hash(validation.newPassword, 12);
+      keys.push('admin_password_hash');
+      values.push(nextPasswordHash);
+    }
+
+    await db.query(
+      `INSERT INTO settings (key, value)
+       SELECT changed.key, changed.value
+       FROM unnest($1::text[], $2::text[]) AS changed(key, value)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [keys, values]
+    );
+
+    req.app.locals.adminUser = validation.username;
+    req.app.locals.adminHash = nextPasswordHash;
+    res.json({ ok: true, username: validation.username });
+  } catch (error) {
+    console.error('[admin/account]', error.message);
+    res.status(500).json({ error: 'Unable to update account credentials.' });
+  }
+});
 
 router.get('/api/receipts', requireAuth, async (req, res) => {
   try {
