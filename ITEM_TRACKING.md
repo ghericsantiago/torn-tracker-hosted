@@ -658,6 +658,11 @@ from the current Asia/Manila calendar day into fixed-anchor bands using a 1% mar
 Each band starts at its lowest price and includes observations no more than 1%
 above that anchor; neighboring steps cannot chain into a wider band.
 
+Trade Admin catalog saves send the selected listings and pricing configuration in
+one request. The bulk-save route has a 2 MB JSON body limit (the default remains
+in place for other routes), rejects more than 5,000 listings, and applies listing
+upserts as one set-based database statement inside the save transaction.
+
 Operational performance note (2026-10): receipt preview and create both run this
 market-history lookup independently; create also fetches the Torn trade again.
 On the production database, `item_market` had about 5.1 million rows. A read-only

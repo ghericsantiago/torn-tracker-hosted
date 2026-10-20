@@ -209,6 +209,8 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
 
 router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
   const { listings = [], config = {} } = req.body;
+  if (!Array.isArray(listings)) return res.status(400).json({ error: 'listings must be an array' });
+  if (listings.length > 5000) return res.status(413).json({ error: 'Too many listings in one save' });
 
   const client = await db.connect();
   try {
@@ -245,30 +247,45 @@ router.post('/admin/api/trade/bulk-save', requireAuth, async (req, res) => {
     if (listings.length === 0) {
       await client.query('DELETE FROM trade_listings WHERE profile_id=1');
     } else {
-      const ids = listings.map(l => l.torn_item_id);
+      const normalizedListings = listings.map(l => ({
+        torn_item_id: l.torn_item_id,
+        item_name: l.item_name,
+        item_type: l.item_type,
+        price_mode: l.price_mode,
+        fixed_price: l.price_mode === 'fixed' ? (parseInt(l.fixed_price, 10) || null) : null,
+        market_pct: l.price_mode === 'market_pct' && l.market_pct != null
+          ? parseFloat(l.market_pct) : null,
+        notes: l.notes || null,
+        is_active: l.is_active !== false,
+        market_protection_enabled: l.market_protection_enabled == null
+          ? null : l.market_protection_enabled === true,
+      }));
+      const ids = normalizedListings.map(l => l.torn_item_id);
       await client.query(
         'DELETE FROM trade_listings WHERE profile_id=1 AND torn_item_id <> ALL($1)',
         [ids]
       );
-      for (const l of listings) {
-        // market_pct=null → item inherits from category/global cascade
-        // market_pct=value → explicit item-level override
-        const fp = l.price_mode === 'fixed'      ? (parseInt(l.fixed_price) || null) : null;
-        const mp = l.price_mode === 'market_pct' ? (l.market_pct != null ? parseFloat(l.market_pct) : null) : null;
-        const protection = l.market_protection_enabled == null ? null : l.market_protection_enabled === true;
-        await client.query(
-          `INSERT INTO trade_listings
-             (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price,
-              market_pct, notes, is_active, market_protection_enabled)
-           VALUES (1,$1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (profile_id, torn_item_id) DO UPDATE SET
-             item_name=$2, item_type=$3, price_mode=$4, fixed_price=$5,
-             market_pct=$6, notes=$7, is_active=$8,
-             market_protection_enabled=$9, updated_at=NOW()`,
-          [l.torn_item_id, l.item_name, l.item_type, l.price_mode, fp, mp,
-           l.notes || null, l.is_active !== false, protection]
-        );
-      }
+      await client.query(
+        `INSERT INTO trade_listings
+           (profile_id, torn_item_id, item_name, item_type, price_mode, fixed_price,
+            market_pct, notes, is_active, market_protection_enabled)
+         SELECT 1, incoming.torn_item_id, incoming.item_name, incoming.item_type,
+                incoming.price_mode, incoming.fixed_price, incoming.market_pct,
+                incoming.notes, incoming.is_active, incoming.market_protection_enabled
+         FROM jsonb_to_recordset($1::jsonb) AS incoming(
+           torn_item_id INTEGER, item_name VARCHAR(255), item_type VARCHAR(128),
+           price_mode VARCHAR(16), fixed_price BIGINT, market_pct DECIMAL(5,4),
+           notes TEXT, is_active BOOLEAN, market_protection_enabled BOOLEAN
+         )
+         ON CONFLICT (profile_id, torn_item_id) DO UPDATE SET
+           item_name=EXCLUDED.item_name, item_type=EXCLUDED.item_type,
+           price_mode=EXCLUDED.price_mode, fixed_price=EXCLUDED.fixed_price,
+           market_pct=EXCLUDED.market_pct, notes=EXCLUDED.notes,
+           is_active=EXCLUDED.is_active,
+           market_protection_enabled=EXCLUDED.market_protection_enabled,
+           updated_at=NOW()`,
+        [JSON.stringify(normalizedListings)]
+      );
     }
 
     await client.query('COMMIT');

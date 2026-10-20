@@ -12,6 +12,7 @@ const PORT      = process.env.PORT || 3001;
 // Pre-hash admin password at startup
 app.locals.adminHash = bcrypt.hashSync(process.env.ADMIN_PASS || 'changeme', 10);
 
+app.use('/admin/api/trade/bulk-save', express.json({ limit: '2mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
