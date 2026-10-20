@@ -637,6 +637,12 @@ The Trade Admin catalog stat pills are toggle filters for public visibility
 (visible/not visible), pricing
 mode (inherit, percentage override, or fixed price), and acceptance state; filters
 combine across groups and can be cleared by toggling an active pill off.
+The up/down market-gap filters compare the current `torn_items.market_price` with
+the median positive `item_market.average_price` recorded during the previous
+Asia/Manila calendar day. The adjustable threshold defaults to 10%; increases
+above it flag a possible spike, while decreases below its negative flag a
+possible buying opportunity. Items without yesterday data are excluded from both
+trend filters. This is a one-day price gap, not a statistical volatility forecast.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
 that resale ceiling instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and highest dense level $70

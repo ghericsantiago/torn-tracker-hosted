@@ -46,6 +46,10 @@
     .stat-pill.sf span { color: var(--gold, #fbbf24); }
     .stat-pill.accepted span { color: var(--success); }
     .stat-pill.rejected span { color: var(--error); }
+    .stat-pill.trend-up span { color: var(--success); }
+    .stat-pill.trend-down span { color: var(--error); }
+    .market-gap-filter { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--text-muted); font: 0.62rem var(--mono); white-space: nowrap; }
+    .market-gap-filter input { width: 3.2rem; padding: 0.18rem 0.25rem; border: 1px solid var(--glass-border); border-radius: 4px; background: rgba(255,255,255,0.04); color: var(--text); font: inherit; text-align: right; }
 
     /* Top bar */
     .browser-head {
@@ -378,6 +382,9 @@
         <button type="button" class="stat-pill sf" data-filter-group="price" data-filter-value="fixed" aria-pressed="false"><span id="statFixed">—</span> fixed</button>
         <button type="button" class="stat-pill accepted" data-filter-group="acceptance" data-filter-value="accepted" aria-pressed="false"><span id="statAccepted">—</span> accepted</button>
         <button type="button" class="stat-pill rejected" data-filter-group="acceptance" data-filter-value="rejected" aria-pressed="false"><span id="statRejected">—</span> not accepted</button>
+        <button type="button" class="stat-pill trend-up" data-filter-group="trend" data-filter-value="up" aria-pressed="false" title="Market value rose by at least the selected gap versus yesterday; possible spike to avoid buying into"><span id="statTrendUp">—</span> ↑ up</button>
+        <button type="button" class="stat-pill trend-down" data-filter-group="trend" data-filter-value="down" aria-pressed="false" title="Market value fell by at least the selected gap versus yesterday; possible buying opportunity"><span id="statTrendDown">—</span> ↓ down</button>
+        <label class="market-gap-filter" title="Minimum absolute market-value change from yesterday to include in up/down filters">gap ≥ <input id="marketGapThreshold" type="number" min="0.1" max="500" step="0.5" value="10" aria-label="Market value trend threshold percent">%</label>
       </div>
       <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center">
         <button class="btn btn-ghost btn-sm" id="profileToggleBtn">Profile ▾</button>
@@ -438,7 +445,8 @@ let catOrder   = [];   // display order — array of type strings
 let selections = new Map();
 let filterQ    = '';
 let sortableInst = null;
-const statFilters = { listing: new Set(), price: new Set(), acceptance: new Set() };
+let marketGapThresholdPct = 10;
+const statFilters = { listing: new Set(), price: new Set(), acceptance: new Set(), trend: new Set() };
 
 const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
 const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
@@ -974,6 +982,14 @@ function updateStats() {
   document.getElementById('statUnlisted').textContent = allItems.filter(item => selections.get(item.id)?.checked !== true).length;
   document.getElementById('statAccepted').textContent = allItems.filter(item => selections.get(item.id)?.isAccepted !== false).length;
   document.getElementById('statRejected').textContent = allItems.filter(item => selections.get(item.id)?.isAccepted === false).length;
+  document.getElementById('statTrendUp').textContent = allItems.filter(item => {
+    const gap = marketGapPct(item);
+    return gap != null && gap >= marketGapThresholdPct;
+  }).length;
+  document.getElementById('statTrendDown').textContent = allItems.filter(item => {
+    const gap = marketGapPct(item);
+    return gap != null && gap <= -marketGapThresholdPct;
+  }).length;
   syncStatFilterButtons();
 
   const btn = document.getElementById('saveChangesBtn');
@@ -990,10 +1006,24 @@ function matchesStatFilters(item) {
   const listingFilters = statFilters.listing;
   const priceFilters = statFilters.price;
   const acceptanceFilters = statFilters.acceptance;
+  const trendFilters = statFilters.trend;
+  const gapPct = marketGapPct(item);
+  const trendMatches = !trendFilters.size || (gapPct != null && (
+    (trendFilters.has('up') && gapPct >= marketGapThresholdPct) ||
+    (trendFilters.has('down') && gapPct <= -marketGapThresholdPct)
+  ));
 
   return (!listingFilters.size || listingFilters.has(listed ? 'listed' : 'unlisted')) &&
     (!priceFilters.size || priceFilters.has(priceType)) &&
-    (!acceptanceFilters.size || acceptanceFilters.has(accepted ? 'accepted' : 'rejected'));
+    (!acceptanceFilters.size || acceptanceFilters.has(accepted ? 'accepted' : 'rejected')) &&
+    trendMatches;
+}
+
+function marketGapPct(item) {
+  const current = Number(item.market_price);
+  const yesterday = Number(item.yesterday_market_value);
+  if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(yesterday) || yesterday <= 0) return null;
+  return ((current - yesterday) / yesterday) * 100;
 }
 
 function syncStatFilterButtons() {
@@ -1013,6 +1043,13 @@ document.querySelectorAll('#statPills .stat-pill').forEach(button => {
     syncStatFilterButtons();
     renderCatalog();
   });
+});
+
+document.getElementById('marketGapThreshold').addEventListener('input', event => {
+  const value = Number(event.target.value);
+  marketGapThresholdPct = Math.min(500, Math.max(0.1, Number.isFinite(value) && value > 0 ? value : 10));
+  updateStats();
+  renderCatalog();
 });
 
 /* ── Save ─────────────────────────────────────────────────────────────── */

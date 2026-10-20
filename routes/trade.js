@@ -145,8 +145,12 @@ router.get('/admin/api/trade/config', requireAuth, async (req, res) => {
 router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(`
+      WITH market_day AS (
+        SELECT date_trunc('day', NOW() AT TIME ZONE 'Asia/Manila') AS today
+      )
       SELECT
         ti.id, ti.name, ti.type, ti.market_price,
+        yesterday.market_value AS yesterday_market_value,
         tl.id          AS listing_id,
         tl.price_mode,
         tl.fixed_price,
@@ -175,6 +179,15 @@ router.get('/admin/api/trade/all-items', requireAuth, async (req, res) => {
       LEFT JOIN trade_category_configs tcc
              ON tcc.profile_id = 1 AND tcc.item_type = ti.type
       LEFT JOIN trade_profiles tp ON tp.id = 1
+      LEFT JOIN market_day ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY history.average_price) AS market_value
+        FROM item_market history
+        WHERE history.item_id = ti.id
+          AND history.average_price > 0
+          AND history.created_at >= ((market_day.today - INTERVAL '1 day') AT TIME ZONE 'Asia/Manila')
+          AND history.created_at < (market_day.today AT TIME ZONE 'Asia/Manila')
+      ) yesterday ON TRUE
       WHERE ti.type IS NOT NULL AND ti.type <> 'Special' AND ti.id > 0
       ORDER BY ti.type, ti.name
     `);
