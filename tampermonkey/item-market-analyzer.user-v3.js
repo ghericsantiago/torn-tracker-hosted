@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Item Market Analyzer
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Torn item market price history — powered by torn-imarket-tracker.gvsantiago.com
 // @author       Gheric
 // @match        https://www.torn.com/*
@@ -22,6 +22,28 @@
     '1m': 60000, '5m': 300000, '15m': 900000,
     '30m': 1800000, '1h': 3600000, 'day': 86400000,
   };
+  const CHART_PREFS_KEY = 'ima_chart_preferences_v1';
+
+  function loadChartPreferences() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CHART_PREFS_KEY) || '{}');
+      return {
+        timeframe: Object.hasOwn(TF_BUCKET_MS, saved.timeframe) ? saved.timeframe : '5m',
+        visibility: Array.isArray(saved.visibility) && saved.visibility.length === 3
+          ? saved.visibility.map(value => value !== false)
+          : [true, true, true],
+      };
+    } catch (_) {
+      return { timeframe: '5m', visibility: [true, true, true] };
+    }
+  }
+
+  const chartPreferences = loadChartPreferences();
+  function saveChartPreferences() {
+    try {
+      localStorage.setItem(CHART_PREFS_KEY, JSON.stringify(chartPreferences));
+    } catch (_) {}
+  }
 
   // ── Timezone State ──────────────────────────────────────────────────────
   let useTCT = true; // Default to TCT (UTC)
@@ -99,7 +121,7 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   let panelOpen        = false;
-  let currentTF        = '5m';
+  let currentTF        = chartPreferences.timeframe;
   let currentChartType = 'line';
   let currentItemId    = null;
   let rawData          = [];
@@ -744,12 +766,12 @@
         </div>
         <div class="ima-ctrl-row">
           <label>TF</label>
-          <button class="ima-tf-btn" data-tf="day">1D</button>
-          <button class="ima-tf-btn" data-tf="1h">1H</button>
-          <button class="ima-tf-btn" data-tf="30m">30M</button>
-          <button class="ima-tf-btn" data-tf="15m">15M</button>
-          <button class="ima-tf-btn active" data-tf="5m">5M</button>
-          <button class="ima-tf-btn" data-tf="1m">1M</button>
+          <button class="ima-tf-btn ${currentTF === 'day' ? 'active' : ''}" data-tf="day">1D</button>
+          <button class="ima-tf-btn ${currentTF === '1h' ? 'active' : ''}" data-tf="1h">1H</button>
+          <button class="ima-tf-btn ${currentTF === '30m' ? 'active' : ''}" data-tf="30m">30M</button>
+          <button class="ima-tf-btn ${currentTF === '15m' ? 'active' : ''}" data-tf="15m">15M</button>
+          <button class="ima-tf-btn ${currentTF === '5m' ? 'active' : ''}" data-tf="5m">5M</button>
+          <button class="ima-tf-btn ${currentTF === '1m' ? 'active' : ''}" data-tf="1m">1M</button>
           <div style="flex:1"></div>
           <button class="ima-btn ghost" id="ima-auto-btn">&#x21BB; Auto</button>
         </div>
@@ -996,6 +1018,8 @@
         panel.querySelectorAll('.ima-tf-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentTF = btn.dataset.tf;
+        chartPreferences.timeframe = currentTF;
+        saveChartPreferences();
         if (rawData.length) renderChart(rawData);
       });
     });
@@ -1440,7 +1464,12 @@
 
   // ── Chart ─────────────────────────────────────────────────────────────────
   function renderChart(rows) {
-    if (priceChart) { priceChart.destroy(); priceChart = null; }
+    if (priceChart) {
+      chartPreferences.visibility = [0, 1, 2].map(index => priceChart.isDatasetVisible(index));
+      priceChart.destroy();
+      priceChart = null;
+      saveChartPreferences();
+    }
     if (!rows.length) return;
 
     const agg   = aggregateByTF(rows);
@@ -1467,6 +1496,7 @@
               borderColor: '#6ee7f7', backgroundColor: isBar ? 'rgba(110,231,247,0.25)' : 'rgba(110,231,247,0.08)',
               borderWidth: 2, pointRadius: isSc ? 4 : 3, pointHoverRadius: 6,
               fill: !isBar && !isSc, tension: 0.3, type: isBar ? 'bar' : 'line', yAxisID: 'y',
+              hidden: !chartPreferences.visibility[0],
             },
             {
               label: 'Market Avg',
@@ -1475,6 +1505,7 @@
               borderWidth: 2, borderDash: [5, 3],
               pointRadius: isSc ? 3 : 0, pointHoverRadius: 5,
               fill: false, tension: 0.3, type: 'line', yAxisID: 'y',
+              hidden: !chartPreferences.visibility[1],
             },
             {
               label: 'Quantity',
@@ -1482,6 +1513,7 @@
               borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'rgba(251,191,36,0.07)',
               borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3,
               fill: 'origin', tension: 0.2, type: 'line', yAxisID: 'yQty',
+              hidden: !chartPreferences.visibility[2],
             },
           ],
         },
@@ -1489,7 +1521,16 @@
           responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { labels: { color: '#94a3b8', font: { size: 11 }, padding: 14, usePointStyle: true } },
+            legend: {
+              labels: { color: '#94a3b8', font: { size: 11 }, padding: 14, usePointStyle: true },
+              onClick: (_event, legendItem, legend) => {
+                const index = legendItem.datasetIndex;
+                legend.chart.setDatasetVisibility(index, !legend.chart.isDatasetVisible(index));
+                chartPreferences.visibility[index] = legend.chart.isDatasetVisible(index);
+                saveChartPreferences();
+                legend.chart.update();
+              },
+            },
             tooltip: {
               backgroundColor: 'rgba(7,8,15,0.95)', titleColor: '#6ee7f7', bodyColor: '#e2e8f0',
               borderColor: 'rgba(110,231,247,0.2)', borderWidth: 1, padding: 10,
@@ -1771,6 +1812,9 @@
     currentItemId = null;
     document.querySelectorAll('.ima-tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === '5m'));
     currentTF = '5m';
+    chartPreferences.timeframe = '5m';
+    chartPreferences.visibility = [true, true, true];
+    saveChartPreferences();
     if (autoRefreshOn) toggleAutoRefresh();
     setStatus('');
     if (priceChart) { priceChart.destroy(); priceChart = null; }

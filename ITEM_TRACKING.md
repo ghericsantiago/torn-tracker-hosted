@@ -682,6 +682,11 @@ from the current Asia/Manila calendar day into fixed-anchor bands using a 1% mar
 Each band starts at its lowest price and includes observations no more than 1%
 above that anchor; neighboring steps cannot chain into a wider band.
 
+The Tampermonkey item-market analyzer stores the selected chart timeframe and
+visibility of Lowest Offer, Market Avg, and Quantity in browser local storage.
+Applying a new date/item query rebuilds the chart but preserves those choices;
+the analyzer's Reset control restores 5M and shows all three datasets.
+
 Trade Admin catalog saves send the selected listings and pricing configuration in
 one request. The bulk-save route has a 2 MB JSON body limit (the default remains
 in place for other routes), rejects more than 5,000 listings, and applies listing
