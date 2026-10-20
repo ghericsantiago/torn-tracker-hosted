@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Tracker - Trade Automation
 // @namespace    torn-tracker-trade-automation
-// @version      2.10.2
+// @version      2.10.3
 // @description  Queue current trades, wait for items, create a receipt, and add the quoted money. Auto-uses Blood Bag B+ from faction armory when hospital time < 5 min.
 // @match        https://www.torn.com/trade.php*
 // @match        https://www.torn.com/factions.php*
@@ -67,6 +67,7 @@
     unlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted items got lower offers. Please review before accepting; happy to negotiate.',
     protectedItemsMessage: 'Receipt: {url} | {total}. Low-market protection adjusted {protectedCount} item(s). Please review; happy to negotiate.',
     protectedUnlistedItemsMessage: 'Receipt: {url} | {total}. Unlisted/low-market items got lower offers. Please review; happy to negotiate.',
+    rejectedItemsMessage: 'Not accepted ($0): {items}. Please remove them. Receipt: {url}',
     insufficientCashMessage: 'Sorry, I only have {cash}. Could you adjust the items to fit that amount?',
     thankYouMessage: 'Thank you for trading with me!',
   };
@@ -259,30 +260,32 @@
     return '$' + Math.round(Number(value) || 0).toLocaleString();
   }
 
-  function rejectedItemsMessage(items, receiptUrl) {
-    const prefix = 'Not accepted ($0): ';
-    const instruction = '. Remove them to continue.';
-    const receipt = ` Receipt: ${receiptUrl}`;
+  function rejectedItemsComment(template, items, receiptUrl) {
     const names = items.map(item => `${item.item_name || `Item #${item.torn_item_id}`}${Number(item.quantity) > 1 ? ` x${item.quantity}` : ''}`);
-    const included = [];
+    const messageTemplate = String(template || DEFAULTS.rejectedItemsMessage);
+    const fixedText = messageTemplate
+      .replaceAll('{items}', '')
+      .replaceAll('{count}', String(names.length))
+      .replaceAll('{url}', receiptUrl);
+    const itemBudget = Math.max(0, MAX_COMMENT - fixedText.length);
+    let listedNames = '';
 
-    for (const name of names) {
-      const remaining = names.length - included.length - 1;
-      const tail = remaining > 0 ? `, +${remaining} more` : '';
-      const candidate = `${prefix}${[...included, name].join(', ')}${tail}${instruction}${receipt}`;
-      if (candidate.length > MAX_COMMENT) break;
-      included.push(name);
+    for (let count = 1; count <= names.length; count++) {
+      const omitted = names.length - count;
+      const candidate = `${names.slice(0, count).join(', ')}${omitted ? `, +${omitted} more` : ''}`;
+      if (candidate.length > itemBudget) break;
+      listedNames = candidate;
     }
 
-    if (included.length === 0 && names.length) {
-      const tail = names.length > 1 ? `, +${names.length - 1} more` : '';
-      const available = Math.max(1, MAX_COMMENT - prefix.length - tail.length - instruction.length - receipt.length - 3);
-      included.push(`${names[0].slice(0, available)}...`);
+    if (!listedNames && names.length && itemBudget > 0) {
+      listedNames = `${names[0].slice(0, Math.max(0, itemBudget - 3))}...`;
     }
 
-    const omitted = names.length - included.length;
-    const tail = omitted > 0 ? `, +${omitted} more` : '';
-    return `${prefix}${included.join(', ')}${tail}${instruction}${receipt}`.slice(0, MAX_COMMENT);
+    return messageTemplate
+      .replaceAll('{items}', listedNames)
+      .replaceAll('{count}', String(names.length))
+      .replaceAll('{url}', receiptUrl)
+      .slice(0, MAX_COMMENT);
   }
 
   function parseAmount(value) {
@@ -814,7 +817,7 @@
       GM_setValue(`receipt_${job.tradeId}`, receipt.short_id || receipt.id);
       if (rejectedItems.length) {
         const rejectedNames = rejectedItems.map(item => item.item_name || `Item #${item.torn_item_id}`);
-        const message = rejectedItemsMessage(rejectedItems, receiptUrl);
+        const message = rejectedItemsComment(settings.rejectedItemsMessage, rejectedItems, receiptUrl);
         const next = {
           ...job,
           stage: 'waiting_for_adjustment',
@@ -1147,6 +1150,9 @@
         <label>Receipt comment with protected and unlisted items <small>variables: {url}, {total}, {protectedCount}, {unlistedCount}, {tradeId}</small>
           <textarea id="tta-protected-unlisted" maxlength="${MAX_COMMENT}">${escapeHtml(settings.protectedUnlistedItemsMessage)}</textarea>
         </label>
+        <label>Not-accepted items comment <small>variables: {items}, {count}, {url} · ${MAX_COMMENT} characters maximum</small>
+          <textarea id="tta-rejected-items" maxlength="${MAX_COMMENT}">${escapeHtml(settings.rejectedItemsMessage)}</textarea>
+        </label>
         <label>Insufficient-cash comment <small>variables: {cash}, {total}, {shortfall}, {tradeId}</small>
           <textarea id="tta-insufficient-cash" maxlength="${MAX_COMMENT}">${escapeHtml(settings.insufficientCashMessage)}</textarea>
         </label>
@@ -1179,6 +1185,7 @@
         unlistedItemsMessage: overlay.querySelector('#tta-unlisted-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.unlistedItemsMessage,
         protectedItemsMessage: overlay.querySelector('#tta-protected-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.protectedItemsMessage,
         protectedUnlistedItemsMessage: overlay.querySelector('#tta-protected-unlisted').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.protectedUnlistedItemsMessage,
+        rejectedItemsMessage: overlay.querySelector('#tta-rejected-items').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.rejectedItemsMessage,
         insufficientCashMessage: overlay.querySelector('#tta-insufficient-cash').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.insufficientCashMessage,
         thankYouMessage: overlay.querySelector('#tta-thanks').value.trim().slice(0, MAX_COMMENT) || DEFAULTS.thankYouMessage,
       });
