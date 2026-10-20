@@ -658,6 +658,21 @@ from the current Asia/Manila calendar day into fixed-anchor bands using a 1% mar
 Each band starts at its lowest price and includes observations no more than 1%
 above that anchor; neighboring steps cannot chain into a wider band.
 
+Operational performance note (2026-10): receipt preview and create both run this
+market-history lookup independently; create also fetches the Torn trade again.
+On the production database, `item_market` had about 5.1 million rows. A read-only
+`EXPLAIN ANALYZE` for two item IDs took about 301 ms cold and 3.6 ms warm, with
+422 heap blocks accessed by the daily observation scan. The existing
+`(item_id, created_at DESC)` index supports the time range, but the query must
+fetch `price` from table pages. The partial covering index
+`(item_id, created_at DESC) INCLUDE (price) WHERE price IS NOT NULL` is now
+installed in production; it occupies 199 MB. After the build, the same bounded
+query used index-only scans: the first run took about 53 ms with 92 buffers read
+and 85 heap fetches, while the warm run took 1.9 ms with 113 buffer hits and no
+physical reads. Avoid repeating the Torn fetch and price lookups between preview
+and create only if the preview can be securely bound to the same trade snapshot
+and its item overrides without trusting stale client data.
+
 A band qualifies as dense when it contains at least 5% of all valid polls that day,
 with an absolute minimum of three observations. Among qualifying bands, the band
 with the highest median price wins, and that median becomes the resale ceiling. A

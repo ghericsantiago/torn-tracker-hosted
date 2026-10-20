@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS item_market (
 CREATE INDEX IF NOT EXISTS idx_item_market_item_id      ON item_market(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_market_created       ON item_market(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_item_market_item_created  ON item_market(item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_item_market_item_created_price
+  ON item_market(item_id, created_at DESC) INCLUDE (price)
+  WHERE price IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
