@@ -197,7 +197,12 @@
       border-radius: 4px; object-fit: contain; padding: 1px;
       image-rendering: pixelated; border: 1px solid rgba(255,255,255,0.06);
     }
-    .item-name-col { font-size: 0.81rem; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-name-col { font-size: 0.81rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-name-wrap { display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 0; }
+    .market-change { flex-shrink: 0; font: 600 0.62rem var(--mono); white-space: nowrap; }
+    .market-change.up { color: var(--success); }
+    .market-change.down { color: var(--error); }
+    .market-change.no-history { color: var(--text-muted); font-weight: 400; }
     .item-price-col { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
 
     /* Price tags */
@@ -750,6 +755,10 @@ function renderItemRow(item, type) {
   const s   = selections.get(item.id);
   const chk = s?.checked ?? false;
   const res = resolvePrice(item);
+  const marketGap = marketGapPct(item);
+  const marketChange = marketGap == null
+    ? '<span class="market-change no-history" title="No market average recorded yesterday">—</span>'
+    : `<span class="market-change ${marketGap >= 0 ? 'up' : 'down'}" title="Current market value ${fmt(item.market_price)} vs yesterday median average ${fmt(item.yesterday_market_value)}">${marketGap >= 0 ? '↑' : '↓'} ${marketGap >= 0 ? '+' : ''}${marketGap.toFixed(1)}%</span>`;
   const protection = resolveProtection(item);
   const protectionReset = protection.inherited ? ''
     : `<button type="button" class="protection-reset item-protection-reset" title="Inherit category/global protection">&times;</button>`;
@@ -779,7 +788,10 @@ function renderItemRow(item, type) {
     <div class="item-row ${chk ? '' : 'unchecked'}" data-id="${item.id}">
       <input type="checkbox" class="item-check" ${chk ? 'checked' : ''}>
       <img class="item-icon-xs" src="https://www.torn.com/images/items/${item.id}/large.png" alt="" onerror="this.style.display='none'">
-      <span class="item-name-col" title="${esc(item.name)}">${esc(item.name)}</span>
+      <div class="item-name-wrap">
+        <span class="item-name-col" title="${esc(item.name)}">${esc(item.name)}</span>
+        ${marketChange}
+      </div>
       <div class="item-price-col">
         ${priceHtml}
         <span class="protection-wrap item-protection-wrap">
