@@ -13,6 +13,12 @@ function shortId() {
   return crypto.randomBytes(6).toString('base64url').slice(0, 8);
 }
 
+function receiptIdPredicate(id) {
+  return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)
+    ? 'id = $1::uuid'
+    : 'short_id = $1';
+}
+
 const APP_URL = 'https://torn-imarket-tracker.gvsantiago.com';
 const FIXTURE_MODE = process.env.RECEIPT_FIXTURE_MODE === 'true' && process.env.NODE_ENV !== 'production';
 const FIXTURE_TRADE_ID = String(process.env.RECEIPT_FIXTURE_TRADE_ID || '99999999');
@@ -90,6 +96,47 @@ const PRICE_LOOKUP = `
   WHERE tl.profile_id = 1 AND tl.torn_item_id = ANY($1::int[])
 `;
 
+const LATEST_MARKET_LOOKUP = `
+  SELECT requested.item_id, latest.price, latest.created_at
+  FROM (
+    SELECT DISTINCT item_id
+    FROM unnest($1::int[]) AS requested(item_id)
+  ) requested
+  CROSS JOIN LATERAL (
+    SELECT price, created_at
+    FROM item_market
+    WHERE item_id = requested.item_id
+    ORDER BY created_at DESC
+    LIMIT 1
+  ) latest
+`;
+
+const DAILY_RESALE_LOOKUP = `
+  WITH requested_items AS (
+    SELECT DISTINCT item_id
+    FROM unnest($1::int[]) AS requested(item_id)
+  ), latest_observations AS (
+    SELECT requested.item_id, latest.created_at,
+           (latest.created_at AT TIME ZONE 'Asia/Manila')::date AS tracked_date
+    FROM requested_items requested
+    CROSS JOIN LATERAL (
+      SELECT created_at
+      FROM item_market
+      WHERE item_id = requested.item_id AND price IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    ) latest
+  )
+  SELECT market.item_id, market.price, market.created_at, latest.tracked_date
+  FROM latest_observations latest
+  JOIN item_market market
+    ON market.item_id = latest.item_id
+   AND market.created_at >= (latest.tracked_date::timestamp AT TIME ZONE 'Asia/Manila')
+   AND market.created_at < ((latest.tracked_date + 1)::timestamp AT TIME ZONE 'Asia/Manila')
+  WHERE market.price IS NOT NULL
+  ORDER BY market.item_id, market.price, market.created_at
+`;
+
 async function buildPricedItems(tornData, itemsOverride) {
   const trade  = tornData?.trade || {};
   const buyer  = trade.user   || {};
@@ -119,30 +166,8 @@ async function buildPricedItems(tornData, itemsOverride) {
          WHERE ti.id = ANY($1::int[])`,
         [itemIds]
       ),
-      db.query(
-        `SELECT DISTINCT ON (item_id) item_id, price, created_at
-         FROM item_market
-         WHERE item_id = ANY($1::int[])
-         ORDER BY item_id, created_at DESC`,
-        [itemIds]
-      ),
-      db.query(
-        `WITH observations AS (
-           SELECT item_id, price, created_at,
-                  (created_at AT TIME ZONE 'Asia/Manila')::date AS tracked_date
-           FROM item_market
-           WHERE item_id = ANY($1::int[]) AND price IS NOT NULL
-         ), selected_days AS (
-           SELECT item_id, MAX(tracked_date) AS tracked_date
-           FROM observations
-           GROUP BY item_id
-         )
-         SELECT o.item_id, o.price, o.created_at, o.tracked_date
-         FROM observations o
-         JOIN selected_days d USING (item_id, tracked_date)
-         ORDER BY o.item_id, o.price, o.created_at`,
-        [itemIds]
-      ),
+      db.query(LATEST_MARKET_LOOKUP, [itemIds]),
+      db.query(DAILY_RESALE_LOOKUP, [itemIds]),
       db.query('SELECT default_market_pct, market_protection_enabled FROM trade_profiles WHERE id = 1'),
     ]);
     for (const r of priceRes.rows) priceMap[r.torn_item_id] = r;
@@ -439,7 +464,7 @@ router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
     if (!await verifyToken(req, res)) return;
     await db.query(
       `UPDATE trade_receipts SET status='completed', completed_at=NOW(), auto_cancelled=FALSE
-       WHERE (short_id=$1 OR id::text=$1) AND status='pending'`,
+       WHERE ${receiptIdPredicate(req.params.id)} AND status='pending'`,
       [req.params.id]
     );
     res.json({ ok: true });
@@ -450,7 +475,7 @@ router.post('/api/receipt/:id/complete', cors(CORS_TORN), async (req, res) => {
 router.get('/api/receipt/:id', async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT * FROM trade_receipts WHERE short_id=$1 OR id::text=$1',
+      `SELECT * FROM trade_receipts WHERE ${receiptIdPredicate(req.params.id)}`,
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
@@ -501,24 +526,9 @@ router.get('/api/item-offering/:itemId', cors(CORS_TORN), async (req, res) => {
       ),
       db.query(PRICE_LOOKUP, [[itemId]]),
       db.query('SELECT id, name, type, market_price FROM torn_items WHERE id = $1', [itemId]),
-      db.query(
-        `WITH obs AS (
-           SELECT item_id, price, created_at,
-                  (created_at AT TIME ZONE 'Asia/Manila')::date AS tracked_date
-           FROM item_market WHERE item_id = $1 AND price IS NOT NULL
-         ), latest_day AS (
-           SELECT MAX(tracked_date) AS tracked_date FROM obs
-         )
-         SELECT obs.item_id, obs.price, obs.created_at, obs.tracked_date
-         FROM obs JOIN latest_day ON obs.tracked_date = latest_day.tracked_date
-         ORDER BY obs.price, obs.created_at`,
-        [itemId]
-      ),
+      db.query(DAILY_RESALE_LOOKUP, [[itemId]]),
       db.query('SELECT default_market_pct, market_protection_enabled FROM trade_profiles WHERE id = 1'),
-      db.query(
-        'SELECT price, created_at FROM item_market WHERE item_id = $1 ORDER BY created_at DESC LIMIT 1',
-        [itemId]
-      ),
+      db.query(LATEST_MARKET_LOOKUP, [[itemId]]),
     ]);
 
     // Inventory snapshot
