@@ -32,14 +32,20 @@
     .stat-pill {
       font-family: var(--mono); font-size: 0.65rem; padding: 0.18rem 0.5rem;
       border-radius: 99px; border: 1px solid var(--glass-border);
-      background: rgba(255,255,255,0.03); white-space: nowrap;
+      background: rgba(255,255,255,0.03); white-space: nowrap; color: var(--text-muted);
+      cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
+    .stat-pill:hover { border-color: rgba(255,255,255,0.22); color: var(--text); }
+    .stat-pill.active { background: rgba(110,231,247,0.1); border-color: rgba(110,231,247,0.4); color: var(--text); }
+    .stat-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .stat-pill span { font-weight: 700; }
     .stat-pill.sl { border-color: rgba(110,231,247,0.18); }
     .stat-pill.sl span { color: var(--accent); }
     .stat-pill.si span { color: var(--accent); }
     .stat-pill.so span { color: var(--success); }
     .stat-pill.sf span { color: var(--gold, #fbbf24); }
+    .stat-pill.accepted span { color: var(--success); }
+    .stat-pill.rejected span { color: var(--error); }
 
     /* Top bar */
     .browser-head {
@@ -365,10 +371,13 @@
       <h2>Item Catalog</h2>
       <span style="font-family:var(--mono);font-size:.62rem;color:var(--text-muted)" id="catalogSub">Loading…</span>
       <div class="stat-pills" id="statPills">
-        <span class="stat-pill sl"><span id="statTotal">—</span> listed</span>
-        <span class="stat-pill si"><span id="statInherit">—</span> inherit</span>
-        <span class="stat-pill so"><span id="statOverride">—</span> override</span>
-        <span class="stat-pill sf"><span id="statFixed">—</span> fixed</span>
+        <button type="button" class="stat-pill sl" data-filter-group="listing" data-filter-value="listed" aria-pressed="false"><span id="statTotal">—</span> listed</button>
+        <button type="button" class="stat-pill" data-filter-group="listing" data-filter-value="unlisted" aria-pressed="false"><span id="statUnlisted">—</span> unlisted</button>
+        <button type="button" class="stat-pill si" data-filter-group="price" data-filter-value="inherit" aria-pressed="false"><span id="statInherit">—</span> inherit</button>
+        <button type="button" class="stat-pill so" data-filter-group="price" data-filter-value="override" aria-pressed="false"><span id="statOverride">—</span> override</button>
+        <button type="button" class="stat-pill sf" data-filter-group="price" data-filter-value="fixed" aria-pressed="false"><span id="statFixed">—</span> fixed</button>
+        <button type="button" class="stat-pill accepted" data-filter-group="acceptance" data-filter-value="accepted" aria-pressed="false"><span id="statAccepted">—</span> accepted</button>
+        <button type="button" class="stat-pill rejected" data-filter-group="acceptance" data-filter-value="rejected" aria-pressed="false"><span id="statRejected">—</span> not accepted</button>
       </div>
       <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center">
         <button class="btn btn-ghost btn-sm" id="profileToggleBtn">Profile ▾</button>
@@ -429,6 +438,7 @@ let catOrder   = [];   // display order — array of type strings
 let selections = new Map();
 let filterQ    = '';
 let sortableInst = null;
+const statFilters = { listing: new Set(), price: new Set(), acceptance: new Set() };
 
 const fmt    = n => n == null ? '—' : '$' + Number(n).toLocaleString();
 const pctFmt = v => v == null ? '' : Number(v).toFixed(1).replace(/\.0$/, '') + '%';
@@ -632,12 +642,13 @@ function renderCatalog() {
     const filtered = q
       ? items.filter(i => i.name.toLowerCase().includes(q) || type.toLowerCase().includes(q))
       : items;
-    if (!filtered.length) continue;
+    const matchingItems = filtered.filter(matchesStatFilters);
+    if (!matchingItems.length) continue;
 
-    const listedCount   = filtered.filter(i => selections.get(i.id)?.checked).length;
+    const listedCount   = matchingItems.filter(i => selections.get(i.id)?.checked).length;
     const checkedCount  = listedCount;
-    const catChecked    = checkedCount === filtered.length && filtered.length > 0;
-    const catIndet      = checkedCount > 0 && checkedCount < filtered.length;
+    const catChecked    = checkedCount === matchingItems.length && matchingItems.length > 0;
+    const catIndet      = checkedCount > 0 && checkedCount < matchingItems.length;
     const catPct        = catPcts[type] ?? null;
     const catProtection = resolveCategoryProtection(type);
     const catProtectionReset = catProtection.inherited ? ''
@@ -672,13 +683,13 @@ function renderCatalog() {
         <span class="cat-chevron">▼</span>
       </div>
       <div class="cat-items">
-        ${filtered.map(item => renderItemRow(item, type)).join('')}
+        ${matchingItems.map(item => renderItemRow(item, type)).join('')}
       </div>`;
 
     // Tri-state
     const catCheck = sec.querySelector('.cat-check');
     if (catIndet) catCheck.indeterminate = true;
-    catCheck.addEventListener('change', e => { e.stopPropagation(); toggleCategory(type, catCheck.checked, filtered); });
+    catCheck.addEventListener('change', e => { e.stopPropagation(); toggleCategory(type, catCheck.checked, matchingItems); });
     catCheck.addEventListener('click', e => e.stopPropagation());
 
     // Expand/collapse
@@ -959,10 +970,50 @@ function updateStats() {
   document.getElementById('statInherit').textContent  = inherit;
   document.getElementById('statOverride').textContent = overrides;
   document.getElementById('statFixed').textContent    = fixed;
+  const allItems = catalog.flatMap(category => category.items);
+  document.getElementById('statUnlisted').textContent = allItems.filter(item => selections.get(item.id)?.checked !== true).length;
+  document.getElementById('statAccepted').textContent = allItems.filter(item => selections.get(item.id)?.isAccepted !== false).length;
+  document.getElementById('statRejected').textContent = allItems.filter(item => selections.get(item.id)?.isAccepted === false).length;
+  syncStatFilterButtons();
 
   const btn = document.getElementById('saveChangesBtn');
   btn.textContent = `Save (${checked.length})`;
 }
+
+function matchesStatFilters(item) {
+  const selection = selections.get(item.id);
+  const listed = selection?.checked === true;
+  const accepted = selection?.isAccepted !== false;
+  const priceType = selection?.override?.price_mode === 'fixed'
+    ? 'fixed'
+    : selection?.override ? 'override' : 'inherit';
+  const listingFilters = statFilters.listing;
+  const priceFilters = statFilters.price;
+  const acceptanceFilters = statFilters.acceptance;
+
+  return (!listingFilters.size || listingFilters.has(listed ? 'listed' : 'unlisted')) &&
+    (!priceFilters.size || priceFilters.has(priceType)) &&
+    (!acceptanceFilters.size || acceptanceFilters.has(accepted ? 'accepted' : 'rejected'));
+}
+
+function syncStatFilterButtons() {
+  document.querySelectorAll('#statPills .stat-pill').forEach(button => {
+    const active = statFilters[button.dataset.filterGroup].has(button.dataset.filterValue);
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+document.querySelectorAll('#statPills .stat-pill').forEach(button => {
+  button.addEventListener('click', () => {
+    const values = statFilters[button.dataset.filterGroup];
+    const value = button.dataset.filterValue;
+    if (values.has(value)) values.delete(value);
+    else values.add(value);
+    syncStatFilterButtons();
+    renderCatalog();
+  });
+});
 
 /* ── Save ─────────────────────────────────────────────────────────────── */
 document.getElementById('saveChangesBtn').addEventListener('click', async () => {

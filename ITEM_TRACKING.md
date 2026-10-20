@@ -633,6 +633,9 @@ limit, so long item lists are abbreviated. Automation then waits for the
 counterpart to remove or change them; it does not add money or continue toward
 acceptance while those items remain. After the trade changes, the normal preview
 and receipt flow runs again.
+The Trade Admin catalog stat pills are toggle filters for listed state, pricing
+mode (inherit, percentage override, or fixed price), and acceptance state; filters
+combine across groups and can be cleared by toggling an active pill off.
 For an enabled, affected percentage-priced item, the same resolved buy percentage is applied to
 that resale ceiling instead of market value, and only when this reduces the
 quote. For example, an 80% buy rate with market value $100 and highest dense level $70
